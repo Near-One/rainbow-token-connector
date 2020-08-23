@@ -11,10 +11,13 @@ contract Locker {
     using ProofDecoder for Borsh.Data;
     using NearDecoder for Borsh.Data;
 
+    INearProver public prover_;
+    bytes public nearTokenFactory_;
+
     // OutcomeReciptId -> Used
     mapping(bytes32 => bool) public usedEvents_;
 
-    function _parseUnlockEvent(bytes memory proofData, uint64 proofBlockHeight) internal pure returns(ProofDecoder.ExecutionStatus memory result) {
+    function _parseUnlockEvent(bytes memory proofData, uint64 proofBlockHeight) internal returns(ProofDecoder.ExecutionStatus memory result) {
         require(prover_.proveOutcome(proofData, proofBlockHeight), "Proof should be valid");
 
         // Unpack the proof and extract the execution outcome.
@@ -26,7 +29,7 @@ contract Locker {
         require(!usedEvents_[receiptId], "The burn event cannot be reused");
         usedEvents_[receiptId] = true;
 
-        require(keccak256(fullOutcomeProof.outcome_proof.outcome_with_id.outcome.executor_id) == keccak256(nearToken_),
+        require(keccak256(fullOutcomeProof.outcome_proof.outcome_with_id.outcome.executor_id) == keccak256(nearTokenFactory_),
         "Can only unlock tokens from the linked mintable fungible token on Near blockchain.");
 
         result = fullOutcomeProof.outcome_proof.outcome_with_id.outcome.status;
@@ -37,9 +40,6 @@ contract Locker {
 
 contract ERC20Locker is Locker {
     using SafeERC20 for IERC20;
-
-    bytes public nearToken_;
-    INearProver public prover_;
 
     event Locked(
         address indexed token,
@@ -62,7 +62,7 @@ contract ERC20Locker is Locker {
     // ERC20Locker is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
     constructor(bytes memory nearTokenFactory, INearProver prover) public {
-        nearToken_ = nearToken;
+        nearTokenFactory_ = nearTokenFactory;
         prover_ = prover;
     }
 

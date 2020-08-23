@@ -4,10 +4,12 @@
     "description": "Generic erc20 locker",
     "license": "MIT",
     "dependencies": {
+        "@openzeppelin/cli": "^2.8.1",
         "@openzeppelin/contracts": "^2.5.1",
-        "@openzeppelin/cli": "^2.8.1"
+        "rainbow-bridge-sol": "https://github.com/near/rainbow-bridge-sol"
     },
     "devDependencies": {
+        "@openzeppelin/test-helpers": "^0.5.5",
         "chai": "^4.2.0",
         "coveralls": "^3.1.0",
         "eslint": "^6.8.0",
@@ -18,7 +20,6 @@
         "eslint-plugin-standard": "^4.0.0",
         "eth-gas-reporter": "^0.2.17",
         "ganache-cli": "^6.9.1",
-        "@openzeppelin/test-helpers": "^0.5.5",
         "solc": "^0.5.17",
         "solidity-coverage": "^0.7.5",
         "solium": "^1.2.5",
@@ -36,4 +37,3 @@
         "lint:fix": "yarn run lint:js:fix && yarn run lint:sol:fix"
     }
 }
-

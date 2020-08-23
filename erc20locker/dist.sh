@@ -14,7 +14,7 @@ do
   contract_name="${filename%.*}"
   npx truffle-flattener "./contracts/${contract_name}.sol" > "dist/${contract_name}.full.sol"
   yarn run solcjs --bin --abi --optimize "dist/${contract_name}.full.sol" -o "dist"
-  mv "dist/dist_${contract_name}_full_sol_${contract_name}.abi" "dist/${contract_name}.full.abi"
-  mv "dist/dist_${contract_name}_full_sol_${contract_name}.bin" "dist/${contract_name}.full.bin"
+  mv "dist/dist_${contract_name}_full_sol_${contract_name}.abi" "../res/${contract_name}.full.abi"
+  mv "dist/dist_${contract_name}_full_sol_${contract_name}.bin" "../res/${contract_name}.full.bin"
   rm -f dist/*_sol_*
 done
