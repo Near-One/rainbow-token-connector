@@ -31,15 +31,17 @@ impl BridgeTokenFactory {
   /// If given token doesn't exist yet in `tokens` map, create new one
   /// Name will be <hex(evm_address)>.<current_id>
   /// Send `mint` action to that token.
-  pub fn deposit();
+  #[payable]
+  pub fn mint(&mut self, proof: Proof);
   
   /// Withdraws funds from NEAR to Ethereum.
   /// This will burn the token in the appropriate BridgeToken contract.
   /// And create an event for Ethereum to unlock the token.
   pub fn withdraw(token_account: AccountId, amount: Balance, recipient: EvmAddress);
 
-  /// Deploys BridgeToken contract to the given address.
-  fn deploy_bridge_token(account_id: AccountId);
+  /// Deploys BridgeToken contract for the given EVM address in hex code.
+  #[payable]
+  pub fn deploy_bridge_token(address: String);
 }
 
 struct BridgeToken {
@@ -67,3 +69,29 @@ impl FungibleToken for BridgeToken {
    ... // see example https://github.com/ilblackdragon/balancer-near/blob/master/balancer-pool/src/lib.rs#L329
 }
 ```
+
+## Setup new ERC20 on NEAR
+
+To setup token contract on NEAR side, anyone can call `<bridge_token_factory>.deploy_bridge_token(<erc20>)` where `<erc20>` is the address of the token.
+With this call must attach the amount of $NEAR to cover storage for (at least 30 $NEAR currently).
+
+This will create `<<hex(erc20)>.<bridge_token_factory>>` NEP21-compatible contract.
+
+## Setup new NEP21 on Ethereum
+
+TODO
+
+## Usage flow Ethereum -> NEAR
+
+1. User sends `<erc20>.approve(<erc20locker>, <amount>)` Ethereum transaction.
+2. User sends `<erc20locker>.lock(<erc20>, <amount>, <destination>)` Ethereum transaction. This transaction will create `Locked` event.
+3. Relayers will be sending Ethereum blocks to the `EthClient` on NEAR side.
+4. After sufficient number of confirmations on top of the mined Ethereum block that contain the `lock` transaction, user or relayer can call `BridgeTokenFactory.mint(proof)`. Proof is the extracted information from the event on Ethereum side.
+5. `BridgeTokenFactory.mint` function will call `EthProver` and verify that proof is correct and relies on a block with sufficient number of confirmations.
+6. `EthProver` will return callback to `BridgeTokenFactory` confirming that proof is correct.
+7. `BridgeTokenFactory` will call `<<hex(erc20)>.<bridge_token_factory>>.mint(<near_account_id>, <amount>)`.
+8. User can use `<<hex(erc20)>.<bridge_token_factory>>` token in other applications now on NEAR.
+
+## Usage flow NEAR -> Ethereum
+
+TODO

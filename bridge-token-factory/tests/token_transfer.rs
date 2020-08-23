@@ -44,5 +44,5 @@ fn deploy_bridge_token() {
     // Fails with not enough deposit.
     factory.deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), 0).unwrap_err();
     // Deploys the contract.
-    factory.deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("30")).unwrap();
+    factory.deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("35")).unwrap();
 }

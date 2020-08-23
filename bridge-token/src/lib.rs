@@ -24,6 +24,7 @@ impl Default for BridgeToken {
 impl BridgeToken {
     #[init]
     pub fn new() -> Self {
+        assert!(!env::state_exists(), "Already initialized");
         Self {
             controller: env::predecessor_account_id(),
             token: Token::new(env::predecessor_account_id(), 0u128),

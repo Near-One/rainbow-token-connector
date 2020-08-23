@@ -18,7 +18,7 @@ const NO_DEPOSIT: Balance = 0;
 
 const BRIDGE_TOKEN_NEW: Gas = 1_000_000_000;
 
-const BRIDGE_TOKEN_INIT_BALANCE: Balance = 1_000;
+const BRIDGE_TOKEN_INIT_BALANCE: Balance = 30_000_000_000_000_000_000_000_000;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -39,8 +39,8 @@ impl Default for BridgeTokenFactory {
     }
 }
 
-//#[ext_contract(ext_bridge_token)]
-//pub trait ExtBridgeToken {
+#[ext_contract(ext_bridge_token)]
+pub trait ExtBridgeToken {
 //    #[result_serializer(borsh)]
 //    fn finish_mint(
 //        &self,
@@ -50,7 +50,7 @@ impl Default for BridgeTokenFactory {
 //        #[serializer(borsh)] new_owner_id: AccountId,
 //        #[serializer(borsh)] amount: U128,
 //    ) -> Promise;
-//}
+}
 
 #[near_bindgen]
 impl BridgeTokenFactory {
@@ -59,12 +59,12 @@ impl BridgeTokenFactory {
     /// `locker_address`: Ethereum address of the locker contract, in hex.
     #[init]
     pub fn new(prover_account: AccountId, locker_address: String) -> Self {
+        assert!(!env::state_exists(), "Already initialized");
         let data =
             hex::decode(locker_address).expect("`locker_address` should be a valid hex string.");
         assert_eq!(data.len(), 20, "`locker_address` should be 20 bytes long");
         let mut locker_address = [0u8; 20];
         locker_address.copy_from_slice(&data);
-        assert!(!env::state_exists(), "Already initialized");
         Self {
             prover_account,
             locker_address,
