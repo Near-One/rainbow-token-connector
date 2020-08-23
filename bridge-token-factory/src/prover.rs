@@ -1,28 +1,33 @@
-use near_sdk::{env, ext_contract, near_bindgen, AccountId, Balance, Promise};
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::{ext_contract, AccountId, Balance};
 
-#[ext_contract(prover)]
-pub trait Prover {
-    #[result_serializer(borsh)]
-    fn verify_log_entry(
-        &self,
-        #[serializer(borsh)] log_index: u64,
-        #[serializer(borsh)] log_entry_data: Vec<u8>,
-        #[serializer(borsh)] receipt_index: u64,
-        #[serializer(borsh)] receipt_data: Vec<u8>,
-        #[serializer(borsh)] header_data: Vec<u8>,
-        #[serializer(borsh)] proof: Vec<Vec<u8>>,
-        #[serializer(borsh)] skip_bridge_call: bool,
-    ) -> bool;
-}
+use eth_types::*;
+use ethabi::{Event, EventParam, Hash, ParamType, RawLog};
+use hex::ToHex;
+
+//#[ext_contract(prover)]
+//pub trait Prover {
+//    #[result_serializer(borsh)]
+//    fn verify_log_entry(
+//        &self,
+//        #[serializer(borsh)] log_index: u64,
+//        #[serializer(borsh)] log_entry_data: Vec<u8>,
+//        #[serializer(borsh)] receipt_index: u64,
+//        #[serializer(borsh)] receipt_data: Vec<u8>,
+//        #[serializer(borsh)] header_data: Vec<u8>,
+//        #[serializer(borsh)] proof: Vec<Vec<u8>>,
+//        #[serializer(borsh)] skip_bridge_call: bool,
+//    ) -> bool;
+//}
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Proof {
-    log_index: u64,
-    log_entry_data: Vec<u8>,
-    receipt_index: u64,
-    receipt_data: Vec<u8>,
-    header_data: Vec<u8>,
-    proof: Vec<Vec<u8>>,
+    pub log_index: u64,
+    pub log_entry_data: Vec<u8>,
+    pub receipt_index: u64,
+    pub receipt_data: Vec<u8>,
+    pub header_data: Vec<u8>,
+    pub proof: Vec<Vec<u8>>,
 }
 
 /// Data that was emitted by the Ethereum event.
@@ -37,10 +42,6 @@ pub struct EthEventData {
 impl EthEventData {
     /// Parse raw log entry data.
     pub fn from_log_entry_data(data: &[u8]) -> Self {
-        use eth_types::*;
-        use ethabi::{Event, EventParam, Hash, ParamType, RawLog};
-        use hex::ToHex;
-
         let event = Event {
             name: "Locked".to_string(),
             inputs: vec![

@@ -1,14 +1,24 @@
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
-use near_sdk::{env, ext_contract, near_bindgen, AccountId, Balance, Promise};
+use near_sdk::collections::UnorderedSet;
+use near_sdk::{env, ext_contract, near_bindgen, AccountId, Balance, Promise, Gas};
 
-mod prover;
+pub mod prover;
+use prover::*;
+
+type EvmAddress = [u8; 20];
 
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 /// Price per 1 byte of storage from mainnet genesis config.
-const STORAGE_PRICE_PER_BYTE: Balance = 100000000000000000000;
+const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
+
+const NO_DEPOSIT: Balance = 0;
+
+const BRIDGE_TOKEN_NEW: Gas = 1_000_000_000;
+
+const BRIDGE_TOKEN_INIT_BALANCE: Balance = 1_000;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -16,7 +26,9 @@ pub struct BridgeTokenFactory {
     /// The account of the prover that we can use to prove
     pub prover_account: AccountId,
     /// Address of the Ethereum locker contract.
-    pub locker_address: [u8; 20],
+    pub locker_address: EvmAddress,
+    /// Set of created BridgeToken contracts.
+    pub tokens: UnorderedSet<String>,
     /// Hashes of the events that were already used.
     pub used_events: UnorderedSet<Vec<u8>>,
 }
@@ -27,18 +39,18 @@ impl Default for BridgeTokenFactory {
     }
 }
 
-#[ext_contract(ext_bridge_token)]
-pub trait ExtBridgeToken {
-    #[result_serializer(borsh)]
-    fn finish_mint(
-        &self,
-        #[callback]
-        #[serializer(borsh)]
-        verification_success: bool,
-        #[serializer(borsh)] new_owner_id: AccountId,
-        #[serializer(borsh)] amount: U128,
-    ) -> Promise;
-}
+//#[ext_contract(ext_bridge_token)]
+//pub trait ExtBridgeToken {
+//    #[result_serializer(borsh)]
+//    fn finish_mint(
+//        &self,
+//        #[callback]
+//        #[serializer(borsh)]
+//        verification_success: bool,
+//        #[serializer(borsh)] new_owner_id: AccountId,
+//        #[serializer(borsh)] amount: U128,
+//    ) -> Promise;
+//}
 
 #[near_bindgen]
 impl BridgeTokenFactory {
@@ -56,14 +68,16 @@ impl BridgeTokenFactory {
         Self {
             prover_account,
             locker_address,
+            tokens: UnorderedSet::new(b"t".to_vec()),
             used_events: UnorderedSet::new(b"u".to_vec()),
         }
     }
 
-    /// Mint the token, increasing the total supply given the proof that the mirror token was locked
-    /// on the Ethereum blockchain.
+    /// Deposit from Ethereum to NEAR based on the proof of the locked tokens.
+    /// Must attach enough NEAR funds to cover for storage of the proof.
+    /// Also if this is first time this token is used, need to attach extra to deploy the BridgeToken contract.
     #[payable]
-    pub fn mint(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
+    pub fn mint(&mut self, #[serializer(borsh)] proof: Proof) {
         let initial_storage = env::storage_usage();
         self.record_proof(&proof);
         let current_storage = env::storage_usage();
@@ -91,25 +105,25 @@ impl BridgeTokenFactory {
         let EthEventData {
             recipient, amount, ..
         } = event;
-        prover::verify_log_entry(
-            log_index,
-            log_entry_data,
-            receipt_index,
-            receipt_data,
-            header_data,
-            proof,
-            false, // Do not skip bridge call. This is only used for development and diagnostics.
-            &self.prover_account,
-            0,
-            env::prepaid_gas() / 3,
-        )
-        .then(ext_fungible_token::finish_mint(
-            recipient,
-            amount.into(),
-            &env::current_account_id(),
-            leftover_deposit,
-            env::prepaid_gas() / 3,
-        ))
+        // prover::verify_log_entry(
+        //     log_index,
+        //     log_entry_data,
+        //     receipt_index,
+        //     receipt_data,
+        //     header_data,
+        //     proof,
+        //     false, // Do not skip bridge call. This is only used for development and diagnostics.
+        //     &self.prover_account,
+        //     0,
+        //     env::prepaid_gas() / 3,
+        // )
+        // .then(ext_fungible_token::finish_mint(
+        //     recipient,
+        //     amount.into(),
+        //     &env::current_account_id(),
+        //     leftover_deposit,
+        //     env::prepaid_gas() / 3,
+        // ))
     }
 
     /// Finish minting once the proof was successfully validated. Can only be called by the contract
@@ -131,12 +145,12 @@ impl BridgeTokenFactory {
         );
         assert!(verification_success, "Failed to verify the proof");
 
-        let mut account = self.get_account(&new_owner_id);
-        let amount: Balance = amount.into();
-        account.balance += amount;
-        self.total_supply += amount;
-        self.set_account(&new_owner_id, &account);
-        self.refund_storage(initial_storage);
+        // let mut account = self.get_account(&new_owner_id);
+        // let amount: Balance = amount.into();
+        // account.balance += amount;
+        // self.total_supply += amount;
+        // self.set_account(&new_owner_id, &account);
+        // self.refund_storage(initial_storage);
     }
 
     /// Burn given amount of tokens and unlock it on the Ethereum side for the recipient address.
@@ -145,11 +159,11 @@ impl BridgeTokenFactory {
     #[result_serializer(borsh)]
     pub fn burn(&mut self, amount: U128, recipient: String) -> (U128, [u8; 20]) {
         let owner = env::predecessor_account_id();
-        let mut account = self.get_account(&owner);
-        assert!(account.balance >= amount.0, "Not enough balance");
-        account.balance -= amount.0;
-        self.total_supply -= amount.0;
-        self.set_account(&owner, &account);
+        // let mut account = self.get_account(&owner);
+        // assert!(account.balance >= amount.0, "Not enough balance");
+        // account.balance -= amount.0;
+        // self.total_supply -= amount.0;
+        // self.set_account(&owner, &account);
         let recipient = hex::decode(recipient).expect("recipient should be a hex");
         assert_eq!(
             recipient.len(),
@@ -172,5 +186,22 @@ impl BridgeTokenFactory {
             "Event cannot be reused for minting."
         );
         self.used_events.insert(&key);
+    }
+
+    #[payable]
+    pub fn deploy_bridge_token(&mut self, address: String) {
+        let data =
+            hex::decode(address.clone()).expect("`address` should be a valid hex string.");
+        assert_eq!(data.len(), 20, "`address` should be 20 bytes long");
+        assert!(!self.tokens.contains(&address), "BridgeToken contract already exists.");
+        let initial_storage = env::storage_usage() as u128;
+        self.tokens.insert(&address);
+        let current_storage = env::storage_usage() as u128;
+        assert!(env::attached_deposit() >= BRIDGE_TOKEN_INIT_BALANCE + STORAGE_PRICE_PER_BYTE * (current_storage - initial_storage), "Not enough attached deposit to complete bridge token creation");
+        let bridge_token_account_id = format!("{}.{}", address, env::current_account_id());
+        Promise::new(bridge_token_account_id)
+            .transfer(BRIDGE_TOKEN_INIT_BALANCE)
+            .deploy_contract(include_bytes!("../../res/bridge_token.wasm").to_vec())
+            .function_call(b"new".to_vec(), b"{}".to_vec(), NO_DEPOSIT, BRIDGE_TOKEN_NEW);
     }
 }

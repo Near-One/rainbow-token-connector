@@ -1,3 +1,5 @@
+.idea
+.vscode
 node_modules
 erc20locker/dist
 yarn-error.log

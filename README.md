@@ -16,7 +16,14 @@ contract ERC20Locker {
 
 ```rust
 struct BridgeTokenFactory {
-    tokens: UnorderedMap<EvmAddress, AccountId>;
+    /// The account of the prover that we can use to prove
+    pub prover_account: AccountId,
+    /// Address of the Ethereum locker contract.
+    pub locker_address: [u8; 20],
+    /// Hashes of the events that were already used.
+    pub used_events: UnorderedSet<Vec<u8>>,
+    /// Mapping from Ethereum tokens to NEAR tokens.
+    pub tokens: UnorderedMap<EvmAddress, AccountId>;
 }
 
 impl BridgeTokenFactory {
@@ -31,13 +38,13 @@ impl BridgeTokenFactory {
   /// And create an event for Ethereum to unlock the token.
   pub fn withdraw(token_account: AccountId, amount: Balance, recipient: EvmAddress);
 
-  // Deploys BridgeToken contract to the given address.
+  /// Deploys BridgeToken contract to the given address.
   fn deploy_bridge_token(account_id: AccountId);
 }
 
 struct BridgeToken {
-   controller: AccountId;
-   token: Token; // uses https://github.com/ilblackdragon/balancer-near/tree/master/near-lib-rs
+   controller: AccountId,
+   token: Token, // uses https://github.com/ilblackdragon/balancer-near/tree/master/near-lib-rs
 }
 
 impl BridgeToken {
@@ -45,12 +52,12 @@ impl BridgeToken {
        Self { controller, token: Token::new() }
    }
 
-   pub fn mint(account_id: AccountId, amount: Balance) {
+   pub fn mint(&mut self, account_id: AccountId, amount: Balance) {
        assert_eq!(env::predecessor_id(), self.controller, "Only controller is allowed to mint the tokens");
        self.token.mint(account_id, amount);
    }
 
-   pub fn burn(account_id: AccountId, amount: Balance) {
+   pub fn burn(&mut self, account_id: AccountId, amount: Balance) {
        assert_eq!(env::predecessor_id(), self.controller, "Only controller is allowed to mint the tokens");
        self.token.burn(account_id, amount);
    }
