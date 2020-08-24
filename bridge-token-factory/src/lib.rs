@@ -44,7 +44,7 @@ impl Default for BridgeTokenFactory {
 #[ext_contract(ext_self)]
 pub trait ExtBridgeTokenFactory {
     #[result_serializer(borsh)]
-    fn finish_mint(
+    fn finish_deposit(
         &self,
         #[callback]
         #[serializer(borsh)]
@@ -57,8 +57,6 @@ pub trait ExtBridgeTokenFactory {
 #[ext_contract(ext_bridge_token)]
 pub trait ExtBridgeToken {
     fn mint(&self, account_id: AccountId, amount: U128) -> Promise;
-
-    fn burn(&self, account_id: AccountId, amount: U128) -> Promise;
 }
 
 fn validate_eth_address(address: String) -> EthAddress {
@@ -90,7 +88,7 @@ impl BridgeTokenFactory {
     /// Must attach enough NEAR funds to cover for storage of the proof.
     /// Also if this is first time this token is used, need to attach extra to deploy the BridgeToken contract.
     #[payable]
-    pub fn mint(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
+    pub fn deposit(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
         let initial_storage = env::storage_usage();
         self.record_proof(&proof);
         let current_storage = env::storage_usage();
@@ -133,7 +131,7 @@ impl BridgeTokenFactory {
              0,
              env::prepaid_gas() / 4,
          )
-         .then(ext_self::finish_mint(
+         .then(ext_self::finish_deposit(
              recipient,
              amount.into(),
              &env::current_account_id(),
@@ -142,10 +140,10 @@ impl BridgeTokenFactory {
          ))
     }
 
-    /// Finish minting once the proof was successfully validated. Can only be called by the contract
+    /// Finish depositing once the proof was successfully validated. Can only be called by the contract
     /// itself.
     #[payable]
-    pub fn finish_mint(
+    pub fn finish_deposit(
         &mut self,
         #[callback]
         #[serializer(borsh)]
@@ -154,7 +152,6 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] new_owner_id: AccountId,
         #[serializer(borsh)] amount: U128,
     ) -> Promise {
-        let initial_storage = env::storage_usage();
         assert_eq!(
             env::predecessor_account_id(),
             env::current_account_id(),
@@ -168,20 +165,19 @@ impl BridgeTokenFactory {
     /// Burn given amount of tokens and unlock it on the Ethereum side for the recipient address.
     /// We return the amount as u128 and the address of the beneficiary as `[u8; 20]` for ease of
     /// processing on Solidity side.
+    /// Caller must be <token_address>.<current_account_id>, where <token_address> exists in the `tokens`.
     #[result_serializer(borsh)]
-    pub fn burn(&mut self, amount: U128, recipient: String) -> (U128, [u8; 20]) {
-        let owner = env::predecessor_account_id();
+    pub fn finish_withdraw(&mut self, amount: U128, recipient: String) -> (U128, [u8; 20], [u8; 20]) {
+        let token = env::predecessor_account_id();
+        let parts: Vec<&str> = token.split(".").collect();
+        assert_eq!(token, format!("{}.{}", parts[0], env::current_account_id()), "Only sub accounts of BridgeTokenFactory can call this method.");
+        assert!(self.tokens.contains(&parts[0].to_string()), "Such BridgeToken does not exist.");
+        let token_address = validate_eth_address(parts[0].to_string());
         let recipient_address = validate_eth_address(recipient);
-        // TODO: call token.
-        // let mut account = self.get_account(&owner);
-        // assert!(account.balance >= amount.0, "Not enough balance");
-        // account.balance -= amount.0;
-        // self.total_supply -= amount.0;
-        // self.set_account(&owner, &account);
-        (amount, recipient_address)
+        (amount, token_address, recipient_address)
     }
 
-    /// Record proof to make sure it is not re-used later for minting.
+    /// Record proof to make sure it is not re-used later for anther deposit.
     fn record_proof(&mut self, proof: &Proof) {
         let mut data = proof.log_index.try_to_vec().unwrap();
         data.extend(proof.receipt_index.try_to_vec().unwrap());
@@ -189,7 +185,7 @@ impl BridgeTokenFactory {
         let key = env::sha256(&data);
         assert!(
             !self.used_events.contains(&key),
-            "Event cannot be reused for minting."
+            "Event cannot be reused for depositing."
         );
         self.used_events.insert(&key);
     }
@@ -227,12 +223,13 @@ mod tests {
     fn alice() -> AccountId {
         "alice.near".to_string()
     }
-    fn bob() -> AccountId {
-        "alice.near".to_string()
-    }
 
     fn prover() -> AccountId {
         "prover".to_string()
+    }
+
+    fn bridge_token_factory() -> AccountId {
+        "bridge".to_string()
     }
 
     fn token_locker() -> String {
@@ -252,7 +249,7 @@ mod tests {
 
     fn get_context(predecessor_account_id: AccountId, attached_deposit: Balance) -> VMContext {
         VMContext {
-            current_account_id: prover(),
+            current_account_id: bridge_token_factory(),
             signer_account_id: predecessor_account_id.clone(),
             signer_account_pk: vec![0, 1, 2],
             predecessor_account_id,
@@ -282,19 +279,30 @@ mod tests {
     
     #[test]
     #[should_panic]
-    fn test_fail_mint_no_token() {
+    fn test_fail_deposit_no_token() {
         testing_env!(get_context(alice(), 0));
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         testing_env!(get_context(alice(), STORAGE_PRICE_PER_BYTE * 1000));
-        contract.mint(sample_proof());
+        contract.deposit(sample_proof());
     }
 
     #[test]
-    fn test_deploy_bridge_token_and_mint() {
+    fn test_deploy_bridge_token_and_deposit() {
         testing_env!(get_context(alice(), 0));
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         testing_env!(get_context(alice(), BRIDGE_TOKEN_INIT_BALANCE * 2));
         contract.deploy_bridge_token(token_locker());
         assert_eq!(contract.get_bridge_token_account_id(token_locker()), format!("{}.{}", token_locker(), prover()));
+    }
+
+    #[test]
+    fn test_finish_withdraw() {
+        testing_env!(get_context(alice(), 0));
+        let mut contract = BridgeTokenFactory::new(prover(), token_locker());
+        testing_env!(get_context(alice(), BRIDGE_TOKEN_INIT_BALANCE * 2));
+        contract.deploy_bridge_token(token_locker());
+        testing_env!(get_context(format!("{}.{}", token_locker(), bridge_token_factory()), 0));
+        let address = validate_eth_address(token_locker());
+        assert_eq!(contract.finish_withdraw(1_000.into(), token_locker()), (1_000.into(), address, address));
     }
 }

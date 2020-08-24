@@ -1,11 +1,13 @@
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
-use near_sdk::{env, near_bindgen, AccountId};
+use near_sdk::{env, near_bindgen, AccountId, Promise, Balance, ext_contract};
 
 use near_lib::token::{FungibleToken, Token};
 
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+
+const NO_DEPOSIT: Balance = 0;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -18,6 +20,16 @@ impl Default for BridgeToken {
     fn default() -> Self {
         panic!("Bridge Token should be initialized before usage")
     }
+}
+
+#[ext_contract(ext_bridge_token_factory)]
+pub trait ExtBridgeTokenFactory {
+    #[result_serializer(borsh)]
+    fn finish_withdraw(
+        &self,
+        #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)] recipient: AccountId,
+    ) -> Promise;
 }
 
 #[near_bindgen]
@@ -40,13 +52,9 @@ impl BridgeToken {
         self.token.mint(account_id, amount.into());
     }
 
-    pub fn burn(&mut self, account_id: AccountId, amount: U128) {
-        assert_eq!(
-            env::predecessor_account_id(),
-            self.controller,
-            "Only controller can call burn"
-        );
-        self.token.burn(account_id, amount.into());
+    pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
+        self.token.burn(env::predecessor_account_id(), amount.into());
+        ext_bridge_token_factory::finish_withdraw(amount.into(), recipient, &self.controller, NO_DEPOSIT, env::prepaid_gas() / 2)
     }
 }
 

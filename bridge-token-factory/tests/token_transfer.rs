@@ -1,14 +1,15 @@
-use near_sdk::borsh::BorshSerialize;
+use borsh::BorshSerialize;
 use near_sdk::{AccountId, Balance};
 use near_test::test_user::{init_test_runtime, to_yocto, TestRuntime, TxResult};
 use serde_json::json;
 
-use bridge_token_factory::prover::Proof;
+use bridge_token_factory::prover::{Proof, EthEventData};
 
 const PROVER: &str = "prover";
 const FACTORY: &str = "bridge";
 const LOCKER_ADDRESS: &str = "6b175474e89094c44da98b954eedeac495271d0f";
 const DAI_ADDRESS: &str = "6b175474e89094c44da98b954eedeac495271d0f";
+const ALICE: &str = "alice";
 
 lazy_static::lazy_static! {
     static ref FACTORY_WASM_BYTES: &'static [u8] = include_bytes!("../../res/bridge_token_factory.wasm").as_ref();
@@ -37,13 +38,13 @@ impl BridgeTokenFactory {
         Self { contract_id }
     }
 
-    pub fn mint(&self, runtime: &mut TestRuntime, signer_id: &AccountId, proof: Proof) -> TxResult {
-        runtime.call(
+    pub fn deposit(&self, runtime: &mut TestRuntime, signer_id: &AccountId, proof: Proof) -> TxResult {
+        runtime.call_args(
             signer_id.clone(),
             self.contract_id.clone(),
-            "mint",
-            json!({"proof": proof.try_to_vec().unwrap()}),
-            0,
+            "deposit",
+            proof.try_to_vec().unwrap(),
+            to_yocto("1"),
         )
     }
 
@@ -75,14 +76,6 @@ fn deploy_bridge_token() {
         PROVER.to_string(),
         LOCKER_ADDRESS.to_string(),
     );
-    let proof = Proof {
-        log_index: 0,
-        log_entry_data: vec![],
-        receipt_index: 0,
-        receipt_data: vec![],
-        header_data: vec![],
-        proof: vec![],
-    };
     // Fails with not enough deposit.
     factory
         .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), 0)
@@ -91,4 +84,17 @@ fn deploy_bridge_token() {
     factory
         .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("35"))
         .unwrap();
+
+    let data = hex::decode(LOCKER_ADDRESS).unwrap();
+    let mut locker_address= [0u8; 20];
+    locker_address.copy_from_slice(&data);
+    let proof = Proof {
+        log_index: 0,
+        log_entry_data: EthEventData { locker_address, token: DAI_ADDRESS.to_string(), sender: "6b175474e89094c44da98b954eedeac495271d0f".to_string(), amount: 1_000, recipient: ALICE.to_string() }.to_log_entry_data(),
+        receipt_index: 0,
+        receipt_data: vec![],
+        header_data: vec![],
+        proof: vec![],
+    };
+    factory.deposit(&mut runtime, &root, proof).unwrap();
 }

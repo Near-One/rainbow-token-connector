@@ -95,6 +95,15 @@ impl EthEventData {
             recipient,
         }
     }
+
+    pub fn to_log_entry_data(&self) -> Vec<u8> {
+        let log_entry = LogEntry {
+            address: self.locker_address.into(),
+            topics: vec![],
+            data: vec![],
+        };
+        rlp::encode(&log_entry)
+    }
 }
 
 impl std::fmt::Display for EthEventData {
