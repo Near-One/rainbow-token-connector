@@ -20,7 +20,9 @@ overflow-checks = true
 [dependencies]
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
-near-sdk = "1.0.0"
+near-sdk = "0.11.0"
+borsh = "0.6.2"
+# near-sdk = "1.0.0"
 uint = { version = "0.8.3", default-features = false }
 wee_alloc = { version = "0.4.5", default-features = false, features = [] }
 near-lib = { git = "https://github.com/ilblackdragon/balancer-near" }

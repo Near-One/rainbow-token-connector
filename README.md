@@ -27,21 +27,27 @@ struct BridgeTokenFactory {
 }
 
 impl BridgeTokenFactory {
-  /// Relays the lock event from Ethereum.
-  /// If given token doesn't exist yet in `tokens` map, create new one
-  /// Name will be <hex(evm_address)>.<current_id>
-  /// Send `mint` action to that token.
-  #[payable]
-  pub fn mint(&mut self, proof: Proof);
-  
-  /// Withdraws funds from NEAR to Ethereum.
-  /// This will burn the token in the appropriate BridgeToken contract.
-  /// And create an event for Ethereum to unlock the token.
-  pub fn withdraw(token_account: AccountId, amount: Balance, recipient: EvmAddress);
+    /// Initializes the contract.
+    /// `prover_account`: NEAR account of the Near Prover contract;
+    /// `locker_address`: Ethereum address of the locker contract, in hex.
+    #[init]
+    pub fn new(prover_account: AccountId, locker_address: String) -> Self;
 
-  /// Deploys BridgeToken contract for the given EVM address in hex code.
-  #[payable]
-  pub fn deploy_bridge_token(address: String);
+    /// Relays the lock event from Ethereum.
+    /// Uses prover to validate that proof is correct and relies on a canonical Ethereum chain.
+    /// Send `mint` action to the token that is specified in the proof.
+    #[payable]
+    pub fn mint(&mut self, proof: Proof);
+  
+    /// Withdraws funds from NEAR to Ethereum.
+    /// This will burn the token in the appropriate BridgeToken contract.
+    /// And create an event for Ethereum to unlock the token.
+    pub fn withdraw(token_account: AccountId, amount: Balance, recipient: EvmAddress);
+    
+    /// Deploys BridgeToken contract for the given EVM address in hex code.
+    /// The name of new NEP21 compatible contract will be <hex(evm_address)>.<current_id>.
+    #[payable]
+    pub fn deploy_bridge_token(address: String);
 }
 
 struct BridgeToken {

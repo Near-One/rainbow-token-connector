@@ -1,24 +1,25 @@
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use borsh::{BorshDeserialize, BorshSerialize};
+//use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{ext_contract, AccountId, Balance};
 
 use eth_types::*;
 use ethabi::{Event, EventParam, Hash, ParamType, RawLog};
 use hex::ToHex;
 
-//#[ext_contract(prover)]
-//pub trait Prover {
-//    #[result_serializer(borsh)]
-//    fn verify_log_entry(
-//        &self,
-//        #[serializer(borsh)] log_index: u64,
-//        #[serializer(borsh)] log_entry_data: Vec<u8>,
-//        #[serializer(borsh)] receipt_index: u64,
-//        #[serializer(borsh)] receipt_data: Vec<u8>,
-//        #[serializer(borsh)] header_data: Vec<u8>,
-//        #[serializer(borsh)] proof: Vec<Vec<u8>>,
-//        #[serializer(borsh)] skip_bridge_call: bool,
-//    ) -> bool;
-//}
+#[ext_contract(ext_prover)]
+pub trait Prover {
+    #[result_serializer(borsh)]
+    fn verify_log_entry(
+        &self,
+        #[serializer(borsh)] log_index: u64,
+        #[serializer(borsh)] log_entry_data: Vec<u8>,
+        #[serializer(borsh)] receipt_index: u64,
+        #[serializer(borsh)] receipt_data: Vec<u8>,
+        #[serializer(borsh)] header_data: Vec<u8>,
+        #[serializer(borsh)] proof: Vec<Vec<u8>>,
+        #[serializer(borsh)] skip_bridge_call: bool,
+    ) -> bool;
+}
 
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct Proof {
