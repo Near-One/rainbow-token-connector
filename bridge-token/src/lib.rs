@@ -32,12 +32,20 @@ impl BridgeToken {
     }
 
     pub fn mint(&mut self, account_id: AccountId, amount: U128) {
-        assert_eq!(env::predecessor_account_id(), self.controller, "Only controller can call mint");
+        assert_eq!(
+            env::predecessor_account_id(),
+            self.controller,
+            "Only controller can call mint"
+        );
         self.token.mint(account_id, amount.into());
     }
 
     pub fn burn(&mut self, account_id: AccountId, amount: U128) {
-        assert_eq!(env::predecessor_account_id(), self.controller, "Only controller can call burn");
+        assert_eq!(
+            env::predecessor_account_id(),
+            self.controller,
+            "Only controller can call burn"
+        );
         self.token.burn(account_id, amount.into());
     }
 }
