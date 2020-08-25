@@ -10,6 +10,7 @@ impl MockProver {
     #[init]
     pub fn new() -> Self { MockProver {} }
 
+    #[result_serializer(borsh)]
     pub fn verify_log_entry(
         &self,
         #[serializer(borsh)] _log_index: u64,

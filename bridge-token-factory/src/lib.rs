@@ -18,8 +18,10 @@ const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000;
 
 const NO_DEPOSIT: Balance = 0;
 
-const BRIDGE_TOKEN_NEW: Gas = 1_000_000_000;
+/// Gas to initialize BridgeToken contract.
+const BRIDGE_TOKEN_NEW: Gas = 10_000_000_000_000;
 
+/// Initial balance for the BridgeToken contract to cover storage and related.
 const BRIDGE_TOKEN_INIT_BALANCE: Balance = 30_000_000_000_000_000_000_000_000;
 
 #[near_bindgen]
@@ -161,7 +163,7 @@ impl BridgeTokenFactory {
         );
         assert!(verification_success, "Failed to verify the proof");
 
-        ext_bridge_token::mint(new_owner_id, amount.into(), &self.get_bridge_token_account_id(token), NO_DEPOSIT, env::prepaid_gas() / 4)
+        ext_bridge_token::mint(new_owner_id, amount.into(), &self.get_bridge_token_account_id(token), NO_DEPOSIT, env::prepaid_gas() / 2)
     }
 
     /// Burn given amount of tokens and unlock it on the Ethereum side for the recipient address.
@@ -193,7 +195,7 @@ impl BridgeTokenFactory {
     }
 
     #[payable]
-    pub fn deploy_bridge_token(&mut self, address: String) {
+    pub fn deploy_bridge_token(&mut self, address: String) -> Promise {
         let _ = validate_eth_address(address.clone());
         assert!(!self.tokens.contains(&address), "BridgeToken contract already exists.");
         let initial_storage = env::storage_usage() as u128;
@@ -202,9 +204,10 @@ impl BridgeTokenFactory {
         assert!(env::attached_deposit() >= BRIDGE_TOKEN_INIT_BALANCE + STORAGE_PRICE_PER_BYTE * (current_storage - initial_storage), "Not enough attached deposit to complete bridge token creation");
         let bridge_token_account_id = format!("{}.{}", address, env::current_account_id());
         Promise::new(bridge_token_account_id)
+            .create_account()
             .transfer(BRIDGE_TOKEN_INIT_BALANCE)
             .deploy_contract(include_bytes!("../../res/bridge_token.wasm").to_vec())
-            .function_call(b"new".to_vec(), b"{}".to_vec(), NO_DEPOSIT, BRIDGE_TOKEN_NEW);
+            .function_call(b"new".to_vec(), b"{}".to_vec(), NO_DEPOSIT, BRIDGE_TOKEN_NEW)
     }
 
     pub fn get_bridge_token_account_id(&self, address: String) -> AccountId {
