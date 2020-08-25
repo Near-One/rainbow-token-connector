@@ -12,6 +12,7 @@ const DAI_ADDRESS: &str = "6b175474e89094c44da98b954eedeac495271d0f";
 const ALICE: &str = "alice";
 
 lazy_static::lazy_static! {
+    static ref MOCK_PROVER_WASM_BYTES: &'static [u8] = include_bytes!("../../res/mock_prover.wasm").as_ref();
     static ref FACTORY_WASM_BYTES: &'static [u8] = include_bytes!("../../res/bridge_token_factory.wasm").as_ref();
 }
 
@@ -69,6 +70,14 @@ impl BridgeTokenFactory {
 fn deploy_bridge_token() {
     let mut runtime = init_test_runtime();
     let root = "root".to_string();
+    let _ = runtime
+        .deploy(
+            root.clone(),
+            PROVER.to_string(),
+            &MOCK_PROVER_WASM_BYTES,
+            json!({}),
+        )
+        .unwrap();
     let factory = BridgeTokenFactory::new(
         &mut runtime,
         &root,

@@ -1,0 +1,27 @@
+[package]
+name = "mock-prover"
+version = "0.1.0"
+authors = ["Near Inc <hello@near.org>"]
+edition = "2018"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[profile.release]
+codegen-units = 1
+# Tell `rustc` to optimize for small code size.
+opt-level = "z"
+lto = true
+debug = false
+panic = "abort"
+overflow-checks = true
+
+[dependencies]
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
+near-sdk = "0.11.0"
+borsh = "0.6.2"
+uint = { version = "0.8.3", default-features = false }
+wee_alloc = { version = "0.4.5", default-features = false, features = [] }
+near-lib = { git = "https://github.com/ilblackdragon/balancer-near" }

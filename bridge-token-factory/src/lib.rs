@@ -49,6 +49,7 @@ pub trait ExtBridgeTokenFactory {
         #[callback]
         #[serializer(borsh)]
         verification_success: bool,
+        #[serializer(borsh)] token: String,
         #[serializer(borsh)] new_owner_id: AccountId,
         #[serializer(borsh)] amount: U128,
     ) -> Promise;
@@ -132,6 +133,7 @@ impl BridgeTokenFactory {
              env::prepaid_gas() / 4,
          )
          .then(ext_self::finish_deposit(
+             event.token,
              recipient,
              amount.into(),
              &env::current_account_id(),
@@ -148,7 +150,7 @@ impl BridgeTokenFactory {
         #[callback]
         #[serializer(borsh)]
         verification_success: bool,
-        #[serializer(borsh)] address: String,
+        #[serializer(borsh)] token: String,
         #[serializer(borsh)] new_owner_id: AccountId,
         #[serializer(borsh)] amount: U128,
     ) -> Promise {
@@ -159,7 +161,7 @@ impl BridgeTokenFactory {
         );
         assert!(verification_success, "Failed to verify the proof");
 
-        ext_bridge_token::mint(new_owner_id, amount.into(), &self.get_bridge_token_account_id(address), NO_DEPOSIT, env::prepaid_gas() / 4)
+        ext_bridge_token::mint(new_owner_id, amount.into(), &self.get_bridge_token_account_id(token), NO_DEPOSIT, env::prepaid_gas() / 4)
     }
 
     /// Burn given amount of tokens and unlock it on the Ethereum side for the recipient address.
