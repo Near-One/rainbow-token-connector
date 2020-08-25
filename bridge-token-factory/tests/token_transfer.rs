@@ -25,6 +25,14 @@ impl BridgeToken {
     pub fn get_balance(&self, runtime: &mut TestRuntime, owner: String) -> String {
         runtime.view(self.contract_id.clone(), "get_balance", json!({"owner_id": owner})).as_str().unwrap().to_string()
     }
+
+    pub fn mint(&self, runtime: &mut TestRuntime, signer_id: AccountId, account_id: AccountId, amount: String) -> TxResult {
+        runtime.call(signer_id, self.contract_id.clone(), "mint", json!({"amount": amount, "account_id": account_id}), 0)
+    }
+
+    pub fn withdraw(&self, runtime: &mut TestRuntime, signer_id: AccountId, amount: String, recipient: String) -> TxResult {
+        runtime.call(signer_id, self.contract_id.clone(), "withdraw", json!({"amount": amount, "recipient": recipient}), 0)
+    }
 }
 
 pub struct BridgeTokenFactory {
@@ -123,6 +131,7 @@ fn setup_token_factory() -> (TestRuntime, BridgeTokenFactory) {
 fn test_token_transfer() {
     let (mut runtime, factory) = setup_token_factory();
     let root = "root".to_string();
+    runtime.create_user(root.clone(), ALICE.to_string(), to_yocto("1"));
 
     factory
         .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("35"))
@@ -156,6 +165,24 @@ fn test_token_transfer() {
     factory.deposit(&mut runtime, &root, proof).unwrap();
 
     assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "1000");
+
+    token.withdraw(&mut runtime, ALICE.to_string(), "100".to_string(), SENDER_ADDRESS.to_string()).unwrap();
+}
+
+#[test]
+fn test_bridge_token_failures() {
+    let (mut runtime, factory) = setup_token_factory();
+    let root = "root".to_string();
+    factory
+        .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("35"))
+        .unwrap();
+    let token = BridgeToken { contract_id: format!("{}.{}", DAI_ADDRESS, FACTORY) };
+
+    // Fail to withdraw because no coins.
+    token.withdraw(&mut runtime, root.clone(), "100".to_string(), SENDER_ADDRESS.to_string()).unwrap_err();
+
+    // Fail to mint because sender is not controller.
+    token.mint(&mut runtime, root.clone(), ALICE.to_string(), "100".to_string()).unwrap_err();
 }
 
 /// TODO: instead of just unwrap_err check the specific errors.

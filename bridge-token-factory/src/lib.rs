@@ -220,8 +220,9 @@ impl BridgeTokenFactory {
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
-    use near_sdk::{testing_env, VMContext};
+    use near_sdk::testing_env;
     use near_sdk::MockedBlockchain;
+    use near_test::context::VMContextBuilder;
 
     use super::*;
 
@@ -252,61 +253,40 @@ mod tests {
         }
     }
 
-    fn get_context(predecessor_account_id: AccountId, attached_deposit: Balance) -> VMContext {
-        VMContext {
-            current_account_id: bridge_token_factory(),
-            signer_account_id: predecessor_account_id.clone(),
-            signer_account_pk: vec![0, 1, 2],
-            predecessor_account_id,
-            input: vec![],
-            block_index: 0,
-            block_timestamp: 0,
-            account_balance: 1_000_000_000_000_000_000_000_000_000u128,
-            account_locked_balance: 0,
-            storage_usage: 10u64.pow(6),
-            attached_deposit,
-            prepaid_gas: 10u64.pow(18),
-            random_seed: vec![0, 1, 2],
-            is_view: false,
-            output_data_receivers: vec![],
-            epoch_height: 0,
-        }
-    }
-
     #[test]
     #[should_panic]
     fn test_fail_deploy_bridge_token() {
-        testing_env!(get_context(alice(), 0));
+        testing_env!(VMContextBuilder::new().predecessor_account_id(alice()).finish());
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
-        testing_env!(get_context(alice(), BRIDGE_TOKEN_INIT_BALANCE));
+        testing_env!(VMContextBuilder::new().predecessor_account_id(alice()).attached_deposit(BRIDGE_TOKEN_INIT_BALANCE).finish());
         contract.deploy_bridge_token(token_locker());
     }
     
     #[test]
     #[should_panic]
     fn test_fail_deposit_no_token() {
-        testing_env!(get_context(alice(), 0));
+        testing_env!(VMContextBuilder::new().predecessor_account_id(alice()).finish());
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
-        testing_env!(get_context(alice(), STORAGE_PRICE_PER_BYTE * 1000));
+        testing_env!(VMContextBuilder::new().predecessor_account_id(alice()).attached_deposit(STORAGE_PRICE_PER_BYTE * 1000).finish());
         contract.deposit(sample_proof());
     }
 
     #[test]
     fn test_deploy_bridge_token_and_deposit() {
-        testing_env!(get_context(alice(), 0));
+        testing_env!(VMContextBuilder::new().predecessor_account_id(alice()).finish());
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
-        testing_env!(get_context(alice(), BRIDGE_TOKEN_INIT_BALANCE * 2));
+        testing_env!(VMContextBuilder::new().current_account_id(bridge_token_factory()).predecessor_account_id(alice()).attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2).finish());
         contract.deploy_bridge_token(token_locker());
         assert_eq!(contract.get_bridge_token_account_id(token_locker()), format!("{}.{}", token_locker(), bridge_token_factory()));
     }
 
     #[test]
     fn test_finish_withdraw() {
-        testing_env!(get_context(alice(), 0));
+        testing_env!(VMContextBuilder::new().predecessor_account_id(alice()).finish());
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
-        testing_env!(get_context(alice(), BRIDGE_TOKEN_INIT_BALANCE * 2));
+        testing_env!(VMContextBuilder::new().predecessor_account_id(alice()).attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2).finish());
         contract.deploy_bridge_token(token_locker());
-        testing_env!(get_context(format!("{}.{}", token_locker(), bridge_token_factory()), 0));
+        testing_env!(VMContextBuilder::new().current_account_id(bridge_token_factory()).predecessor_account_id(format!("{}.{}", token_locker(), bridge_token_factory())).finish());
         let address = validate_eth_address(token_locker());
         assert_eq!(contract.finish_withdraw(1_000.into(), token_locker()), (1_000.into(), address, address));
     }

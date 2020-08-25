@@ -251,7 +251,7 @@ dependencies = [
  "hex",
  "lazy_static",
  "near-lib",
- "near-sdk 0.11.0",
+ "near-sdk",
  "near-test",
  "rlp",
  "serde",
@@ -563,7 +563,7 @@ dependencies = [
  "borsh 0.6.2",
  "derive_more",
  "ethereum-types",
- "near-sdk 0.11.0",
+ "near-sdk",
  "rlp",
  "rlp-derive",
  "serde",
@@ -932,10 +932,10 @@ dependencies = [
 [[package]]
 name = "near-lib"
 version = "0.1.0"
-source = "git+https://github.com/ilblackdragon/balancer-near#ce15ce9b20b5de4e91c1eb46acf89e04ef8ecd77"
+source = "git+https://github.com/ilblackdragon/balancer-near#c5ed67458a505839825e49f8a5a75210fe30e826"
 dependencies = [
  "borsh 0.6.2",
- "near-sdk 0.11.0",
+ "near-sdk",
  "serde",
  "serde_json",
 ]
@@ -1066,16 +1066,6 @@ dependencies = [
 
 [[package]]
 name = "near-runtime-fees"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9d21fc1e813f9ee1cd1b6c9ef51de044bad1515f76d4d10228310cfcbab769d"
-dependencies = [
- "num-rational",
- "serde",
-]
-
-[[package]]
-name = "near-runtime-fees"
 version = "1.2.0"
 source = "git+https://github.com/nearprotocol/nearcore.git#c2b0fc1349118fbe5d6632928df4054970babe0f"
 dependencies = [
@@ -1106,26 +1096,9 @@ dependencies = [
  "borsh 0.6.2",
  "bs58",
  "near-runtime-fees 0.9.1",
- "near-sdk-macros 0.11.0",
+ "near-sdk-macros",
  "near-vm-logic 0.9.1",
  "serde",
-]
-
-[[package]]
-name = "near-sdk"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9029864061ff35b166072d9f407d91da4c76cfd0a190913fa5576148c6b0be45"
-dependencies = [
- "base64",
- "borsh 0.7.0",
- "bs58",
- "near-runtime-fees 1.0.0",
- "near-sdk-macros 1.0.0",
- "near-vm-logic 1.0.0",
- "serde",
- "serde_json",
- "wee_alloc",
 ]
 
 [[package]]
@@ -1141,36 +1114,12 @@ dependencies = [
 ]
 
 [[package]]
-name = "near-sdk-core"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e3adcdcb947537027bf3ac8b3e89079abab8b1ecef257debaf5352d97157756"
-dependencies = [
- "Inflector",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "near-sdk-macros"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "27c06b45c56028b0e1241b2196397d449091665f3f08d543415373505df5e05f"
 dependencies = [
- "near-sdk-core 0.11.0",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "near-sdk-macros"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aca63d45c527d8053d42ecc747fb1fb73555350f1b0e0fb1e7f76ed2fabd6266"
-dependencies = [
- "near-sdk-core 1.0.0",
+ "near-sdk-core",
  "proc-macro2",
  "quote",
  "syn",
@@ -1201,14 +1150,15 @@ dependencies = [
 [[package]]
 name = "near-test"
 version = "0.1.0"
-source = "git+https://github.com/ilblackdragon/balancer-near#ce15ce9b20b5de4e91c1eb46acf89e04ef8ecd77"
+source = "git+https://github.com/ilblackdragon/balancer-near#c5ed67458a505839825e49f8a5a75210fe30e826"
 dependencies = [
+ "borsh 0.6.2",
  "env_logger",
  "log",
  "near-crypto",
  "near-primitives",
  "near-runtime-standalone",
- "near-sdk 1.0.0",
+ "near-sdk",
  "quickcheck",
  "quickcheck_macros",
  "serde",
@@ -1222,17 +1172,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "386c2c07ef37ae52ad43860ef69c6322bbc1e610ae0c08c1d7f5ff56f4c28e6a"
 dependencies = [
  "borsh 0.6.2",
- "near-rpc-error-macro 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde",
-]
-
-[[package]]
-name = "near-vm-errors"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edcd99bfd53a61a5a10989ea492f9648bd4392c6cbf16cbf7b9c1d284ae73f97"
-dependencies = [
- "borsh 0.7.0",
  "near-rpc-error-macro 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
 ]
@@ -1258,22 +1197,6 @@ dependencies = [
  "byteorder",
  "near-runtime-fees 0.9.1",
  "near-vm-errors 0.9.1",
- "serde",
- "sha2",
- "sha3",
-]
-
-[[package]]
-name = "near-vm-logic"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b9685dae19123fba499b4e98f44b800b5d9494a8afd3b3717a8eef775123f6b"
-dependencies = [
- "base64",
- "bs58",
- "byteorder",
- "near-runtime-fees 1.0.0",
- "near-vm-errors 1.0.0",
  "serde",
  "sha2",
  "sha3",
