@@ -98,8 +98,7 @@ impl BridgeTokenFactory {
     }
 }
 
-#[test]
-fn deploy_bridge_token() {
+fn setup_token_factory() -> (TestRuntime, BridgeTokenFactory) {
     let mut runtime = init_test_runtime();
     let root = "root".to_string();
     let _ = runtime
@@ -117,11 +116,14 @@ fn deploy_bridge_token() {
         PROVER.to_string(),
         LOCKER_ADDRESS.to_string(),
     );
-    // Fails with not enough deposit.
-    factory
-        .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), 0)
-        .unwrap_err();
-    // Deploys the contract.
+    (runtime, factory)
+}
+
+#[test]
+fn test_token_transfer() {
+    let (mut runtime, factory) = setup_token_factory();
+    let root = "root".to_string();
+
     factory
         .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("35"))
         .unwrap();
@@ -145,7 +147,7 @@ fn deploy_bridge_token() {
             amount: 1_000,
             recipient: ALICE.to_string(),
         }
-        .to_log_entry_data(),
+            .to_log_entry_data(),
         receipt_index: 0,
         receipt_data: vec![],
         header_data: vec![],
@@ -154,4 +156,29 @@ fn deploy_bridge_token() {
     factory.deposit(&mut runtime, &root, proof).unwrap();
 
     assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "1000");
+}
+
+/// TODO: instead of just unwrap_err check the specific errors.
+#[test]
+fn test_deploy_failures() {
+    let (mut runtime, factory) = setup_token_factory();
+    let root = "root".to_string();
+
+    // Fails with not enough deposit.
+    factory
+        .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), 0)
+        .unwrap_err();
+
+    // Fails with address is invalid.
+    factory
+        .deploy_bridge_token(&mut runtime, &root, "not_a_hex".to_string(), to_yocto("100"))
+        .unwrap_err();
+
+    // Fails second time because already exists.
+    factory
+        .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("35"))
+        .unwrap();
+    factory
+        .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("35"))
+        .unwrap_err();
 }
