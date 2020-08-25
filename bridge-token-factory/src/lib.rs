@@ -292,7 +292,7 @@ mod tests {
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         testing_env!(get_context(alice(), BRIDGE_TOKEN_INIT_BALANCE * 2));
         contract.deploy_bridge_token(token_locker());
-        assert_eq!(contract.get_bridge_token_account_id(token_locker()), format!("{}.{}", token_locker(), prover()));
+        assert_eq!(contract.get_bridge_token_account_id(token_locker()), format!("{}.{}", token_locker(), bridge_token_factory()));
     }
 
     #[test]
