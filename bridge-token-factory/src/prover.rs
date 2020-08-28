@@ -35,9 +35,9 @@ pub struct Proof {
     pub proof: Vec<Vec<u8>>,
 }
 
-/// Data that was emitted by the Ethereum event.
+/// Data that was emitted by the Ethereum Locked event.
 #[derive(Debug, Eq, PartialEq)]
-pub struct EthEventData {
+pub struct EthLockedEvent {
     pub locker_address: [u8; 20],
     pub token: String,
     pub sender: String,
@@ -45,7 +45,7 @@ pub struct EthEventData {
     pub recipient: AccountId,
 }
 
-impl EthEventData {
+impl EthLockedEvent {
     fn event() -> Event {
         Event {
             name: "Locked".to_string(),
@@ -76,7 +76,7 @@ impl EthEventData {
     }
     /// Parse raw log entry data.
     pub fn from_log_entry_data(data: &[u8]) -> Self {
-        let event = EthEventData::event();
+        let event = EthLockedEvent::event();
         let log_entry: LogEntry = rlp::decode(data).expect("Invalid RLP");
         let locker_address = (log_entry.address.clone().0).0;
         let raw_log = RawLog {
@@ -104,7 +104,7 @@ impl EthEventData {
     }
 
     pub fn to_log_entry_data(&self) -> Vec<u8> {
-        let event = EthEventData::event();
+        let event = EthLockedEvent::event();
         let token = hex::decode(self.token.clone()).unwrap();
         let sender = hex::decode(self.sender.clone()).unwrap();
         let params: Vec<ParamType> = event.inputs.iter().map(|p| p.kind.clone()).collect();
@@ -124,7 +124,7 @@ impl EthEventData {
     }
 }
 
-impl std::fmt::Display for EthEventData {
+impl std::fmt::Display for EthLockedEvent {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -156,9 +156,9 @@ mod tests {
 
     #[test]
     fn test_event_data() {
-         let event_data = EthEventData { locker_address: [0u8; 20], token: "6b175474e89094c44da98b954eedeac495271d0f".to_string(), sender: "00005474e89094c44da98b954eedeac495271d0f".to_string(), amount: 1000, recipient: "123".to_string() };
+         let event_data = EthLockedEvent { locker_address: [0u8; 20], token: "6b175474e89094c44da98b954eedeac495271d0f".to_string(), sender: "00005474e89094c44da98b954eedeac495271d0f".to_string(), amount: 1000, recipient: "123".to_string() };
          let data = event_data.to_log_entry_data();
-         let result = EthEventData::from_log_entry_data(&data);
+         let result = EthLockedEvent::from_log_entry_data(&data);
         assert_eq!(result, event_data);
     }
 }

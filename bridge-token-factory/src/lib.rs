@@ -1,8 +1,10 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use near_sdk::{AccountId, Balance, env, ext_contract, Gas, near_bindgen, Promise};
+use near_sdk::{AccountId, Balance, env, ext_contract, Gas, near_bindgen, Promise, PromiseResult};
 // use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedSet;
 use near_sdk::json_types::U128;
+
+use near_lib::token::ext_nep21;
 
 use prover::*;
 
@@ -23,6 +25,8 @@ const BRIDGE_TOKEN_NEW: Gas = 10_000_000_000_000;
 
 /// Initial balance for the BridgeToken contract to cover storage and related.
 const BRIDGE_TOKEN_INIT_BALANCE: Balance = 30_000_000_000_000_000_000_000_000;
+
+const TRANSFER_FROM_GAS: Gas = 10_000_000_000_000;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -53,8 +57,16 @@ pub trait ExtBridgeTokenFactory {
         verification_success: bool,
         #[serializer(borsh)] token: String,
         #[serializer(borsh)] new_owner_id: AccountId,
-        #[serializer(borsh)] amount: U128,
+        #[serializer(borsh)] amount: Balance,
     ) -> Promise;
+
+    #[result_serializer(borsh)]
+    fn finish_lock(
+        &self,
+        #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)] recipient: [u8; 20],
+        #[serializer(borsh)] token: String,
+    ) -> (U128, [u8; 20], String);
 }
 
 #[ext_contract(ext_bridge_token)]
@@ -69,6 +81,22 @@ fn validate_eth_address(address: String) -> EthAddress {
     let mut result  = [0u8; 20];
     result.copy_from_slice(&data);
     result
+}
+
+pub fn assert_self() {
+    assert_eq!(env::predecessor_account_id(), env::current_account_id());
+}
+
+pub fn is_promise_success() -> bool {
+    assert_eq!(
+        env::promise_results_count(),
+        1,
+        "Contract expected a result on the callback"
+    );
+    match env::promise_result(0) {
+        PromiseResult::Successful(_) => true,
+        _ => false,
+    }
 }
 
 #[near_bindgen]
@@ -107,7 +135,7 @@ impl BridgeTokenFactory {
             header_data,
             proof,
         } = proof;
-        let event = EthEventData::from_log_entry_data(&log_entry_data);
+        let event = EthLockedEvent::from_log_entry_data(&log_entry_data);
         assert_eq!(
             event.locker_address,
             self.locker_address,
@@ -119,7 +147,7 @@ impl BridgeTokenFactory {
             self.tokens.contains(&event.token), "Bridge token for {} is not deployed yet", event.token
         );
         env::log(format!("{}", event).as_bytes());
-        let EthEventData {
+        let EthLockedEvent {
             recipient, amount, ..
         } = event;
          ext_prover::verify_log_entry(
@@ -131,13 +159,13 @@ impl BridgeTokenFactory {
              proof,
              false, // Do not skip bridge call. This is only used for development and diagnostics.
              &self.prover_account,
-             0,
+             NO_DEPOSIT,
              env::prepaid_gas() / 4,
          )
          .then(ext_self::finish_deposit(
              event.token,
              recipient,
-             amount.into(),
+             amount,
              &env::current_account_id(),
              leftover_deposit,
              env::prepaid_gas() / 2,
@@ -154,13 +182,9 @@ impl BridgeTokenFactory {
         verification_success: bool,
         #[serializer(borsh)] token: String,
         #[serializer(borsh)] new_owner_id: AccountId,
-        #[serializer(borsh)] amount: U128,
+        #[serializer(borsh)] amount: Balance,
     ) -> Promise {
-        assert_eq!(
-            env::predecessor_account_id(),
-            env::current_account_id(),
-            "Finish transfer is only allowed to be called by the contract itself"
-        );
+        assert_self();
         assert!(verification_success, "Failed to verify the proof");
 
         ext_bridge_token::mint(new_owner_id, amount.into(), &self.get_bridge_token_account_id(token), NO_DEPOSIT, env::prepaid_gas() / 2)
@@ -214,6 +238,26 @@ impl BridgeTokenFactory {
         let _ = validate_eth_address(address.clone());
         assert!(self.tokens.contains(&address), "BridgeToken with such address does not exist.");
         format!("{}.{}", address, env::current_account_id())
+    }
+
+    /// Locks NEP-21 token on NEAR side to mint on Ethereum it's counterpart.
+    #[payable]
+    pub fn lock(&mut self, token: AccountId, amount: U128, recipient: String) -> Promise {
+        let address = validate_eth_address(recipient);
+        ext_nep21::transfer_from(env::predecessor_account_id(), env::current_account_id(), amount, &token, env::attached_deposit(), TRANSFER_FROM_GAS)
+            .then(ext_self::finish_lock(amount.into(), address, token, &env::current_account_id(), NO_DEPOSIT, env::prepaid_gas() / 3))
+    }
+
+    /// Callback after transfer_from happened.
+    #[result_serializer(borsh)]
+    pub fn finish_lock(
+        &self,
+        #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)] recipient: [u8; 20],
+        #[serializer(borsh)] token: String) -> (U128, [u8; 20], String) {
+        assert_self();
+        assert!(is_promise_success());
+        (amount.into(), recipient, token)
     }
 }
 
