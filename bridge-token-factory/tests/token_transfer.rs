@@ -4,7 +4,7 @@ use near_test::test_user::{init_test_runtime, to_yocto, TestRuntime, TxResult};
 use near_test::token::TokenContract;
 use serde_json::json;
 
-use bridge_token_factory::prover::{EthLockedEvent, Proof};
+use bridge_token_factory::{validate_eth_address, EthLockedEvent, EthUnlockedEvent, Proof};
 
 const PROVER: &str = "prover";
 const FACTORY: &str = "bridge";
@@ -21,20 +21,52 @@ lazy_static::lazy_static! {
 }
 
 pub struct BridgeToken {
-    pub contract_id: AccountId
+    pub contract_id: AccountId,
 }
 
 impl BridgeToken {
     pub fn get_balance(&self, runtime: &mut TestRuntime, owner: String) -> String {
-        runtime.view(self.contract_id.clone(), "get_balance", json!({"owner_id": owner})).as_str().unwrap().to_string()
+        runtime
+            .view(
+                self.contract_id.clone(),
+                "get_balance",
+                json!({ "owner_id": owner }),
+            )
+            .as_str()
+            .unwrap()
+            .to_string()
     }
 
-    pub fn mint(&self, runtime: &mut TestRuntime, signer_id: AccountId, account_id: AccountId, amount: String) -> TxResult {
-        runtime.call(signer_id, self.contract_id.clone(), "mint", json!({"amount": amount, "account_id": account_id}), 0)
+    pub fn mint(
+        &self,
+        runtime: &mut TestRuntime,
+        signer_id: AccountId,
+        account_id: AccountId,
+        amount: String,
+    ) -> TxResult {
+        runtime.call(
+            signer_id,
+            self.contract_id.clone(),
+            "mint",
+            json!({"amount": amount, "account_id": account_id}),
+            0,
+        )
     }
 
-    pub fn withdraw(&self, runtime: &mut TestRuntime, signer_id: AccountId, amount: String, recipient: String) -> TxResult {
-        runtime.call(signer_id, self.contract_id.clone(), "withdraw", json!({"amount": amount, "recipient": recipient}), 0)
+    pub fn withdraw(
+        &self,
+        runtime: &mut TestRuntime,
+        signer_id: AccountId,
+        amount: String,
+        recipient: String,
+    ) -> TxResult {
+        runtime.call(
+            signer_id,
+            self.contract_id.clone(),
+            "withdraw",
+            json!({"amount": amount, "recipient": recipient}),
+            0,
+        )
     }
 }
 
@@ -108,8 +140,36 @@ impl BridgeTokenFactory {
             .to_string()
     }
 
-    pub fn lock(&self, runtime: &mut TestRuntime, signer_id: AccountId, token: AccountId, amount: Balance, recipient: String) -> TxResult {
-        runtime.call(signer_id.clone(), self.contract_id.clone(), "lock", json!({"token": token, "amount": amount.to_string(), "recipient": recipient}), to_yocto("0.005"))
+    pub fn lock(
+        &self,
+        runtime: &mut TestRuntime,
+        signer_id: AccountId,
+        token: AccountId,
+        amount: Balance,
+        recipient: String,
+    ) -> TxResult {
+        runtime.call(
+            signer_id.clone(),
+            self.contract_id.clone(),
+            "lock",
+            json!({"token": token, "amount": amount.to_string(), "recipient": recipient}),
+            to_yocto("0.005"),
+        )
+    }
+
+    pub fn unlock(
+        &self,
+        runtime: &mut TestRuntime,
+        signer_id: AccountId,
+        proof: Proof,
+    ) -> TxResult {
+        runtime.call_args(
+            signer_id.clone(),
+            self.contract_id.clone(),
+            "unlock",
+            proof.try_to_vec().unwrap(),
+            to_yocto("1"),
+        )
     }
 }
 
@@ -148,62 +208,117 @@ fn test_eth_token_transfer() {
         factory.get_bridge_token_account_id(&mut runtime, DAI_ADDRESS.to_string());
     assert_eq!(token_account_id, format!("{}.{}", DAI_ADDRESS, FACTORY));
 
-    let token = BridgeToken { contract_id: token_account_id };
+    let token = BridgeToken {
+        contract_id: token_account_id,
+    };
     assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "0");
 
-    let data = hex::decode(LOCKER_ADDRESS).unwrap();
-    let mut locker_address = [0u8; 20];
-    locker_address.copy_from_slice(&data);
-    let proof = Proof {
-        log_index: 0,
-        log_entry_data: EthLockedEvent {
-            locker_address,
-            token: DAI_ADDRESS.to_string(),
-            sender: SENDER_ADDRESS.to_string(),
-            amount: 1_000,
-            recipient: ALICE.to_string(),
-        }
-            .to_log_entry_data(),
-        receipt_index: 0,
-        receipt_data: vec![],
-        header_data: vec![],
-        proof: vec![],
-    };
+    let mut proof = Proof::default();
+    proof.log_entry_data = EthLockedEvent {
+        locker_address: validate_eth_address(LOCKER_ADDRESS.to_string()),
+        token: DAI_ADDRESS.to_string(),
+        sender: SENDER_ADDRESS.to_string(),
+        amount: 1_000,
+        recipient: ALICE.to_string(),
+    }
+    .to_log_entry_data();
     factory.deposit(&mut runtime, &root, proof).unwrap();
 
     assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "1000");
 
-    token.withdraw(&mut runtime, ALICE.to_string(), "100".to_string(), SENDER_ADDRESS.to_string()).unwrap();
+    token
+        .withdraw(
+            &mut runtime,
+            ALICE.to_string(),
+            "100".to_string(),
+            SENDER_ADDRESS.to_string(),
+        )
+        .unwrap();
 }
 
 #[test]
 fn test_near_token_transfer() {
     let (mut runtime, factory) = setup_token_factory();
     let root = "root".to_string();
-    let token = TokenContract::new(&mut runtime, &root, &TEST_TOKEN_WASM_BYTES, TEST_TOKEN.to_string(), &root, "1000");
-    token.inc_allowance(&mut runtime, &root, FACTORY.to_string(), to_yocto("100").into()).unwrap();
-    factory.lock(&mut runtime, root.clone(), TEST_TOKEN.to_string(), to_yocto("100"), SENDER_ADDRESS.to_string()).unwrap();
-    assert_eq!(token.get_balance(&mut runtime, root.clone()), to_yocto("900").to_string());
+    let token = TokenContract::new(
+        &mut runtime,
+        &root,
+        &TEST_TOKEN_WASM_BYTES,
+        TEST_TOKEN.to_string(),
+        &root,
+        "1000",
+    );
+    token
+        .inc_allowance(
+            &mut runtime,
+            &root,
+            FACTORY.to_string(),
+            to_yocto("100").into(),
+        )
+        .unwrap();
+    factory
+        .lock(
+            &mut runtime,
+            root.clone(),
+            TEST_TOKEN.to_string(),
+            to_yocto("100"),
+            SENDER_ADDRESS.to_string(),
+        )
+        .unwrap();
+    assert_eq!(
+        token.get_balance(&mut runtime, root.clone()),
+        to_yocto("900").to_string()
+    );
+    assert_eq!(token.get_total_supply(&mut runtime), to_yocto("1000").to_string());
 
-    // let proof = ...?
-    // factory.unlock(root.clone(), proof);
-    // assert_eq!(token.get_balance(ALICE.to_string()), to_yocto("50"));
+    let mut proof = Proof::default();
+    proof.log_entry_data = EthUnlockedEvent {
+        locker_address: validate_eth_address(LOCKER_ADDRESS.to_string()),
+        token: TEST_TOKEN.to_string(),
+        sender: SENDER_ADDRESS.to_string(),
+        amount: 50 * 10u128.pow(24),
+        recipient: ALICE.to_string(),
+    }
+    .to_log_entry_data();
+    factory.unlock(&mut runtime, root.clone(), proof).unwrap();
+    assert_eq!(
+        token.get_balance(&mut runtime, ALICE.to_string()),
+        to_yocto("50").to_string()
+    );
+    assert_eq!(token.get_total_supply(&mut runtime), to_yocto("1000").to_string());
 }
 
 #[test]
 fn test_bridge_token_failures() {
     let (mut runtime, factory) = setup_token_factory();
     let root = "root".to_string();
+    runtime.create_user(root.clone(), ALICE.to_string(), to_yocto("1"));
     factory
         .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("35"))
         .unwrap();
-    let token = BridgeToken { contract_id: format!("{}.{}", DAI_ADDRESS, FACTORY) };
+    let token = BridgeToken {
+        contract_id: format!("{}.{}", DAI_ADDRESS, FACTORY),
+    };
 
     // Fail to withdraw because no coins.
-    token.withdraw(&mut runtime, root.clone(), "100".to_string(), SENDER_ADDRESS.to_string()).unwrap_err();
+    token
+        .withdraw(
+            &mut runtime,
+            root.clone(),
+            "100".to_string(),
+            SENDER_ADDRESS.to_string(),
+        )
+        .unwrap_err();
 
     // Fail to mint because sender is not controller.
-    token.mint(&mut runtime, root.clone(), ALICE.to_string(), "100".to_string()).unwrap_err();
+    token
+        .mint(
+            &mut runtime,
+            root.clone(),
+            ALICE.to_string(),
+            "100".to_string(),
+        )
+        .unwrap_err();
 }
 
 /// TODO: instead of just unwrap_err check the specific errors.
@@ -219,7 +334,12 @@ fn test_deploy_failures() {
 
     // Fails with address is invalid.
     factory
-        .deploy_bridge_token(&mut runtime, &root, "not_a_hex".to_string(), to_yocto("100"))
+        .deploy_bridge_token(
+            &mut runtime,
+            &root,
+            "not_a_hex".to_string(),
+            to_yocto("100"),
+        )
         .unwrap_err();
 
     // Fails second time because already exists.

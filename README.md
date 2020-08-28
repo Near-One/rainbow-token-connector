@@ -37,13 +37,23 @@ impl BridgeTokenFactory {
     /// Uses prover to validate that proof is correct and relies on a canonical Ethereum chain.
     /// Send `mint` action to the token that is specified in the proof.
     #[payable]
-    pub fn mint(&mut self, proof: Proof);
+    pub fn deposit(&mut self, proof: Proof);
   
-    /// Withdraws funds from NEAR to Ethereum.
-    /// This will burn the token in the appropriate BridgeToken contract.
-    /// And create an event for Ethereum to unlock the token.
-    pub fn withdraw(token_account: AccountId, amount: Balance, recipient: EvmAddress);
+    /// A callback from BridgeToken contract deployed under this factory.
+    /// Is called after tokens are burned there to create an receipt result `(amount, token_address, recipient_address)` for Ethereum to unlock the token.
+    pub fn finish_withdraw(token_account: AccountId, amount: Balance, recipient: EvmAddress);
     
+    /// Transfers given NEP-21 token from `predecessor_id` to factory to lock.
+    /// On success, leaves a receipt result `(amount, token_address, recipient_address)`.
+    #[payable]
+    pub fn lock(&mut self, token: AccountId, amount: Balance, recipient: String);
+
+    /// Relays the unlock event from Ethereum.
+    /// Uses prover to validate that proof is correct and relies on a canonical Ethereum chain.
+    /// Uses NEP-21 `transfer` action to move funds to `recipient` account.
+    #[payable]
+    pub fn unlock(&mut self, proof: Proof);
+
     /// Deploys BridgeToken contract for the given EVM address in hex code.
     /// The name of new NEP21 compatible contract will be <hex(evm_address)>.<current_id>.
     #[payable]

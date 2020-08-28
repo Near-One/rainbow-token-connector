@@ -7,10 +7,13 @@ use near_sdk::json_types::U128;
 use near_lib::token::ext_nep21;
 
 use prover::*;
+pub use prover::{validate_eth_address, Proof};
+pub use lock_event::EthLockedEvent;
+pub use unlock_event::EthUnlockedEvent;
 
 pub mod prover;
-
-type EthAddress = [u8; 20];
+mod lock_event;
+mod unlock_event;
 
 #[global_allocator]
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
@@ -27,6 +30,8 @@ const BRIDGE_TOKEN_NEW: Gas = 10_000_000_000_000;
 const BRIDGE_TOKEN_INIT_BALANCE: Balance = 30_000_000_000_000_000_000_000_000;
 
 const TRANSFER_FROM_GAS: Gas = 10_000_000_000_000;
+
+const TRANSFER_GAS: Gas = 10_000_000_000_000;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
@@ -67,20 +72,22 @@ pub trait ExtBridgeTokenFactory {
         #[serializer(borsh)] recipient: [u8; 20],
         #[serializer(borsh)] token: String,
     ) -> (U128, [u8; 20], String);
+
+    #[result_serializer(borsh)]
+    fn finish_unlock(
+        &self,
+        #[callback]
+        #[serializer(borsh)]
+        verification_success: bool,
+        #[serializer(borsh)] token: AccountId,
+        #[serializer(borsh)] recipient: AccountId,
+        #[serializer(borsh)] amount: Balance,
+    ) -> Promise;
 }
 
 #[ext_contract(ext_bridge_token)]
 pub trait ExtBridgeToken {
     fn mint(&self, account_id: AccountId, amount: U128) -> Promise;
-}
-
-fn validate_eth_address(address: String) -> EthAddress {
-    let data =
-        hex::decode(address).expect("address should be a valid hex string.");
-    assert_eq!(data.len(), 20, "address should be 20 bytes long");
-    let mut result  = [0u8; 20];
-    result.copy_from_slice(&data);
-    result
 }
 
 pub fn assert_self() {
@@ -120,22 +127,8 @@ impl BridgeTokenFactory {
     /// Also if this is first time this token is used, need to attach extra to deploy the BridgeToken contract.
     #[payable]
     pub fn deposit(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
-        let initial_storage = env::storage_usage();
-        self.record_proof(&proof);
-        let current_storage = env::storage_usage();
-        let attached_deposit = env::attached_deposit();
-        let required_deposit =
-            Balance::from(current_storage - initial_storage) * STORAGE_PRICE_PER_BYTE;
-        let leftover_deposit = attached_deposit - required_deposit;
-        let Proof {
-            log_index,
-            log_entry_data,
-            receipt_index,
-            receipt_data,
-            header_data,
-            proof,
-        } = proof;
-        let event = EthLockedEvent::from_log_entry_data(&log_entry_data);
+        let leftover_deposit = self.record_proof(&proof);
+        let event = EthLockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
             event.locker_address,
             self.locker_address,
@@ -146,26 +139,21 @@ impl BridgeTokenFactory {
         assert!(
             self.tokens.contains(&event.token), "Bridge token for {} is not deployed yet", event.token
         );
-        env::log(format!("{}", event).as_bytes());
-        let EthLockedEvent {
-            recipient, amount, ..
-        } = event;
-         ext_prover::verify_log_entry(
-             log_index,
-             log_entry_data,
-             receipt_index,
-             receipt_data,
-             header_data,
-             proof,
-             false, // Do not skip bridge call. This is only used for development and diagnostics.
-             &self.prover_account,
-             NO_DEPOSIT,
-             env::prepaid_gas() / 4,
-         )
-         .then(ext_self::finish_deposit(
+        ext_prover::verify_log_entry(
+            proof.log_index,
+            proof.log_entry_data,
+            proof.receipt_index,
+            proof.receipt_data,
+            proof.header_data,
+            proof.proof,
+            false, // Do not skip bridge call. This is only used for development and diagnostics.
+            &self.prover_account,
+            NO_DEPOSIT,
+            env::prepaid_gas() / 4,
+        ).then(ext_self::finish_deposit(
              event.token,
-             recipient,
-             amount,
+             event.recipient,
+             event.amount,
              &env::current_account_id(),
              leftover_deposit,
              env::prepaid_gas() / 2,
@@ -195,27 +183,18 @@ impl BridgeTokenFactory {
     /// processing on Solidity side.
     /// Caller must be <token_address>.<current_account_id>, where <token_address> exists in the `tokens`.
     #[result_serializer(borsh)]
-    pub fn finish_withdraw(&mut self, amount: U128, recipient: String) -> (U128, [u8; 20], [u8; 20]) {
+    pub fn finish_withdraw(
+        &mut self,
+        #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)] recipient: String
+    ) -> (U128, [u8; 20], [u8; 20]) {
         let token = env::predecessor_account_id();
         let parts: Vec<&str> = token.split(".").collect();
         assert_eq!(token, format!("{}.{}", parts[0], env::current_account_id()), "Only sub accounts of BridgeTokenFactory can call this method.");
         assert!(self.tokens.contains(&parts[0].to_string()), "Such BridgeToken does not exist.");
         let token_address = validate_eth_address(parts[0].to_string());
         let recipient_address = validate_eth_address(recipient);
-        (amount, token_address, recipient_address)
-    }
-
-    /// Record proof to make sure it is not re-used later for anther deposit.
-    fn record_proof(&mut self, proof: &Proof) {
-        let mut data = proof.log_index.try_to_vec().unwrap();
-        data.extend(proof.receipt_index.try_to_vec().unwrap());
-        data.extend(proof.header_data.clone());
-        let key = env::sha256(&data);
-        assert!(
-            !self.used_events.contains(&key),
-            "Event cannot be reused for depositing."
-        );
-        self.used_events.insert(&key);
+        (amount.into(), token_address, recipient_address)
     }
 
     #[payable]
@@ -258,6 +237,72 @@ impl BridgeTokenFactory {
         assert_self();
         assert!(is_promise_success());
         (amount.into(), recipient, token)
+    }
+
+    #[payable]
+    pub fn unlock(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
+        let leftover_deposit = self.record_proof(&proof);
+        let event = EthUnlockedEvent::from_log_entry_data(&proof.log_entry_data);
+        assert_eq!(
+            event.locker_address,
+            self.locker_address,
+            "Event's address {} does not match locker address of this token {}",
+            hex::encode(&event.locker_address),
+            hex::encode(&self.locker_address),
+        );
+        ext_prover::verify_log_entry(
+            proof.log_index,
+            proof.log_entry_data,
+            proof.receipt_index,
+            proof.receipt_data,
+            proof.header_data,
+            proof.proof,
+            false, // Do not skip bridge call. This is only used for development and diagnostics.
+            &self.prover_account,
+            NO_DEPOSIT,
+            env::prepaid_gas() / 4,
+        ).then(ext_self::finish_unlock(
+            event.token,
+            event.recipient,
+            event.amount,
+            &env::current_account_id(),
+            leftover_deposit,
+            env::prepaid_gas() / 2,
+        ))
+    }
+
+    #[payable]
+    pub fn finish_unlock(
+        &mut self,
+        #[callback]
+        #[serializer(borsh)]
+        verification_success: bool,
+        #[serializer(borsh)] token: AccountId,
+        #[serializer(borsh)] recipient: AccountId,
+        #[serializer(borsh)] amount: Balance,
+    ) -> Promise {
+        assert_self();
+        assert!(verification_success, "Failed to verify the proof");
+        ext_nep21::transfer(recipient, amount.into(), &token, env::attached_deposit(), TRANSFER_GAS)
+    }
+
+    /// Record proof to make sure it is not re-used later for anther deposit.
+    fn record_proof(&mut self, proof: &Proof) -> Balance {
+        let initial_storage = env::storage_usage();
+        let mut data = proof.log_index.try_to_vec().unwrap();
+        data.extend(proof.receipt_index.try_to_vec().unwrap());
+        data.extend(proof.header_data.clone());
+        let key = env::sha256(&data);
+        assert!(
+            !self.used_events.contains(&key),
+            "Event cannot be reused for depositing."
+        );
+        self.used_events.insert(&key);
+        let current_storage = env::storage_usage();
+        let attached_deposit = env::attached_deposit();
+        let required_deposit =
+            Balance::from(current_storage - initial_storage) * STORAGE_PRICE_PER_BYTE;
+        attached_deposit - required_deposit
     }
 }
 
@@ -332,6 +377,6 @@ mod tests {
         contract.deploy_bridge_token(token_locker());
         testing_env!(VMContextBuilder::new().current_account_id(bridge_token_factory()).predecessor_account_id(format!("{}.{}", token_locker(), bridge_token_factory())).finish());
         let address = validate_eth_address(token_locker());
-        assert_eq!(contract.finish_withdraw(1_000.into(), token_locker()), (1_000.into(), address, address));
+        assert_eq!(contract.finish_withdraw(1_000, token_locker()), (1_000.into(), address, address));
     }
 }
