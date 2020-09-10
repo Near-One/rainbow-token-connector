@@ -1006,8 +1006,8 @@ contract ERC20Locker is Locker {
         address recipient;
     }
 
-    function lockToken(IERC20 ethToken, uint256 amount, string memory accountId) public {
-        ethToken.safeTransferFrom(msg.sender, address(this), amount);
+    function lockToken(address ethToken, uint256 amount, string memory accountId) public {
+        IERC20(ethToken).safeTransferFrom(msg.sender, address(this), amount);
         emit Locked(address(ethToken), msg.sender, amount, accountId);
     }
 
