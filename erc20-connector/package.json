@@ -1,12 +1,14 @@
 {
-    "name": "erc20-locker",
+    "name": "erc20-connector",
     "version": "0.1.0",
-    "description": "Generic erc20 locker",
+    "description": "Generic ERC20 brdige connector",
     "license": "MIT",
     "dependencies": {
         "@openzeppelin/cli": "^2.8.1",
         "@openzeppelin/contracts": "^2.5.1",
-        "rainbow-bridge-sol": "https://github.com/near/rainbow-bridge-sol"
+        "rainbow-bridge-lib": "https://github.com/near/rainbow-bridge-lib",
+        "rainbow-bridge-sol": "https://github.com/near/rainbow-bridge-sol",
+        "truffle-assertions": "^0.9.2"
     },
     "devDependencies": {
         "@openzeppelin/test-helpers": "^0.5.5",
@@ -27,6 +29,7 @@
         "truffle-flattener": "^1.4.4"
     },
     "scripts": {
+        "testrpc": "ganache-cli --port 9545 --deterministic --gasLimit 10000000",
         "test": "scripts/test.sh",
         "coverage": "scripts/coverage.sh",
         "lint:js": "eslint .",

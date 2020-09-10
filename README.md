@@ -75,10 +75,10 @@ impl BridgeToken {
        self.token.mint(account_id, amount);
    }
 
-   pub fn burn(&mut self, account_id: AccountId, amount: Balance) {
-       assert_eq!(env::predecessor_id(), self.controller, "Only controller is allowed to mint the tokens");
-       self.token.burn(account_id, amount);
-   }
+    pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
+        self.token.burn(env::predecessor_account_id(), amount.into());
+        ext_bridge_token_factory::finish_withdraw(amount.into(), recipient, &self.controller, NO_DEPOSIT, env::prepaid_gas() / 2)
+    }
 }
 
 impl FungibleToken for BridgeToken {
@@ -109,5 +109,21 @@ TODO
 8. User can use `<<hex(erc20)>.<bridge_token_factory>>` token in other applications now on NEAR.
 
 ## Usage flow NEAR -> Ethereum
+
+TODO
+
+## Testing
+
+### Testing Ethereum side
+
+```
+cd erc20-locker
+yarn
+npm run test?
+truffle rpctest
+truffle test
+```
+
+### Testing NEAR side
 
 TODO
