@@ -418,7 +418,7 @@ library Borsh {
     }
 
     modifier shift(Data memory data, uint256 size) {
-        require(data.raw.length >= data.offset + size, "Borsh: Out of range");
+        // require(data.raw.length > data.offset + size, "Borsh: Out of range");
         _;
         data.offset += size;
     }
@@ -529,7 +529,7 @@ library Borsh {
         }
     }
 
-    function decodeBytes20(Data memory data) internal pure shift(data, 20) returns(bytes20 value) {
+    function decodeBytes20(Data memory data) internal pure returns(bytes20 value) {
         for (uint i = 0; i < 20; i++) {
             value |= bytes20(byte(decodeU8(data)) & 0xFF) >> (i * 8);
         }
@@ -952,7 +952,7 @@ contract Locker {
     // OutcomeReciptId -> Used
     mapping(bytes32 => bool) public usedEvents_;
 
-    function _parseUnlockEvent(bytes memory proofData, uint64 proofBlockHeight) internal returns(ProofDecoder.ExecutionStatus memory result) {
+    function _parseProof(bytes memory proofData, uint64 proofBlockHeight) internal returns(ProofDecoder.ExecutionStatus memory result) {
         require(prover_.proveOutcome(proofData, proofBlockHeight), "Proof should be valid");
 
         // Unpack the proof and extract the execution outcome.
@@ -1001,8 +1001,8 @@ contract ERC20Locker is Locker {
 
     // Function output from burning fungible token on Near side.
     struct BurnResult {
-        address token;
         uint128 amount;
+        address token;
         address recipient;
     }
 
@@ -1011,8 +1011,14 @@ contract ERC20Locker is Locker {
         emit Locked(address(ethToken), msg.sender, amount, accountId);
     }
 
+    function burnResult(bytes memory proofData, uint64 proofBlockHeight) public returns(address) {
+        ProofDecoder.ExecutionStatus memory status = _parseProof(proofData, proofBlockHeight);
+        BurnResult memory result = _decodeBurnResult(status.successValue);
+        return result.token;
+    }
+
     function unlockToken(bytes memory proofData, uint64 proofBlockHeight) public {
-        ProofDecoder.ExecutionStatus memory status = _parseUnlockEvent(proofData, proofBlockHeight);
+        ProofDecoder.ExecutionStatus memory status = _parseProof(proofData, proofBlockHeight);
         BurnResult memory result = _decodeBurnResult(status.successValue);
         IERC20(result.token).safeTransfer(result.recipient, result.amount);
         emit Unlocked(result.amount, result.recipient);
@@ -1021,6 +1027,8 @@ contract ERC20Locker is Locker {
     function _decodeBurnResult(bytes memory data) internal pure returns(BurnResult memory result) {
         Borsh.Data memory borshData = Borsh.from(data);
         result.amount = borshData.decodeU128();
+        bytes20 token = borshData.decodeBytes20();
+        result.token = address(uint160(token));
         bytes20 recipient = borshData.decodeBytes20();
         result.recipient = address(uint160(recipient));
     }

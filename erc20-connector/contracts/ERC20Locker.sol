@@ -24,8 +24,8 @@ contract ERC20Locker is Locker {
 
     // Function output from burning fungible token on Near side.
     struct BurnResult {
-        address token;
         uint128 amount;
+        address token;
         address recipient;
     }
 
@@ -34,8 +34,14 @@ contract ERC20Locker is Locker {
         emit Locked(address(ethToken), msg.sender, amount, accountId);
     }
 
+    function burnResult(bytes memory proofData, uint64 proofBlockHeight) public returns(address) {
+        ProofDecoder.ExecutionStatus memory status = _parseProof(proofData, proofBlockHeight);
+        BurnResult memory result = _decodeBurnResult(status.successValue);
+        return result.token;
+    }
+
     function unlockToken(bytes memory proofData, uint64 proofBlockHeight) public {
-        ProofDecoder.ExecutionStatus memory status = _parseUnlockEvent(proofData, proofBlockHeight);
+        ProofDecoder.ExecutionStatus memory status = _parseProof(proofData, proofBlockHeight);
         BurnResult memory result = _decodeBurnResult(status.successValue);
         IERC20(result.token).safeTransfer(result.recipient, result.amount);
         emit Unlocked(result.amount, result.recipient);
@@ -44,6 +50,8 @@ contract ERC20Locker is Locker {
     function _decodeBurnResult(bytes memory data) internal pure returns(BurnResult memory result) {
         Borsh.Data memory borshData = Borsh.from(data);
         result.amount = borshData.decodeU128();
+        bytes20 token = borshData.decodeBytes20();
+        result.token = address(uint160(token));
         bytes20 recipient = borshData.decodeBytes20();
         result.recipient = address(uint160(recipient));
     }

@@ -187,7 +187,7 @@ impl BridgeTokenFactory {
         &mut self,
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] recipient: String
-    ) -> (U128, [u8; 20], [u8; 20]) {
+    ) -> (u128, [u8; 20], [u8; 20]) {
         let token = env::predecessor_account_id();
         let parts: Vec<&str> = token.split(".").collect();
         assert_eq!(token, format!("{}.{}", parts[0], env::current_account_id()), "Only sub accounts of BridgeTokenFactory can call this method.");
@@ -233,10 +233,10 @@ impl BridgeTokenFactory {
         &self,
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] recipient: [u8; 20],
-        #[serializer(borsh)] token: String) -> (U128, [u8; 20], String) {
+        #[serializer(borsh)] token: String) -> (String, u128, [u8; 20]) {
         assert_self();
         assert!(is_promise_success());
-        (amount.into(), recipient, token)
+        (token, amount.into(), recipient)
     }
 
     #[payable]

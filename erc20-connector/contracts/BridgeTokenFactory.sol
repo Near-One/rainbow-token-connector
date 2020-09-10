@@ -22,6 +22,17 @@ contract BridgeTokenFactory is ERC20Locker {
         string recipient
     );
 
+    event Deposit (
+        uint256 amount,
+        address recipient
+    );
+
+    struct LockResult {
+        string token;
+        uint128 amount;
+        address recipient;
+    }
+
     // BridgeTokenFactory is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
     constructor(bytes memory nearTokenFactory, INearProver prover) public {
@@ -44,7 +55,7 @@ contract BridgeTokenFactory is ERC20Locker {
     }
 
     function newBridgeToken(string calldata nearTokenId) external returns (BridgeToken) {
-        require(_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_BRIDGE_TOKEN_EXISTS");
+        require(!_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_BRIDGE_TOKEN_EXISTS");
         BridgeToken btoken = new BridgeToken();
         _isBridgeToken[address(btoken)] = true;
         _ethToNearToken[address(btoken)] = nearTokenId;
@@ -53,14 +64,24 @@ contract BridgeTokenFactory is ERC20Locker {
     }
 
     function deposit(bytes memory proofData, uint64 proofBlockHeight) public {
-    //     ProofDecoder.ExecutionStatus memory status = _parseDepositEvent(proofData, proofBlockHeight);
-    //     BurnResult memory result = _decodeDepositResult(status.successValue);
-    //     emit Deposit(result.amount, result.recipient);
+        ProofDecoder.ExecutionStatus memory status = _parseProof(proofData, proofBlockHeight);
+        LockResult memory result = _decodeLockResult(status.successValue);
+        require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
+        BridgeToken(_nearToEthToken[result.token]).mint(result.recipient, result.amount);
+        emit Deposit(result.amount, result.recipient);
     }
 
     function withdraw(address token, uint256 amount, string memory recipient) public {
         require(_isBridgeToken[token], "ERR_NOT_BRIDGE_TOKEN");
         BridgeToken(token).burn(msg.sender, amount);
         emit Withdraw(_ethToNearToken[token], msg.sender, amount, recipient);
+    }
+
+    function _decodeLockResult(bytes memory data) internal pure returns(LockResult memory result) {
+        Borsh.Data memory borshData = Borsh.from(data);
+        result.token = string(borshData.decodeBytes());
+        result.amount = borshData.decodeU128();
+        bytes20 recipient = borshData.decodeBytes20();
+        result.recipient = address(uint160(recipient));
     }
 }

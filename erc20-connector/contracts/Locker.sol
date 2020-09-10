@@ -15,7 +15,7 @@ contract Locker {
     // OutcomeReciptId -> Used
     mapping(bytes32 => bool) public usedEvents_;
 
-    function _parseUnlockEvent(bytes memory proofData, uint64 proofBlockHeight) internal returns(ProofDecoder.ExecutionStatus memory result) {
+    function _parseProof(bytes memory proofData, uint64 proofBlockHeight) internal returns(ProofDecoder.ExecutionStatus memory result) {
         require(prover_.proveOutcome(proofData, proofBlockHeight), "Proof should be valid");
 
         // Unpack the proof and extract the execution outcome.
