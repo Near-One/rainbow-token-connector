@@ -5,18 +5,27 @@ const BridgeTokenFactory = artifacts.require('BridgeTokenFactory');
 const NearProverMock = artifacts.require('test/NearProverMock');
 const TToken = artifacts.require('test/TToken');
 
+const { toWei, fromWei } = web3.utils;
+
 contract('TokenLocker', function ([_, addr1]) {
     beforeEach(async function () {
         this.token = await TToken.new();
         this.prover = await NearProverMock.new();
         this.locker = await BridgeTokenFactory.new(Buffer.from('nearfuntoken', 'utf-8'), this.prover.address);
         await this.token.mint(this.locker.address, 10000);
+        await this.token.mint(addr1, toWei('2'));
     });
 
     it('lock Token', async function() {
-        await this.token.approve(addr1, 1000);
-        const tx = await this.locker.lockToken(this.token.address, 1000, 'receiver');
-        // truffleAssert.eventEmitted(tx, 'Locked', (event) => event.amount == 1000 && event.accountId == 'receiver');
+        const preBalance1 = await this.token.balanceOf(addr1);
+        expect(fromWei(preBalance1)).equal('2');
+        await this.token.approve(this.locker.address, toWei('1'), { from: addr1 });
+        const tx = await this.locker.lockToken(this.token.address, toWei('1'), 'receiver', { from: addr1 });
+        const afterBalance1 = await this.token.balanceOf(addr1);
+        expect(fromWei(afterBalance1)).equal('1');
+        truffleAssert.eventEmitted(tx, 'Locked', (event) => {
+            return event.token == this.token.address && event.sender == addr1 && fromWei(event.amount) == 1 && event.accountId == 'receiver';
+        });
     });
 
     // it('unlock Token', async function () {
