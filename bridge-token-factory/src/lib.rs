@@ -377,6 +377,6 @@ mod tests {
         contract.deploy_bridge_token(token_locker());
         testing_env!(VMContextBuilder::new().current_account_id(bridge_token_factory()).predecessor_account_id(format!("{}.{}", token_locker(), bridge_token_factory())).finish());
         let address = validate_eth_address(token_locker());
-        assert_eq!(contract.finish_withdraw(1_000, token_locker()), (1_000.into(), address, address));
+        assert_eq!(contract.finish_withdraw(1_000, token_locker()), (1_000,  address, address));
     }
 }

@@ -26,15 +26,11 @@ pub struct BridgeToken {
 
 impl BridgeToken {
     pub fn get_balance(&self, runtime: &mut TestRuntime, owner: String) -> String {
-        runtime
-            .view(
-                self.contract_id.clone(),
-                "get_balance",
-                json!({ "owner_id": owner }),
-            )
-            .as_str()
-            .unwrap()
-            .to_string()
+        TokenContract { contract_id: self.contract_id.clone() }.get_balance(runtime, owner)
+    }
+
+    pub fn get_total_supply(&self, runtime: &mut TestRuntime) -> String {
+        TokenContract { contract_id: self.contract_id.clone() }.get_total_supply(runtime)
     }
 
     pub fn mint(
@@ -212,6 +208,7 @@ fn test_eth_token_transfer() {
         contract_id: token_account_id,
     };
     assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "0");
+    assert_eq!(token.get_total_supply(&mut runtime), "0");
 
     let mut proof = Proof::default();
     proof.log_entry_data = EthLockedEvent {
@@ -225,6 +222,7 @@ fn test_eth_token_transfer() {
     factory.deposit(&mut runtime, &root, proof).unwrap();
 
     assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "1000");
+    assert_eq!(token.get_total_supply(&mut runtime), "1000");
 
     token
         .withdraw(
@@ -234,6 +232,9 @@ fn test_eth_token_transfer() {
             SENDER_ADDRESS.to_string(),
         )
         .unwrap();
+
+    assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "900");
+    assert_eq!(token.get_total_supply(&mut runtime), "900");
 }
 
 #[test]

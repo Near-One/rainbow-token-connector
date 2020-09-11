@@ -26,7 +26,7 @@ impl EthUnlockedEvent {
     /// Parse raw log entry data.
     pub fn from_log_entry_data(data: &[u8]) -> Self {
         let event =
-            EthEvent::from_log_entry_data("Unlocked", EthUnlockedEvent::event_params(), data);
+            EthEvent::from_log_entry_data("Withdraw", EthUnlockedEvent::event_params(), data);
         let token = event.log.params[0].value.clone().to_string().unwrap();
         let sender = event.log.params[1].value.clone().to_address().unwrap().0;
         let sender = (&sender).encode_hex::<String>();
@@ -48,7 +48,7 @@ impl EthUnlockedEvent {
 
     pub fn to_log_entry_data(&self) -> Vec<u8> {
         EthEvent::to_log_entry_data(
-            "Unlocked",
+            "Withdraw",
             EthUnlockedEvent::event_params(),
             self.locker_address,
             vec![hex::decode(self.sender.clone()).unwrap()],

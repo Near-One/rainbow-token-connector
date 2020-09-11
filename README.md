@@ -56,6 +56,7 @@ impl BridgeTokenFactory {
 
     /// Deploys BridgeToken contract for the given EVM address in hex code.
     /// The name of new NEP21 compatible contract will be <hex(evm_address)>.<current_id>.
+    /// Expects ~35N attached to cover storage for BridgeToken.
     #[payable]
     pub fn deploy_bridge_token(address: String);
 }
@@ -66,23 +67,19 @@ struct BridgeToken {
 }
 
 impl BridgeToken {
-   pub fn new(controller: AccountId) -> Self {
-       Self { controller, token: Token::new() }
-   }
+    /// Setup the Token contract with given factory/controller.
+    pub fn new(controller: AccountId) -> Self;
 
-   pub fn mint(&mut self, account_id: AccountId, amount: Balance) {
-       assert_eq!(env::predecessor_id(), self.controller, "Only controller is allowed to mint the tokens");
-       self.token.mint(account_id, amount);
-   }
+    /// Mint tokens to given user. Only can be called by the controller.
+    pub fn mint(&mut self, account_id: AccountId, amount: Balance);
 
-    pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
-        self.token.burn(env::predecessor_account_id(), amount.into());
-        ext_bridge_token_factory::finish_withdraw(amount.into(), recipient, &self.controller, NO_DEPOSIT, env::prepaid_gas() / 2)
-    }
+    /// Withdraw tokens from this contract.
+    /// Burns sender's tokens and calls controller to create event for relaying.
+    pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise;
 }
 
 impl FungibleToken for BridgeToken {
-   ... // see example https://github.com/ilblackdragon/balancer-near/blob/master/balancer-pool/src/lib.rs#L329
+   // see example https://github.com/ilblackdragon/balancer-near/blob/master/balancer-pool/src/lib.rs#L329
 }
 ```
 
@@ -126,4 +123,8 @@ truffle test
 
 ### Testing NEAR side
 
-TODO
+```
+cd bridge-token-factory
+./build.sh
+cargo test --all
+```
