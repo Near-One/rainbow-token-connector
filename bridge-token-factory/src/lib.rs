@@ -199,6 +199,7 @@ impl BridgeTokenFactory {
 
     #[payable]
     pub fn deploy_bridge_token(&mut self, address: String) -> Promise {
+        let address = address.to_lowercase();
         let _ = validate_eth_address(address.clone());
         assert!(!self.tokens.contains(&address), "BridgeToken contract already exists.");
         let initial_storage = env::storage_usage() as u128;
@@ -214,6 +215,7 @@ impl BridgeTokenFactory {
     }
 
     pub fn get_bridge_token_account_id(&self, address: String) -> AccountId {
+        let address = address.to_lowercase();
         let _ = validate_eth_address(address.clone());
         assert!(self.tokens.contains(&address), "BridgeToken with such address does not exist.");
         format!("{}.{}", address, env::current_account_id())
@@ -367,6 +369,10 @@ mod tests {
         testing_env!(VMContextBuilder::new().current_account_id(bridge_token_factory()).predecessor_account_id(alice()).attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2).finish());
         contract.deploy_bridge_token(token_locker());
         assert_eq!(contract.get_bridge_token_account_id(token_locker()), format!("{}.{}", token_locker(), bridge_token_factory()));
+
+        let uppercase_address = "0f5Ea0A652E851678Ebf77B69484bFcD31F9459B".to_string();
+        contract.deploy_bridge_token(uppercase_address.clone());
+        assert_eq!(contract.get_bridge_token_account_id(uppercase_address.clone()), format!("{}.{}", uppercase_address.to_lowercase(), bridge_token_factory()));
     }
 
     #[test]
@@ -378,5 +384,5 @@ mod tests {
         testing_env!(VMContextBuilder::new().current_account_id(bridge_token_factory()).predecessor_account_id(format!("{}.{}", token_locker(), bridge_token_factory())).finish());
         let address = validate_eth_address(token_locker());
         assert_eq!(contract.finish_withdraw(1_000, token_locker()), (1_000,  address, address));
-    }
+    }    
 }
