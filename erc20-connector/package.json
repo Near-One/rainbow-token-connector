@@ -4,13 +4,13 @@
     "description": "Generic ERC20 brdige connector",
     "license": "MIT",
     "dependencies": {
-        "@openzeppelin/cli": "^2.8.1",
         "@openzeppelin/contracts": "^2.5.1",
-        "rainbow-bridge-lib": "https://github.com/near/rainbow-bridge-lib",
-        "rainbow-bridge-sol": "https://github.com/near/rainbow-bridge-sol",
-        "truffle-assertions": "^0.9.2"
+        "rainbow-bridge-sol": "https://github.com/near/rainbow-bridge-sol"
     },
     "devDependencies": {
+        "@openzeppelin/cli": "^2.8.1",
+        "rainbow-bridge-lib": "https://github.com/near/rainbow-bridge-lib",
+        "truffle-assertions": "^0.9.2",
         "@openzeppelin/test-helpers": "^0.5.5",
         "chai": "^4.2.0",
         "coveralls": "^3.1.0",
@@ -24,6 +24,7 @@
         "ganache-cli": "^6.9.1",
         "solc": "^0.5.17",
         "solidity-coverage": "^0.7.5",
+        "solidity-stringutils": "Arachnid/solidity-stringutils#3101baec6ec2ed009f81eb74db3cf3bd022214d4",
         "solium": "^1.2.5",
         "truffle": "^5.1.24",
         "truffle-flattener": "^1.4.4"

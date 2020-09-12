@@ -1,10 +1,14 @@
 pragma solidity ^0.5.0;
+import "solidity-stringutils/strings.sol";
+
 import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
 import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
 import "rainbow-bridge-sol/nearbridge/contracts/NearDecoder.sol";
 import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 
 contract Locker {
+    using strings for *;
+
     using Borsh for Borsh.Data;
     using ProofDecoder for Borsh.Data;
     using NearDecoder for Borsh.Data;
@@ -27,7 +31,14 @@ contract Locker {
         require(!usedEvents_[receiptId], "The burn event cannot be reused");
         usedEvents_[receiptId] = true;
 
-        require(keccak256(fullOutcomeProof.outcome_proof.outcome_with_id.outcome.executor_id) == keccak256(nearTokenFactory_),
+        strings.slice memory executorIdSlice = string(fullOutcomeProof.outcome_proof.outcome_with_id.outcome.executor_id).toSlice();
+        strings.slice memory delim = ".".toSlice();
+        require(executorIdSlice.count(delim) == 1, string(fullOutcomeProof.outcome_proof.outcome_with_id.outcome.executor_id));
+        strings.slice memory part;
+        executorIdSlice.split(delim, part);
+        executorIdSlice.split(delim, part);
+
+        require(keccak256(bytes(part.toString())) == keccak256(nearTokenFactory_),
         "Can only unlock tokens from the linked mintable fungible token on Near blockchain.");
 
         result = fullOutcomeProof.outcome_proof.outcome_with_id.outcome.status;

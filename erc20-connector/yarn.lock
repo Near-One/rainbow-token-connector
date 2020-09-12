@@ -7405,6 +7405,10 @@ solidity-coverage@^0.7.5:
     shelljs "^0.8.3"
     web3 "1.2.6"
 
+solidity-stringutils@Arachnid/solidity-stringutils#3101baec6ec2ed009f81eb74db3cf3bd022214d4:
+  version "0.0.0"
+  resolved "https://codeload.github.com/Arachnid/solidity-stringutils/tar.gz/3101baec6ec2ed009f81eb74db3cf3bd022214d4"
+
 solium-plugin-security@0.1.1:
   version "0.1.1"
   resolved "https://registry.yarnpkg.com/solium-plugin-security/-/solium-plugin-security-0.1.1.tgz#2a87bcf8f8c3abf7d198e292e4ac080284e3f3f6"
