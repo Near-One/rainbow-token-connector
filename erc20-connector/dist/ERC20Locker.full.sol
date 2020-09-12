@@ -418,7 +418,7 @@ library Borsh {
     }
 
     modifier shift(Data memory data, uint256 size) {
-        // require(data.raw.length > data.offset + size, "Borsh: Out of range");
+        require(data.raw.length >= data.offset + size, "Borsh: Out of range");
         _;
         data.offset += size;
     }

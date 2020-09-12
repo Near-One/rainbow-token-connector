@@ -1,15 +1,14 @@
 {
-    "name": "erc20-connector",
+    "name": "rainbow-token-connector",
     "version": "0.1.0",
-    "description": "Generic ERC20 brdige connector",
+    "description": "Generic Token bridge connector",
     "license": "MIT",
+    "main": "index.js",
     "dependencies": {
-        "@openzeppelin/contracts": "^2.5.1",
-        "rainbow-bridge-sol": "https://github.com/near/rainbow-bridge-sol"
+        "rainbow-bridge-lib": "https://github.com/near/rainbow-bridge-lib",
+        "tweetnacl": "^1.0.3"
     },
     "devDependencies": {
-        "@openzeppelin/cli": "^2.8.1",
-        "rainbow-bridge-lib": "https://github.com/near/rainbow-bridge-lib",
         "truffle-assertions": "^0.9.2",
         "@openzeppelin/test-helpers": "^0.5.5",
         "chai": "^4.2.0",
@@ -28,15 +27,15 @@
         "truffle": "^5.1.24",
         "truffle-flattener": "^1.4.4"
     },
+    "jest": {
+        "testEnvironment": "node",
+        "coverageDirectory": "./coverage/",
+        "collectCoverage": true
+    },
     "scripts": {
         "testrpc": "ganache-cli --port 9545 --deterministic --gasLimit 10000000",
-        "test": "scripts/test.sh",
-        "coverage": "scripts/coverage.sh",
-        "lint:js": "eslint .",
-        "lint:js:fix": "eslint . --fix",
-        "lint:sol": "solium -d .",
-        "lint:sol:fix": "solium -d . --fix",
-        "lint": "yarn run lint:js && yarn run lint:sol",
-        "lint:fix": "yarn run lint:js:fix && yarn run lint:sol:fix"
+        "test": "jest",
+        "lint": "eslint .",
+        "lint:fix": "eslint . --fix"
     }
 }

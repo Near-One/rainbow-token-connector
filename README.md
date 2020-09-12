@@ -111,7 +111,7 @@ TODO
 
 ## Testing
 
-### Testing Ethereum side
+### Developing & Testing Ethereum side
 
 ```
 cd erc20-locker
@@ -121,10 +121,35 @@ truffle rpctest
 truffle test
 ```
 
-### Testing NEAR side
+### Developing & Testing NEAR side
+
+You should make sure that if you are changing `bridge-token` contract, you `./build.sh` on it before running `bridge-token-factory`.
 
 ```
-cd bridge-token-factory
+cd bridge-token
+./build.sh
+cd ../bridge-token-factory
 ./build.sh
 cargo test --all
+```
+
+### Testing both sides
+
+Run both `neard` and `ganache-cli`.
+
+Start ganache in one console:
+```
+truffle rpctest
+```
+
+Start neard in a different console:
+```
+neard --home=~/.near/local init
+neard --home=~/.near/local run
+```
+
+Now ready to run both sides integration tests:
+```
+yarn
+yarn test
 ```
