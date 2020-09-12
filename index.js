@@ -1,6 +1,14 @@
 const fs = require('fs');
 
 const rainbowLib = require('rainbow-bridge-lib');
+const { BorshContract } = require('rainbow-bridge-lib/rainbow/borsh');
+const {
+    EthProofExtractor,
+    receiptFromWeb3,
+    logFromWeb3,
+} = require('rainbow-bridge-lib/eth-proof-extractor');
+const { rlp } = require('ethereumjs-util')
+
 const utils = rainbowLib.utils;
 const nearAPI = rainbowLib.nearAPI;
 
@@ -10,6 +18,26 @@ const ETH_CONNECTOR_DEPLOY_GAS = 5000000;
 const ETH_BRIDGE_TOKEN_DEPLOY_GAS = 5000000;
 const NEAR_BRIDGE_TOKEN_DEPOSIT = nearAPI.utils.format.parseNearAmount('40');
 const NEAR_BRIDGE_TOKEN_DEPLOY_GAS = '100000000000000';
+
+const NEAR_CONNECTOR_SCHEMA = {
+    bool: {
+        kind: 'function',
+        // @ts-ignore
+        ser: (b) => Buffer.from(Web3.utils.hexToBytes(b ? '0x01' : '0x00')),
+        deser: (z) => readerToHex(1)(z) === '0x01',
+    },
+    Proof: {
+        kind: 'struct',
+        fields: [
+            ['log_index', 'u64'],
+            ['log_entry_data', ['u8']],
+            ['receipt_index', 'u64'],
+            ['receipt_data', ['u8']],
+            ['header_data', ['u8']],
+            ['proof', [['u8']]],
+        ],
+    },
+}
 
 async function createNearConnector(masterAccount, config) {
     if (!await rainbowLib.utils.accountExists(masterAccount.connection, config.nearConnectorId)) {
@@ -25,9 +53,14 @@ async function createNearConnector(masterAccount, config) {
             nearAPI.transactions.functionCall('new', newArgs, NEAR_CONNECTOR_NEW_GAS)
         ]);
     }
-    return new nearAPI.Contract(masterAccount, config.nearConnectorId, {
+    return new BorshContract(NEAR_CONNECTOR_SCHEMA, masterAccount, config.nearConnectorId, {
         viewMethods: ['get_bridge_token_account_id'],
-        changeMethods: ['deposit', 'deploy_bridge_token', 'lock', 'unlock'],
+        changeMethods: [
+            { methodName: 'deposit', inputFieldType: 'Proof', outputFieldType: null },
+            // {'deploy_bridge_token'}, 
+            // {'lock'}, 
+            // {'unlock'}],
+        ]
     });
 }
 
@@ -88,9 +121,59 @@ async function createEthBridgeToken(web3, ethConnector, tokenId) {
     return utils.getEthContract(web3, 'res/BridgeToken', address);
 }
 
+/**
+ * TODO: MOVE TO rainbow-lib
+ * @param {*} web3 
+ * @param {*} lockedEvent 
+ */
+async function ethExtractEventProof(web3, lockedEvent) {
+    const extractor = EthProofExtractor.fromWeb3(web3);
+    const receipt = await extractor.extractReceipt(lockedEvent.transactionHash)
+    const block = await extractor.extractBlock(receipt.blockNumber)
+    const tree = await extractor.buildTrie(block)
+    const proof = await extractor.extractProof(
+        web3,
+        block,
+        tree,
+        receipt.transactionIndex
+    )
+    let txLogIndex = -1
+
+    let logFound = false
+    let log
+    for (let receiptLog of receipt.logs) {
+        txLogIndex++
+        const blockLogIndex = receiptLog.logIndex
+        if (blockLogIndex === lockedEvent.logIndex) {
+            logFound = true
+            log = receiptLog
+            break
+        }
+    }
+
+    if (!logFound) {
+        throw new Error(`Log for ${lockedEvent} is not found.`);
+    }
+
+    const _proof = []
+    for (const node of proof.receiptProof) {
+        _proof.push(rlp.encode(node));
+    }
+
+    return {
+        log_index: txLogIndex,
+        log_entry_data: logFromWeb3(log).serialize(),
+        receipt_index: proof.txIndex,
+        receipt_data: receiptFromWeb3(receipt).serialize(),
+        header_data: proof.header_rlp,
+        proof: _proof
+    };
+}
+
 module.exports = {
     createNearConnector,
     createEthConnector,
     createNearBridgeToken,
     createEthBridgeToken,
+    ethExtractEventProof,
 }

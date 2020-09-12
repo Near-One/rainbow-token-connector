@@ -2,6 +2,7 @@ const fs = require('fs');
 const connector = require('../index.js');
 
 const rainbowLib = require('rainbow-bridge-lib');
+
 const utils = rainbowLib.utils;
 const nearAPI = rainbowLib.nearAPI;
 
@@ -12,6 +13,18 @@ const NEAR_TTOKEN_NEW_GAS = '100000000000000';
 const ETH_MOCK_PROVER_DEPLOY_GAS = 200000;
 const ETH_TEST_TOKEN_DEPLOY_GAS = 1000000;
 
+const NEAR_DEPOSIT_GAS = '300000000000000';
+// We need to attach tokens because minting increases the contract state, by <600 bytes, which
+// requires an additional 0.06 NEAR to be deposited to the account for state staking.
+// Note technically 0.0537 NEAR should be enough, but we round it up to stay on the safe side.
+const NEAR_DEPOSIT_DEPOSIT = '60000000000000000000000';
+
+/**
+ * TODO: Move to RAINBOW-LIB
+ * @param {*} masterAccount 
+ * @param {*} web3 
+ * @param {*} config 
+ */
 async function setupMockProvers(masterAccount, web3, config) {
     if (!await utils.accountExists(masterAccount.connection, config.nearEthProverId)) {
         const code = fs.readFileSync('res/mock_prover.wasm');
@@ -69,7 +82,20 @@ describe('--- Token Connector ---', () => {
         const ethConnector = await connector.createEthConnector(web3, config);
         const nearConnector = await connector.createNearConnector(masterAccount, config);
 
-        const nearBridgeToken = await connector.createNearBridgeToken(nearConnector, config.ethTestTokenAddress);
-        const ethBridgeToken = await connector.createEthBridgeToken(web3, ethConnector, config.nearTestTokenId);
+        // const nearBridgeToken = await connector.createNearBridgeToken(nearConnector, config.ethTestTokenAddress);
+        // const ethBridgeToken = await connector.createEthBridgeToken(web3, ethConnector, config.nearTestTokenId);
+
+        // Scenario 1: Eth token to NEAR
+        await utils.ethCallContract(ethToken, 'mint', [web3.eth.defaultAccount, utils.toWei('10000')]);
+        await utils.ethCallContract(ethToken, 'approve', [config.ethConnectorAddress, utils.toWei('1000')]);
+        const tx = await utils.ethCallContract(ethConnector, 'lockToken', [ethToken.options.address, utils.toWei('1000'), masterAccount.accountId]);
+        const eventProof = await connector.ethExtractEventProof(web3, tx.events.Locked);
+        await nearConnector.deposit(eventProof, NEAR_DEPOSIT_GAS, NEAR_DEPOSIT_DEPOSIT);
+
+        // Scenario 2: Eth token from NEAR
+
+        // Scenario 3: NEAR token to Eth
+
+        // Scenario 4: NEAR token from Eth
     });
 });
