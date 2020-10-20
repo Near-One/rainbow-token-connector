@@ -59,6 +59,11 @@ impl BridgeTokenFactory {
     /// Expects ~35N attached to cover storage for BridgeToken.
     #[payable]
     pub fn deploy_bridge_token(address: String);
+
+    /// Checks if Bridge Token has been successfully deployed with `deploy_bridge_token`.
+    /// On success, returns the name of NEP21 contract associated with given address (<hex(evm_address)>.<current_id>).
+    /// Otherwise, returns "token do not exists" error.
+    pub fn get_bridge_token_account_id(&self, address: String) -> AccountId;
 }
 
 struct BridgeToken {
