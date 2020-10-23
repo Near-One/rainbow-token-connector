@@ -932,7 +932,7 @@ dependencies = [
 [[package]]
 name = "near-lib"
 version = "0.1.0"
-source = "git+https://github.com/ilblackdragon/balancer-near#934a9126ce50637ec1a9f98cec23886b54df27cf"
+source = "git+https://github.com/ilblackdragon/balancer-near?rev=a386305c9829d2e5302a78fdc475c8a279fcf6ed#a386305c9829d2e5302a78fdc475c8a279fcf6ed"
 dependencies = [
  "borsh 0.6.2",
  "near-sdk",
@@ -1150,7 +1150,7 @@ dependencies = [
 [[package]]
 name = "near-test"
 version = "0.1.0"
-source = "git+https://github.com/ilblackdragon/balancer-near#934a9126ce50637ec1a9f98cec23886b54df27cf"
+source = "git+https://github.com/ilblackdragon/balancer-near?rev=a386305c9829d2e5302a78fdc475c8a279fcf6ed#a386305c9829d2e5302a78fdc475c8a279fcf6ed"
 dependencies = [
  "borsh 0.6.2",
  "env_logger",
