@@ -224,13 +224,11 @@ impl BridgeTokenFactory {
         let initial_storage = env::storage_usage() as u128;
         self.tokens.insert(&address);
         let current_storage = env::storage_usage() as u128;
-        let needed_deposit = BRIDGE_TOKEN_INIT_BALANCE
-            + STORAGE_PRICE_PER_BYTE * (current_storage - initial_storage);
         assert!(
-            env::attached_deposit() >= needed_deposit,
-            "Not enough attached deposit to complete bridge token creation. Attached: {}; Needed: {}",
-            env::attached_deposit(),
-            needed_deposit
+            env::attached_deposit()
+                >= BRIDGE_TOKEN_INIT_BALANCE
+                    + STORAGE_PRICE_PER_BYTE * (current_storage - initial_storage),
+            "Not enough attached deposit to complete bridge token creation"
         );
         let bridge_token_account_id = format!("{}.{}", address, env::current_account_id());
         Promise::new(bridge_token_account_id)
