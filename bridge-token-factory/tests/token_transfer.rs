@@ -244,6 +244,53 @@ fn test_eth_token_transfer() {
 }
 
 #[test]
+fn test_with_invalid_proof() {
+    let (mut runtime, factory) = setup_token_factory();
+    let root = "root".to_string();
+    runtime.create_user(root.clone(), ALICE.to_string(), to_yocto("1"));
+
+    factory
+        .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("35"))
+        .unwrap();
+
+    let token_account_id =
+        factory.get_bridge_token_account_id(&mut runtime, DAI_ADDRESS.to_string());
+    assert_eq!(token_account_id, format!("{}.{}", DAI_ADDRESS, FACTORY));
+
+    let token = BridgeToken {
+        contract_id: token_account_id,
+    };
+    assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "0");
+    assert_eq!(token.get_total_supply(&mut runtime), "0");
+
+    let mut proof = Proof::default();
+    proof.log_entry_data = EthLockedEvent {
+        locker_address: validate_eth_address(LOCKER_ADDRESS.to_string()),
+        token: DAI_ADDRESS.to_string(),
+        sender: SENDER_ADDRESS.to_string(),
+        amount: 1_000,
+        recipient: ALICE.to_string(),
+    }
+    .to_log_entry_data();
+    factory.deposit(&mut runtime, &root, proof).unwrap();
+
+    assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "1000");
+    assert_eq!(token.get_total_supply(&mut runtime), "1000");
+
+    token
+        .withdraw(
+            &mut runtime,
+            ALICE.to_string(),
+            "100".to_string(),
+            SENDER_ADDRESS.to_string(),
+        )
+        .unwrap();
+
+    assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "900");
+    assert_eq!(token.get_total_supply(&mut runtime), "900");
+}
+
+#[test]
 fn test_near_token_transfer() {
     let (mut runtime, factory) = setup_token_factory();
     let root = "root".to_string();
