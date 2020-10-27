@@ -26,11 +26,17 @@ pub struct BridgeToken {
 
 impl BridgeToken {
     pub fn get_balance(&self, runtime: &mut TestRuntime, owner: String) -> String {
-        TokenContract { contract_id: self.contract_id.clone() }.get_balance(runtime, owner)
+        TokenContract {
+            contract_id: self.contract_id.clone(),
+        }
+        .get_balance(runtime, owner)
     }
 
     pub fn get_total_supply(&self, runtime: &mut TestRuntime) -> String {
-        TokenContract { contract_id: self.contract_id.clone() }.get_total_supply(runtime)
+        TokenContract {
+            contract_id: self.contract_id.clone(),
+        }
+        .get_total_supply(runtime)
     }
 
     pub fn mint(
@@ -270,7 +276,10 @@ fn test_near_token_transfer() {
         token.get_balance(&mut runtime, root.clone()),
         to_yocto("900").to_string()
     );
-    assert_eq!(token.get_total_supply(&mut runtime), to_yocto("1000").to_string());
+    assert_eq!(
+        token.get_total_supply(&mut runtime),
+        to_yocto("1000").to_string()
+    );
 
     let mut proof = Proof::default();
     proof.log_entry_data = EthUnlockedEvent {
@@ -286,7 +295,10 @@ fn test_near_token_transfer() {
         token.get_balance(&mut runtime, ALICE.to_string()),
         to_yocto("50").to_string()
     );
-    assert_eq!(token.get_total_supply(&mut runtime), to_yocto("1000").to_string());
+    assert_eq!(
+        token.get_total_supply(&mut runtime),
+        to_yocto("1000").to_string()
+    );
 }
 
 #[test]

@@ -1,6 +1,6 @@
 use borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
-use near_sdk::{env, near_bindgen, AccountId, Promise, Balance, ext_contract};
+use near_sdk::{env, ext_contract, near_bindgen, AccountId, Balance, Promise};
 
 use near_lib::token::{FungibleToken, Token};
 
@@ -53,8 +53,15 @@ impl BridgeToken {
     }
 
     pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
-        self.token.burn(env::predecessor_account_id(), amount.into());
-        ext_bridge_token_factory::finish_withdraw(amount.into(), recipient, &self.controller, NO_DEPOSIT, env::prepaid_gas() / 2)
+        self.token
+            .burn(env::predecessor_account_id(), amount.into());
+        ext_bridge_token_factory::finish_withdraw(
+            amount.into(),
+            recipient,
+            &self.controller,
+            NO_DEPOSIT,
+            env::prepaid_gas() / 2,
+        )
     }
 }
 

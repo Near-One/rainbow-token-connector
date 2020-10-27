@@ -8,7 +8,9 @@ pub struct MockProver {}
 #[near_bindgen]
 impl MockProver {
     #[init]
-    pub fn new() -> Self { MockProver {} }
+    pub fn new() -> Self {
+        MockProver {}
+    }
 
     #[result_serializer(borsh)]
     pub fn verify_log_entry(
