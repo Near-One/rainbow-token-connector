@@ -142,7 +142,6 @@ impl BridgeTokenFactory {
             "Bridge token for {} is not deployed yet",
             event.token
         );
-        // TODO: Is it possible to avoid this clone here?
         let proof_1 = proof.clone();
         ext_prover::verify_log_entry(
             proof.log_index,
@@ -304,7 +303,6 @@ impl BridgeTokenFactory {
             hex::encode(&event.locker_address),
             hex::encode(&self.locker_address),
         );
-        // TODO: Is it possible to avoid this clone here?
         let proof_1 = proof.clone();
         ext_prover::verify_log_entry(
             proof.log_index,
