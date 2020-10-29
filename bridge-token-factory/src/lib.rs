@@ -182,7 +182,7 @@ impl BridgeTokenFactory {
     ) -> Promise {
         assert_self();
         assert!(verification_success, "Failed to verify the proof");
-        let _ = self.record_proof(&proof);
+        self.record_proof(&proof);
 
         ext_bridge_token::mint(
             new_owner_id,
@@ -342,7 +342,7 @@ impl BridgeTokenFactory {
     ) -> Promise {
         assert_self();
         assert!(verification_success, "Failed to verify the proof");
-        let _ = self.record_proof(&proof);
+        self.record_proof(&proof);
         ext_nep21::transfer(
             recipient,
             amount.into(),
@@ -355,7 +355,8 @@ impl BridgeTokenFactory {
     /// Record proof to make sure it is not re-used later for anther deposit.
     fn record_proof(&mut self, proof: &Proof) -> Balance {
         // TODO: Instead of sending the full proof (clone only relevant parts of the Proof)
-        // log_index / receipt_index / header_data
+        //       log_index / receipt_index / header_data
+        assert_self();
         let initial_storage = env::storage_usage();
         let mut data = proof.log_index.try_to_vec().unwrap();
         data.extend(proof.receipt_index.try_to_vec().unwrap());

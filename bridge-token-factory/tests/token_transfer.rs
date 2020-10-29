@@ -284,10 +284,8 @@ fn test_with_invalid_proof() {
     factory.deposit(&mut runtime, &root, proof.clone()).unwrap();
 
     // This deposit event must fail since same deposit event can't be reused.
-    // Previous call to deposit with the same event already was successful.
-    factory
-        .deposit(&mut runtime, &root, proof.clone())
-        .unwrap_err();
+    // Previous call to deposit with the same event was successful.
+    factory.deposit(&mut runtime, &root, proof).unwrap_err();
 }
 
 #[test]
