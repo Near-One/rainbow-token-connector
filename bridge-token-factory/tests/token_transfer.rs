@@ -244,6 +244,51 @@ fn test_eth_token_transfer() {
 }
 
 #[test]
+fn test_with_invalid_proof() {
+    let (mut runtime, factory) = setup_token_factory();
+    let root = "root".to_string();
+    runtime.create_user(root.clone(), ALICE.to_string(), to_yocto("1"));
+
+    factory
+        .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("35"))
+        .unwrap();
+
+    let token_account_id =
+        factory.get_bridge_token_account_id(&mut runtime, DAI_ADDRESS.to_string());
+    assert_eq!(token_account_id, format!("{}.{}", DAI_ADDRESS, FACTORY));
+
+    let mut proof = Proof::default();
+
+    proof.log_entry_data = EthLockedEvent {
+        locker_address: validate_eth_address(LOCKER_ADDRESS.to_string()),
+        token: DAI_ADDRESS.to_string(),
+        sender: SENDER_ADDRESS.to_string(),
+        amount: 1_000,
+        recipient: ALICE.to_string(),
+    }
+    .to_log_entry_data();
+
+    // This is an invalid proof that will not pass proof validation
+    // since mock_prover will only accept empty proofs.
+    proof.proof = vec![vec![]];
+
+    factory
+        .deposit(&mut runtime, &root, proof.clone())
+        .unwrap_err();
+
+    // Convert the proof in a valid proof that is going to be accepted by the mock_prover.
+    proof.proof.clear();
+
+    // This deposit event must succeed. Notice that previously a similar deposit
+    // was made, but it failed because it had an invalid proof, so this one should succeed.
+    factory.deposit(&mut runtime, &root, proof.clone()).unwrap();
+
+    // This deposit event must fail since same deposit event can't be reused.
+    // Previous call to deposit with the same event was successful.
+    factory.deposit(&mut runtime, &root, proof).unwrap_err();
+}
+
+#[test]
 fn test_near_token_transfer() {
     let (mut runtime, factory) = setup_token_factory();
     let root = "root".to_string();

@@ -34,7 +34,7 @@ pub trait Prover {
     ) -> bool;
 }
 
-#[derive(Default, BorshDeserialize, BorshSerialize)]
+#[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
 pub struct Proof {
     pub log_index: u64,
     pub log_entry_data: Vec<u8>,
@@ -67,14 +67,17 @@ impl EthEvent {
         };
         let log_entry: LogEntry = rlp::decode(data).expect("Invalid RLP");
         let locker_address = (log_entry.address.clone().0).0;
+        let topics = log_entry
+            .topics
+            .iter()
+            .map(|h| Hash::from(&((h.0).0)))
+            .collect();
+
         let raw_log = RawLog {
-            topics: log_entry
-                .topics
-                .iter()
-                .map(|h| Hash::from(&((h.0).0)))
-                .collect(),
+            topics,
             data: log_entry.data.clone(),
         };
+
         let log = event.parse_log(raw_log).expect("Failed to parse event log");
         Self {
             locker_address,

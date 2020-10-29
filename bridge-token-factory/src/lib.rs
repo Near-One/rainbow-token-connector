@@ -63,6 +63,7 @@ pub trait ExtBridgeTokenFactory {
         #[serializer(borsh)] token: String,
         #[serializer(borsh)] new_owner_id: AccountId,
         #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)] proof: Proof,
     ) -> Promise;
 
     #[result_serializer(borsh)]
@@ -82,6 +83,7 @@ pub trait ExtBridgeTokenFactory {
         #[serializer(borsh)] token: AccountId,
         #[serializer(borsh)] recipient: AccountId,
         #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)] proof: Proof,
     ) -> Promise;
 }
 
@@ -127,7 +129,6 @@ impl BridgeTokenFactory {
     /// Also if this is first time this token is used, need to attach extra to deploy the BridgeToken contract.
     #[payable]
     pub fn deposit(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
-        let leftover_deposit = self.record_proof(&proof);
         let event = EthLockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
             event.locker_address,
@@ -141,6 +142,7 @@ impl BridgeTokenFactory {
             "Bridge token for {} is not deployed yet",
             event.token
         );
+        let proof_1 = proof.clone();
         ext_prover::verify_log_entry(
             proof.log_index,
             proof.log_entry_data,
@@ -157,8 +159,9 @@ impl BridgeTokenFactory {
             event.token,
             event.recipient,
             event.amount,
+            proof_1,
             &env::current_account_id(),
-            leftover_deposit,
+            env::attached_deposit(),
             env::prepaid_gas() / 2,
         ))
     }
@@ -174,9 +177,11 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] token: String,
         #[serializer(borsh)] new_owner_id: AccountId,
         #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)] proof: Proof,
     ) -> Promise {
         assert_self();
         assert!(verification_success, "Failed to verify the proof");
+        self.record_proof(&proof);
 
         ext_bridge_token::mint(
             new_owner_id,
@@ -224,13 +229,11 @@ impl BridgeTokenFactory {
         let initial_storage = env::storage_usage() as u128;
         self.tokens.insert(&address);
         let current_storage = env::storage_usage() as u128;
-        let needed_deposit = BRIDGE_TOKEN_INIT_BALANCE
-            + STORAGE_PRICE_PER_BYTE * (current_storage - initial_storage);
         assert!(
-            env::attached_deposit() >= needed_deposit,
-            "Not enough attached deposit to complete bridge token creation. Attached: {}; Needed: {}",
-            env::attached_deposit(),
-            needed_deposit
+            env::attached_deposit()
+                >= BRIDGE_TOKEN_INIT_BALANCE
+                    + STORAGE_PRICE_PER_BYTE * (current_storage - initial_storage),
+            "Not enough attached deposit to complete bridge token creation"
         );
         let bridge_token_account_id = format!("{}.{}", address, env::current_account_id());
         Promise::new(bridge_token_account_id)
@@ -292,7 +295,6 @@ impl BridgeTokenFactory {
 
     #[payable]
     pub fn unlock(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
-        let leftover_deposit = self.record_proof(&proof);
         let event = EthUnlockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
             event.locker_address,
@@ -301,6 +303,7 @@ impl BridgeTokenFactory {
             hex::encode(&event.locker_address),
             hex::encode(&self.locker_address),
         );
+        let proof_1 = proof.clone();
         ext_prover::verify_log_entry(
             proof.log_index,
             proof.log_entry_data,
@@ -317,8 +320,9 @@ impl BridgeTokenFactory {
             event.token,
             event.recipient,
             event.amount,
+            proof_1,
             &env::current_account_id(),
-            leftover_deposit,
+            env::attached_deposit(),
             env::prepaid_gas() / 2,
         ))
     }
@@ -332,9 +336,11 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] token: AccountId,
         #[serializer(borsh)] recipient: AccountId,
         #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)] proof: Proof,
     ) -> Promise {
         assert_self();
         assert!(verification_success, "Failed to verify the proof");
+        self.record_proof(&proof);
         ext_nep21::transfer(
             recipient,
             amount.into(),
@@ -346,6 +352,9 @@ impl BridgeTokenFactory {
 
     /// Record proof to make sure it is not re-used later for anther deposit.
     fn record_proof(&mut self, proof: &Proof) -> Balance {
+        // TODO: Instead of sending the full proof (clone only relevant parts of the Proof)
+        //       log_index / receipt_index / header_data
+        assert_self();
         let initial_storage = env::storage_usage();
         let mut data = proof.log_index.try_to_vec().unwrap();
         data.extend(proof.receipt_index.try_to_vec().unwrap());
@@ -429,7 +438,7 @@ mod tests {
     }
 
     #[test]
-    fn test_deploy_bridge_token_and_deposit() {
+    fn test_deploy_bridge_token() {
         testing_env!(VMContextBuilder::new()
             .predecessor_account_id(alice())
             .finish());

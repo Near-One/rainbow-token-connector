@@ -25,7 +25,7 @@ borsh = "0.6.2"
 # near-sdk = "1.0.0"
 uint = { version = "0.8.3", default-features = false }
 wee_alloc = { version = "0.4.5", default-features = false, features = [] }
-near-lib = { git = "https://github.com/ilblackdragon/balancer-near" }
+near-lib = { git = "https://github.com/ilblackdragon/balancer-near", rev = "a386305c9829d2e5302a78fdc475c8a279fcf6ed"}
 eth-types =  { git = "https://github.com/near/rainbow-bridge" }
 rlp = "0.4.2"
 ethabi = "12.0.0"
@@ -33,5 +33,5 @@ hex = "0.4.2"
 tiny-keccak = "1.4.0"
 
 [dev-dependencies]
-near-test = { git = "https://github.com/ilblackdragon/balancer-near" }
+near-test = { git = "https://github.com/ilblackdragon/balancer-near", rev = "a386305c9829d2e5302a78fdc475c8a279fcf6ed"}
 lazy_static = "1.4.0"
