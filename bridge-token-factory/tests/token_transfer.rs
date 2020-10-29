@@ -257,13 +257,8 @@ fn test_with_invalid_proof() {
         factory.get_bridge_token_account_id(&mut runtime, DAI_ADDRESS.to_string());
     assert_eq!(token_account_id, format!("{}.{}", DAI_ADDRESS, FACTORY));
 
-    let token = BridgeToken {
-        contract_id: token_account_id,
-    };
-    assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "0");
-    assert_eq!(token.get_total_supply(&mut runtime), "0");
-
     let mut proof = Proof::default();
+
     proof.log_entry_data = EthLockedEvent {
         locker_address: validate_eth_address(LOCKER_ADDRESS.to_string()),
         token: DAI_ADDRESS.to_string(),
@@ -272,22 +267,27 @@ fn test_with_invalid_proof() {
         recipient: ALICE.to_string(),
     }
     .to_log_entry_data();
-    factory.deposit(&mut runtime, &root, proof).unwrap();
 
-    assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "1000");
-    assert_eq!(token.get_total_supply(&mut runtime), "1000");
+    // This is an invalid proof that will not pass proof validation
+    // since mock_prover will only accept empty proofs.
+    proof.proof = vec![vec![]];
 
-    token
-        .withdraw(
-            &mut runtime,
-            ALICE.to_string(),
-            "100".to_string(),
-            SENDER_ADDRESS.to_string(),
-        )
-        .unwrap();
+    factory
+        .deposit(&mut runtime, &root, proof.clone())
+        .unwrap_err();
 
-    assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "900");
-    assert_eq!(token.get_total_supply(&mut runtime), "900");
+    // Convert the proof in a valid proof that is going to be accepted by the mock_prover.
+    proof.proof.clear();
+
+    // This deposit event must succeed. Notice that previously a similar deposit
+    // was made, but it failed because it had an invalid proof, so this one should succeed.
+    factory.deposit(&mut runtime, &root, proof.clone()).unwrap();
+
+    // This deposit event must fail since same deposit event can't be reused.
+    // Previous call to deposit with the same event already was successful.
+    factory
+        .deposit(&mut runtime, &root, proof.clone())
+        .unwrap_err();
 }
 
 #[test]
