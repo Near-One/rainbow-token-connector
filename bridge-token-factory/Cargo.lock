@@ -253,6 +253,7 @@ dependencies = [
  "near-lib",
  "near-sdk",
  "near-test",
+ "rand",
  "rlp",
  "serde",
  "serde_json",
