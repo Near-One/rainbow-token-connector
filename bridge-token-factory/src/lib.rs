@@ -33,6 +33,12 @@ const TRANSFER_FROM_GAS: Gas = 10_000_000_000_000;
 
 const TRANSFER_GAS: Gas = 10_000_000_000_000;
 
+#[derive(Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+pub enum ResultType {
+    Withdraw,
+    Lock,
+}
+
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct BridgeTokenFactory {
@@ -201,7 +207,7 @@ impl BridgeTokenFactory {
         &mut self,
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] recipient: String,
-    ) -> (u128, [u8; 20], [u8; 20]) {
+    ) -> (ResultType, u128, [u8; 20], [u8; 20]) {
         let token = env::predecessor_account_id();
         let parts: Vec<&str> = token.split(".").collect();
         assert_eq!(
@@ -215,7 +221,12 @@ impl BridgeTokenFactory {
         );
         let token_address = validate_eth_address(parts[0].to_string());
         let recipient_address = validate_eth_address(recipient);
-        (amount.into(), token_address, recipient_address)
+        (
+            ResultType::Withdraw,
+            amount.into(),
+            token_address,
+            recipient_address,
+        )
     }
 
     #[payable]
@@ -287,10 +298,10 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] recipient: [u8; 20],
         #[serializer(borsh)] token: String,
-    ) -> (String, u128, [u8; 20]) {
+    ) -> (ResultType, String, u128, [u8; 20]) {
         assert_self();
         assert!(is_promise_success());
-        (token, amount.into(), recipient)
+        (ResultType::Lock, token, amount.into(), recipient)
     }
 
     #[payable]
@@ -484,7 +495,7 @@ mod tests {
         let address = validate_eth_address(token_locker());
         assert_eq!(
             contract.finish_withdraw(1_000, token_locker()),
-            (1_000, address, address)
+            (ResultType::Withdraw, 1_000, address, address)
         );
     }
 }

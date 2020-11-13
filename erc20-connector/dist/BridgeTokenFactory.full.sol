@@ -418,7 +418,7 @@ library Borsh {
     }
 
     modifier shift(Data memory data, uint256 size) {
-        // require(data.raw.length > data.offset + size, "Borsh: Out of range");
+        require(data.raw.length >= data.offset + size, "Borsh: Out of range");
         _;
         data.offset += size;
     }
@@ -529,7 +529,7 @@ library Borsh {
         }
     }
 
-    function decodeBytes20(Data memory data) internal pure returns(bytes20 value) {
+    function decodeBytes20(Data memory data) internal pure shift(data, 20) returns(bytes20 value) {
         for (uint i = 0; i < 20; i++) {
             value |= bytes20(byte(decodeU8(data)) & 0xFF) >> (i * 8);
         }
@@ -1311,6 +1311,8 @@ contract ERC20Locker is Locker {
 
     function _decodeBurnResult(bytes memory data) internal pure returns(BurnResult memory result) {
         Borsh.Data memory borshData = Borsh.from(data);
+        uint8 flag = borshData.decodeU8();
+        require(flag == 0, "ERR_NOT_WITHDRAW_RESULT");
         result.amount = borshData.decodeU128();
         bytes20 token = borshData.decodeBytes20();
         result.token = address(uint160(token));
@@ -1401,6 +1403,8 @@ contract BridgeTokenFactory is ERC20Locker {
 
     function _decodeLockResult(bytes memory data) internal pure returns(LockResult memory result) {
         Borsh.Data memory borshData = Borsh.from(data);
+        uint8 flag = borshData.decodeU8();
+        require(flag == 1, "ERR_NOT_LOCK_RESULT");
         result.token = string(borshData.decodeBytes());
         result.amount = borshData.decodeU128();
         bytes20 recipient = borshData.decodeBytes20();

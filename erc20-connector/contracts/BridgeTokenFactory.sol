@@ -79,6 +79,8 @@ contract BridgeTokenFactory is ERC20Locker {
 
     function _decodeLockResult(bytes memory data) internal pure returns(LockResult memory result) {
         Borsh.Data memory borshData = Borsh.from(data);
+        uint8 flag = borshData.decodeU8();
+        require(flag == 1, "ERR_NOT_LOCK_RESULT");
         result.token = string(borshData.decodeBytes());
         result.amount = borshData.decodeU128();
         bytes20 recipient = borshData.decodeBytes20();

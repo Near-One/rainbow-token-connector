@@ -189,7 +189,7 @@ library Borsh {
     }
 
     modifier shift(Data memory data, uint256 size) {
-        // require(data.raw.length > data.offset + size, "Borsh: Out of range");
+        require(data.raw.length >= data.offset + size, "Borsh: Out of range");
         _;
         data.offset += size;
     }
@@ -300,7 +300,7 @@ library Borsh {
         }
     }
 
-    function decodeBytes20(Data memory data) internal pure returns(bytes20 value) {
+    function decodeBytes20(Data memory data) internal pure shift(data, 20) returns(bytes20 value) {
         for (uint i = 0; i < 20; i++) {
             value |= bytes20(byte(decodeU8(data)) & 0xFF) >> (i * 8);
         }
