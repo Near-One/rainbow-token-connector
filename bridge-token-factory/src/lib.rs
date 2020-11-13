@@ -33,7 +33,7 @@ const TRANSFER_FROM_GAS: Gas = 10_000_000_000_000;
 
 const TRANSFER_GAS: Gas = 10_000_000_000_000;
 
-#[derive(Debug, Eq, PartialEq)]
+#[derive(Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum ResultType {
     Withdraw,
     Lock,
