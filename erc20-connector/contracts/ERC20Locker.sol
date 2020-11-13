@@ -49,7 +49,7 @@ contract ERC20Locker is Locker {
 
     function _decodeBurnResult(bytes memory data) internal pure returns(BurnResult memory result) {
         Borsh.Data memory borshData = Borsh.from(data);
-        uint8 memory flag = borshData.decodeU8();
+        uint8 flag = borshData.decodeU8();
         require(flag == 0, "ERR_NOT_WITHDRAW_RESULT");
         result.amount = borshData.decodeU128();
         bytes20 token = borshData.decodeBytes20();
