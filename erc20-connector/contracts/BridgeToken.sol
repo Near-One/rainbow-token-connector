@@ -1,10 +1,10 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.6.0;
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
 contract BridgeToken is ERC20 {
     address private _controller; // has CONTROL role
 
-    constructor() public {
+    constructor(string memory name, string memory symbol) ERC20(name, symbol) public {
         _controller = msg.sender;
     }
 

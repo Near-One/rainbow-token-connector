@@ -1,4 +1,4 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.6.0;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
@@ -56,7 +56,7 @@ contract BridgeTokenFactory is ERC20Locker {
 
     function newBridgeToken(string calldata nearTokenId) external returns (BridgeToken) {
         require(!_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_BRIDGE_TOKEN_EXISTS");
-        BridgeToken btoken = new BridgeToken();
+        BridgeToken btoken = new BridgeToken("Rainbow", "RB");
         _isBridgeToken[address(btoken)] = true;
         _ethToNearToken[address(btoken)] = nearTokenId;
         _nearToEthToken[nearTokenId] = address(btoken);
