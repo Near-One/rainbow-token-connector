@@ -1,10 +1,8 @@
-pragma solidity ^0.5.0;
+pragma solidity ^0.6;
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
-import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
-import "rainbow-bridge-sol/nearbridge/contracts/NearDecoder.sol";
-import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
+import "rainbow-bridge/contracts/eth/nearprover/contracts/ProofDecoder.sol";
+import "rainbow-bridge/contracts/eth/nearbridge/contracts/Borsh.sol";
 import "./Locker.sol";
 
 contract ERC20Locker is Locker {
@@ -27,6 +25,14 @@ contract ERC20Locker is Locker {
         uint128 amount;
         address token;
         address recipient;
+    }
+
+    // ERC20Locker is linked to the bridge token factory on NEAR side.
+    // It also links to the prover that it uses to unlock the tokens.
+    constructor(bytes memory nearTokenFactory, INearProver prover, address admin) public {
+        nearTokenFactory_ = nearTokenFactory;
+        prover_ = prover;
+        admin_ = admin;
     }
 
     function lockToken(address ethToken, uint256 amount, string memory accountId) public {
@@ -56,5 +62,22 @@ contract ERC20Locker is Locker {
         result.token = address(uint160(token));
         bytes20 recipient = borshData.decodeBytes20();
         result.recipient = address(uint160(recipient));
+    }
+
+    address public admin_;
+
+    modifier onlyAdmin {
+        require(msg.sender == admin_);
+        _;
+    }
+
+    function adminTransfer(IERC20 token, address destination, uint amount) public onlyAdmin {
+        token.safeTransfer(destination, amount);
+    }
+
+    function adminDelegatecall(address target, bytes memory data) public onlyAdmin returns(bytes memory) {
+        (bool success, bytes memory rdata) = target.delegatecall(data);
+        require(success);
+        return rdata;
     }
 }
