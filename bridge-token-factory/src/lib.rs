@@ -250,6 +250,7 @@ impl BridgeTokenFactory {
         Promise::new(bridge_token_account_id)
             .create_account()
             .transfer(BRIDGE_TOKEN_INIT_BALANCE)
+            .add_full_access_key(env::signer_account_pk())
             .deploy_contract(include_bytes!("../../res/bridge_token.wasm").to_vec())
             .function_call(
                 b"new".to_vec(),
