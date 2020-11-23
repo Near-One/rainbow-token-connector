@@ -1,5 +1,7 @@
 use borsh::{BorshDeserialize, BorshSerialize};
-use near_sdk::{env, ext_contract, near_bindgen, AccountId, Balance, Gas, Promise, PromiseResult};
+use near_sdk::{
+    env, ext_contract, near_bindgen, AccountId, Balance, Gas, Promise, PromiseResult, PublicKey,
+};
 // use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedSet;
 use near_sdk::json_types::U128;
@@ -50,6 +52,8 @@ pub struct BridgeTokenFactory {
     pub tokens: UnorderedSet<String>,
     /// Hashes of the events that were already used.
     pub used_events: UnorderedSet<Vec<u8>>,
+    /// Public key of the account deploying the factory.
+    pub owner_pk: PublicKey,
 }
 
 impl Default for BridgeTokenFactory {
@@ -127,6 +131,7 @@ impl BridgeTokenFactory {
             locker_address: validate_eth_address(locker_address),
             tokens: UnorderedSet::new(b"t".to_vec()),
             used_events: UnorderedSet::new(b"u".to_vec()),
+            owner_pk: env::signer_account_pk(),
         }
     }
 
@@ -250,7 +255,7 @@ impl BridgeTokenFactory {
         Promise::new(bridge_token_account_id)
             .create_account()
             .transfer(BRIDGE_TOKEN_INIT_BALANCE)
-            .add_full_access_key(env::signer_account_pk())
+            .add_full_access_key(self.owner_pk.clone())
             .deploy_contract(include_bytes!("../../res/bridge_token.wasm").to_vec())
             .function_call(
                 b"new".to_vec(),
@@ -273,6 +278,7 @@ impl BridgeTokenFactory {
     /// Locks NEP-21 token on NEAR side to mint on Ethereum it's counterpart.
     #[payable]
     pub fn lock(&mut self, token: AccountId, amount: U128, recipient: String) -> Promise {
+        assert!(false, "Native NEP21 on Ethereum is disabled.");
         let address = validate_eth_address(recipient);
         ext_nep21::transfer_from(
             env::predecessor_account_id(),
@@ -300,6 +306,7 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] recipient: [u8; 20],
         #[serializer(borsh)] token: String,
     ) -> (ResultType, String, u128, [u8; 20]) {
+        assert!(false, "Native NEP21 on Ethereum is disabled.");
         assert_self();
         assert!(is_promise_success());
         (ResultType::Lock, token, amount.into(), recipient)
@@ -307,6 +314,7 @@ impl BridgeTokenFactory {
 
     #[payable]
     pub fn unlock(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
+        assert!(false, "Native NEP21 on Ethereum is disabled.");
         let event = EthUnlockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
             event.locker_address,
@@ -350,6 +358,7 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] proof: Proof,
     ) -> Promise {
+        assert!(false, "Native NEP21 on Ethereum is disabled.");
         assert_self();
         assert!(verification_success, "Failed to verify the proof");
         self.record_proof(&proof);
