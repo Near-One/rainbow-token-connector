@@ -1,5 +1,17 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
-RUSTFLAGS='-C link-arg=-s' cargo +stable build -p bridge-token-factory --target wasm32-unknown-unknown --release || exit 1
+# Exit script as soon as a command fails.
+set -e
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+docker run \
+     --mount type=bind,source=$DIR/..,target=/host \
+     --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
+     -w /host/bridge-token-factory \
+     -e RUSTFLAGS='-C link-arg=-s' \
+     nearprotocol/contract-builder \
+     cargo +stable build --target wasm32-unknown-unknown --release
+
 mkdir -p res
-cp target/wasm32-unknown-unknown/release/bridge_token_factory.wasm ../res/
+cp $DIR/target/wasm32-unknown-unknown/release/bridge_token_factory.wasm $DIR/../res/

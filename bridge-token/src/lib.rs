@@ -67,19 +67,23 @@ impl BridgeToken {
 
 #[near_bindgen]
 impl FungibleToken for BridgeToken {
+    #[payable]
     fn inc_allowance(&mut self, escrow_account_id: String, amount: U128) {
         self.token.inc_allowance(escrow_account_id, amount.into());
     }
 
+    #[payable]
     fn dec_allowance(&mut self, escrow_account_id: String, amount: U128) {
         self.token.dec_allowance(escrow_account_id, amount.into());
     }
 
+    #[payable]
     fn transfer_from(&mut self, owner_id: String, new_owner_id: String, amount: U128) {
         self.token
             .transfer_from(owner_id, new_owner_id, amount.into());
     }
 
+    #[payable]
     fn transfer(&mut self, new_owner_id: String, amount: U128) {
         self.token.transfer(new_owner_id, amount.into());
     }
