@@ -96,6 +96,8 @@ pub trait ExtBridgeTokenFactory {
 #[ext_contract(ext_bridge_token)]
 pub trait ExtBridgeToken {
     fn mint(&self, account_id: AccountId, amount: U128) -> Promise;
+
+    fn withdraw_internal(&self, account_id: AccountId, amount: U128, recipient: String) -> Promise;
 }
 
 pub fn assert_self() {
@@ -199,9 +201,33 @@ impl BridgeTokenFactory {
     }
 
     /// Burn given amount of tokens and unlock it on the Ethereum side for the recipient address.
-    /// We return the amount as u128 and the address of the beneficiary as `[u8; 20]` for ease of
-    /// processing on Solidity side.
-    /// Caller must be <token_address>.<current_account_id>, where <token_address> exists in the `tokens`.
+    /// Exposing at BridgeTokenFactory minimizes the number of contracts for which a user needs a
+    /// FunctionCall access key.
+    /// Calls withdraw_internal on subaccount BridgeToken contract.
+    pub fn withdraw(&mut self, erc20_address: String, recipient: String, amount: U128) -> Promise {
+        let _ = validate_eth_address(erc20_address.clone());
+        let _ = validate_eth_address(recipient.clone());
+        assert!(
+            self.tokens.contains(&erc20_address),
+            "Such BridgeToken does not exist."
+        );
+
+        let sender = env::predecessor_account_id();
+
+        ext_bridge_token::withdraw_internal(
+            sender,
+            amount,
+            recipient,
+            &self.get_bridge_token_account_id(erc20_address),
+            NO_DEPOSIT,
+            env::prepaid_gas() / 2,
+        )
+    }
+
+    // Finish withdraw; called by a BridgeToken contract.
+    // We return the amount as u128 and the address of the beneficiary as `[u8; 20]` for ease of
+    // processing on Solidity side.
+    // Caller must be <token_address>.<current_account_id>, where <token_address> exists in the `tokens`.
     #[result_serializer(borsh)]
     pub fn finish_withdraw(
         &mut self,

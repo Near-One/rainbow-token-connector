@@ -52,6 +52,27 @@ impl BridgeToken {
         self.token.mint(account_id, amount.into());
     }
 
+    pub fn withdraw_internal(
+        &mut self,
+        account_id: AccountId,
+        amount: U128,
+        recipient: String,
+    ) -> Promise {
+        assert_eq!(
+            env::predecessor_account_id(),
+            self.controller,
+            "Only controller can call mint"
+        );
+        self.token.burn(account_id, amount.into());
+        ext_bridge_token_factory::finish_withdraw(
+            amount.into(),
+            recipient,
+            &self.controller,
+            NO_DEPOSIT,
+            env::prepaid_gas() / 2,
+        )
+    }
+
     pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
         self.token
             .burn(env::predecessor_account_id(), amount.into());
