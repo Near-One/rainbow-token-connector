@@ -1,13 +1,11 @@
-pragma solidity ^0.5.0;
-import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
-import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
-import "rainbow-bridge-sol/nearbridge/contracts/NearDecoder.sol";
-import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
+pragma solidity ^0.6;
+import "rainbow-bridge/contracts/eth/nearprover/contracts/INearProver.sol";
+import "rainbow-bridge/contracts/eth/nearprover/contracts/ProofDecoder.sol";
+import "rainbow-bridge/contracts/eth/nearbridge/contracts/Borsh.sol";
 
 contract Locker {
     using Borsh for Borsh.Data;
     using ProofDecoder for Borsh.Data;
-    using NearDecoder for Borsh.Data;
 
     INearProver public prover_;
     bytes public nearTokenFactory_;
