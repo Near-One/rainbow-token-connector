@@ -119,11 +119,9 @@ TODO
 ### Testing Ethereum side
 
 ```
-cd erc20-locker
+cd erc20-connector
 yarn
-npm run test?
-truffle rpctest
-truffle test
+yarn run test
 ```
 
 ### Testing NEAR side
