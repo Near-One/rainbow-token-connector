@@ -40,12 +40,6 @@ contract ERC20Locker is Locker {
         emit Locked(address(ethToken), msg.sender, amount, accountId);
     }
 
-    function burnResult(bytes memory proofData, uint64 proofBlockHeight) public returns(address) {
-        ProofDecoder.ExecutionStatus memory status = _parseProof(proofData, proofBlockHeight);
-        BurnResult memory result = _decodeBurnResult(status.successValue);
-        return result.token;
-    }
-
     function unlockToken(bytes memory proofData, uint64 proofBlockHeight) public {
         ProofDecoder.ExecutionStatus memory status = _parseProof(proofData, proofBlockHeight);
         BurnResult memory result = _decodeBurnResult(status.successValue);
