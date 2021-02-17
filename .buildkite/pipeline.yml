@@ -1,0 +1,5 @@
+steps:
+    - label: test buildkite
+      command: |
+          echo EPIC
+      timeout: 5
