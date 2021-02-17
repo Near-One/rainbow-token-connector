@@ -1,10 +1,5 @@
 steps:
     - label: test buildkite
-
-    command: |
-      echo EPIC
-
-    timeout: 5
-
-    agents:
-        - "queue=default"
+      command: |
+          echo EPIC
+      timeout: 5
