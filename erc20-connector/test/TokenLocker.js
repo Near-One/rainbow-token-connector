@@ -36,7 +36,7 @@ contract('TokenLocker', function ([addr, addr1]) {
         this.btoken = await BridgeToken.at(BTOKEN);*/
     });
 
-    it('lock to NEAR', async function() {
+    it('lock to NEAR', async function () {
         const preBalance1 = await this.token.balanceOf(addr1);
         expect(fromWei(preBalance1)).equal('5');
         await this.token.approve(this.locker.address, toWei('1'), { from: addr1 });
@@ -98,13 +98,13 @@ contract('TokenLocker', function ([addr, addr1]) {
         expect(fromWei(afterBalance2)).equal('5');
     });*/
 
-    it('admin functions', async function() {
-      expect(await this.locker.admin_()).equal(addr)
-      try {
-        await this.locker.adminTransfer(this.token.address, addr1, toWei('1'), { from: addr1 })
-        assert(false)
-      } catch (_) { }
-      await this.locker.adminTransfer(this.token.address, addr1, toWei('1'), { from: addr })
-      expect(fromWei(await this.token.balanceOf(addr1))).to.be.equal('6')
+    it('admin functions', async function () {
+        expect(await this.locker.admin_()).equal(addr)
+        try {
+            await this.locker.adminTransfer(this.token.address, addr1, toWei('1'), { from: addr1 })
+            assert(false)
+        } catch (_) { }
+        await this.locker.adminTransfer(this.token.address, addr1, toWei('1'), { from: addr })
+        expect(fromWei(await this.token.balanceOf(addr1))).to.be.equal('6')
     });
 });
