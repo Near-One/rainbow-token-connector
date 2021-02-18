@@ -1,0 +1,8 @@
+version: "3.3"
+services:
+    compile-solidity:
+        image: node:10.23-buster
+        volumes:
+            - .:/host
+        working_dir: /host/erc20-connector
+        command: ./dist.sh
