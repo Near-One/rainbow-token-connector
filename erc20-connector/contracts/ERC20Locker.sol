@@ -62,7 +62,7 @@ contract ERC20Locker is Locker {
     // This allows to support ERC223 tokens with no extra cost.
     // The function always passes: we don't need to make any decision and the contract always
     // accept token transfers transfer.
-    function tokenFallback(address _from, uint _value, bytes _data) public pure {}
+    function tokenFallback(address _from, uint _value, bytes memory _data) public pure {}
 
     address public admin_;
 
