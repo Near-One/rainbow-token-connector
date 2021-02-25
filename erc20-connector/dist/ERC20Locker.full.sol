@@ -1004,24 +1004,43 @@ interface INearProver {
     function proveOutcome(bytes calldata proofData, uint64 blockHeight) external view returns(bool);
 }
 
-// File: contracts/Locker.sol
+// File: contracts/ProofKeeper.sol
 
-pragma solidity ^0.6;
-
-
+pragma solidity ^0.6.12;
 
 
-contract Locker {
+
+
+contract ProofKeeper {
     using Borsh for Borsh.Data;
     using ProofDecoder for Borsh.Data;
 
     INearProver public prover_;
-    bytes public nearTokenFactory_;
+    bytes public nearProofProducerAccount_;
+
+    /// Proofs from blocks that are below the acceptance height will be rejected.
+    // If `minBlockAcceptanceHeight_` value is zero - proofs from block with any height are accepted.
+    uint64 public minBlockAcceptanceHeight_;
 
     // OutcomeReciptId -> Used
     mapping(bytes32 => bool) public usedEvents_;
 
-    function _parseProof(bytes memory proofData, uint64 proofBlockHeight) internal returns(ProofDecoder.ExecutionStatus memory result) {
+    constructor(bytes memory nearProofProducerAccount, INearProver prover, uint64 minBlockAcceptanceHeight) public {
+        require(nearProofProducerAccount.length > 0, "Invalid Near ProofProducer address");
+        require(address(prover) != address(0), "Invalid Near prover address");
+
+        nearProofProducerAccount_ = nearProofProducerAccount;
+        prover_ = prover;
+        minBlockAcceptanceHeight_ = minBlockAcceptanceHeight;
+    }
+
+    /// Parses the provided proof and consumes it if it's not already used.
+    /// The consumed event cannot be reused for future calls.
+    function _parseAndConsumeProof(bytes memory proofData, uint64 proofBlockHeight)
+        internal
+        returns (ProofDecoder.ExecutionStatus memory result)
+    {
+        require(proofBlockHeight >= minBlockAcceptanceHeight_, "Proof is from the ancient block");
         require(prover_.proveOutcome(proofData, proofBlockHeight), "Proof should be valid");
 
         // Unpack the proof and extract the execution outcome.
@@ -1033,25 +1052,26 @@ contract Locker {
         require(!usedEvents_[receiptId], "The burn event cannot be reused");
         usedEvents_[receiptId] = true;
 
-        require(keccak256(fullOutcomeProof.outcome_proof.outcome_with_id.outcome.executor_id) == keccak256(nearTokenFactory_),
-        "Can only unlock tokens from the linked mintable fungible token on Near blockchain.");
+        require(keccak256(fullOutcomeProof.outcome_proof.outcome_with_id.outcome.executor_id)
+                == keccak256(nearProofProducerAccount_),
+                "Can only unlock tokens from the linked proof producer on Near blockchain");
 
         result = fullOutcomeProof.outcome_proof.outcome_with_id.outcome.status;
-        require(!result.failed, "Cannot use failed execution outcome for unlocking the tokens.");
-        require(!result.unknown, "Cannot use unknown execution outcome for unlocking the tokens.");
+        require(!result.failed, "Cannot use failed execution outcome for unlocking the tokens");
+        require(!result.unknown, "Cannot use unknown execution outcome for unlocking the tokens");
     }
 }
 
 // File: contracts/ERC20Locker.sol
 
-pragma solidity ^0.6;
+pragma solidity ^0.6.12;
 
 
 
 
 
 
-contract ERC20Locker is Locker {
+contract ERC20Locker is ProofKeeper {
     using SafeERC20 for IERC20;
 
     event Locked (
@@ -1075,10 +1095,11 @@ contract ERC20Locker is Locker {
 
     // ERC20Locker is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
-    constructor(bytes memory nearTokenFactory, INearProver prover, address admin) public {
-        nearTokenFactory_ = nearTokenFactory;
-        prover_ = prover;
-        admin_ = admin;
+    constructor(bytes memory nearTokenFactory, INearProver prover, uint64 minBlockAcceptanceHeight, address _admin)
+        ProofKeeper(nearTokenFactory, prover, minBlockAcceptanceHeight)
+        public
+    {
+        admin_ = _admin;
     }
 
     function lockToken(address ethToken, uint256 amount, string memory accountId) public {
@@ -1087,7 +1108,7 @@ contract ERC20Locker is Locker {
     }
 
     function unlockToken(bytes memory proofData, uint64 proofBlockHeight) public {
-        ProofDecoder.ExecutionStatus memory status = _parseProof(proofData, proofBlockHeight);
+        ProofDecoder.ExecutionStatus memory status = _parseAndConsumeProof(proofData, proofBlockHeight);
         BurnResult memory result = _decodeBurnResult(status.successValue);
         IERC20(result.token).safeTransfer(result.recipient, result.amount);
         emit Unlocked(result.amount, result.recipient);

@@ -25,9 +25,10 @@ contract('TokenLocker', function ([addr, addr1]) {
     const nearToken = 'neartoken';
 
     beforeEach(async function () {
+        let minBlockAcceptanceHeight = 0;
         this.token = await TToken.new();
         this.prover = await NearProverMock.new();
-        this.locker = await ERC20Locker.new(Buffer.from('nearfuntoken', 'utf-8'), this.prover.address, addr);
+        this.locker = await ERC20Locker.new(Buffer.from('nearfuntoken', 'utf-8'), this.prover.address, minBlockAcceptanceHeight, addr);
         await this.token.mint(this.locker.address, toWei('100'));
         await this.token.mint(addr1, toWei('5'));
 
