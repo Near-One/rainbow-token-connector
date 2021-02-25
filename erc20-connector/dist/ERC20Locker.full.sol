@@ -996,6 +996,51 @@ library ProofDecoder {
     }
 }
 
+// File: contracts/AdminControlled.sol
+
+pragma solidity ^0.6.12;
+
+contract AdminControlled {
+    address public admin;
+    uint public paused;
+
+    constructor(address _admin) public {
+        admin = _admin;
+    }
+
+    modifier onlyAdmin {
+        require(msg.sender == admin);
+        _;
+    }
+
+    modifier pausable(uint flag) {
+        require((paused & flag) == 0);
+        _;
+    }
+
+    function adminPause(uint flags) public onlyAdmin {
+        paused = flags;
+    }
+
+    function adminSstore(uint key, uint value) public onlyAdmin {
+        assembly {
+            sstore(key, value)
+        }
+    }
+
+    function adminSendEth(address payable destination, uint amount) public onlyAdmin {
+        destination.transfer(amount);
+    }
+
+    function adminReceiveEth() public payable onlyAdmin {}
+
+    function adminDelegatecall(address target, bytes memory data) public payable onlyAdmin returns (bytes memory) {
+        (bool success, bytes memory rdata) = target.delegatecall(data);
+        require(success);
+        return rdata;
+    }
+}
+
 // File: rainbow-bridge/contracts/eth/nearprover/contracts/INearProver.sol
 
 pragma solidity ^0.6;
@@ -1071,7 +1116,8 @@ pragma solidity ^0.6.12;
 
 
 
-contract ERC20Locker is Locker {
+
+contract ERC20Locker is Locker, AdminControlled {
     using SafeERC20 for IERC20;
 
     event Locked (
@@ -1093,21 +1139,30 @@ contract ERC20Locker is Locker {
         address recipient;
     }
 
+    uint constant PAUSED_LOCK = 1;
+    uint constant PAUSED_UNLOCK = 2;
+
     // ERC20Locker is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
     constructor(bytes memory nearTokenFactory, INearProver prover, uint64 minBlockAcceptanceHeight, address _admin)
+        AdminControlled(_admin)
         Locker(nearTokenFactory, prover, minBlockAcceptanceHeight)
         public
     {
-        admin_ = _admin;
     }
 
-    function lockToken(address ethToken, uint256 amount, string memory accountId) public {
+    function lockToken(address ethToken, uint256 amount, string memory accountId)
+        public
+        pausable (PAUSED_LOCK)
+    {
         IERC20(ethToken).safeTransferFrom(msg.sender, address(this), amount);
         emit Locked(address(ethToken), msg.sender, amount, accountId);
     }
 
-    function unlockToken(bytes memory proofData, uint64 proofBlockHeight) public {
+    function unlockToken(bytes memory proofData, uint64 proofBlockHeight)
+        public
+        pausable (PAUSED_UNLOCK)
+    {
         ProofDecoder.ExecutionStatus memory status = _parseAndConsumeProof(proofData, proofBlockHeight);
         BurnResult memory result = _decodeBurnResult(status.successValue);
         IERC20(result.token).safeTransfer(result.recipient, result.amount);
@@ -1131,20 +1186,10 @@ contract ERC20Locker is Locker {
     // accept token transfers transfer.
     function tokenFallback(address _from, uint _value, bytes memory _data) public pure {}
 
-    address public admin_;
-
-    modifier onlyAdmin {
-        require(msg.sender == admin_);
-        _;
-    }
-
-    function adminTransfer(IERC20 token, address destination, uint amount) public onlyAdmin {
+    function adminTransfer(IERC20 token, address destination, uint amount)
+        public
+        onlyAdmin
+    {
         token.safeTransfer(destination, amount);
-    }
-
-    function adminDelegatecall(address target, bytes memory data) public onlyAdmin returns(bytes memory) {
-        (bool success, bytes memory rdata) = target.delegatecall(data);
-        require(success);
-        return rdata;
     }
 }
