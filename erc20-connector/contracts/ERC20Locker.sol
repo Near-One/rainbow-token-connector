@@ -4,9 +4,11 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "rainbow-bridge/contracts/eth/nearprover/contracts/ProofDecoder.sol";
 import "rainbow-bridge/contracts/eth/nearbridge/contracts/Borsh.sol";
+
+import "./AdminControlled.sol";
 import "./ProofKeeper.sol";
 
-contract ERC20Locker is ProofKeeper {
+contract ERC20Locker is ProofKeeper, AdminControlled {
     using SafeERC20 for IERC20;
 
     event Locked (
@@ -28,21 +30,30 @@ contract ERC20Locker is ProofKeeper {
         address recipient;
     }
 
+    uint constant PAUSED_LOCK = 1;
+    uint constant PAUSED_UNLOCK = 2;
+
     // ERC20Locker is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
     constructor(bytes memory nearTokenFactory, INearProver prover, uint64 minBlockAcceptanceHeight, address _admin)
+        AdminControlled(_admin)
         ProofKeeper(nearTokenFactory, prover, minBlockAcceptanceHeight)
         public
     {
-        admin_ = _admin;
     }
 
-    function lockToken(address ethToken, uint256 amount, string memory accountId) public {
+    function lockToken(address ethToken, uint256 amount, string memory accountId)
+        public
+        pausable (PAUSED_LOCK)
+    {
         IERC20(ethToken).safeTransferFrom(msg.sender, address(this), amount);
         emit Locked(address(ethToken), msg.sender, amount, accountId);
     }
 
-    function unlockToken(bytes memory proofData, uint64 proofBlockHeight) public {
+    function unlockToken(bytes memory proofData, uint64 proofBlockHeight)
+        public
+        pausable (PAUSED_UNLOCK)
+    {
         ProofDecoder.ExecutionStatus memory status = _parseAndConsumeProof(proofData, proofBlockHeight);
         BurnResult memory result = _decodeBurnResult(status.successValue);
         IERC20(result.token).safeTransfer(result.recipient, result.amount);
@@ -66,20 +77,10 @@ contract ERC20Locker is ProofKeeper {
     // accept token transfers transfer.
     function tokenFallback(address _from, uint _value, bytes memory _data) public pure {}
 
-    address public admin_;
-
-    modifier onlyAdmin {
-        require(msg.sender == admin_);
-        _;
-    }
-
-    function adminTransfer(IERC20 token, address destination, uint amount) public onlyAdmin {
+    function adminTransfer(IERC20 token, address destination, uint amount)
+        public
+        onlyAdmin
+    {
         token.safeTransfer(destination, amount);
-    }
-
-    function adminDelegatecall(address target, bytes memory data) public onlyAdmin returns(bytes memory) {
-        (bool success, bytes memory rdata) = target.delegatecall(data);
-        require(success);
-        return rdata;
     }
 }
