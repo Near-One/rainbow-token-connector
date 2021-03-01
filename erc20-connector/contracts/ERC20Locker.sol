@@ -1,4 +1,5 @@
-pragma solidity ^0.6;
+pragma solidity ^0.6.12;
+
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "rainbow-bridge/contracts/eth/nearprover/contracts/ProofDecoder.sol";
@@ -29,10 +30,11 @@ contract ERC20Locker is Locker {
 
     // ERC20Locker is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
-    constructor(bytes memory nearTokenFactory, INearProver prover, address admin) public {
-        nearTokenFactory_ = nearTokenFactory;
-        prover_ = prover;
-        admin_ = admin;
+    constructor(bytes memory nearTokenFactory, INearProver prover, uint64 minBlockAcceptanceHeight, address _admin)
+        Locker(nearTokenFactory, prover, minBlockAcceptanceHeight)
+        public
+    {
+        admin_ = _admin;
     }
 
     function lockToken(address ethToken, uint256 amount, string memory accountId) public {
@@ -41,7 +43,7 @@ contract ERC20Locker is Locker {
     }
 
     function unlockToken(bytes memory proofData, uint64 proofBlockHeight) public {
-        ProofDecoder.ExecutionStatus memory status = _parseProof(proofData, proofBlockHeight);
+        ProofDecoder.ExecutionStatus memory status = _parseAndConsumeProof(proofData, proofBlockHeight);
         BurnResult memory result = _decodeBurnResult(status.successValue);
         IERC20(result.token).safeTransfer(result.recipient, result.amount);
         emit Unlocked(result.amount, result.recipient);
