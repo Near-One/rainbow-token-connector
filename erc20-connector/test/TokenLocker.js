@@ -83,9 +83,9 @@ contract('TokenLocker', function ([addr, addr1]) {
             const preBalance1 = await this.token.balanceOf(addr1);
             expect(fromWei(preBalance1)).equal(fromWei(initialBalanceAddr1));
             await this.token.approve(this.locker.address, amountToTransfer, { from: addr1 });
-            const tx1 = await this.locker.lockToken(this.token.address, toWei('1'), 'receiver', { from: addr1 });
+            const tx1 = await this.locker.lockToken(this.token.address, amountToTransfer, 'receiver', { from: addr1 });
             const afterBalance1 = await this.token.balanceOf(addr1);
-            expect(fromWei(afterBalance1)).equal('4');
+            expect(fromWei(afterBalance1)).equal((fromWei(initialBalanceAddr1) - fromWei(amountToTransfer)).toString());
             truffleAssert.eventEmitted(tx1, 'Locked', (event) => {
                 return event.token == this.token.address
                     && event.sender == addr1
