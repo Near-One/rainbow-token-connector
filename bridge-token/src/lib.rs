@@ -52,6 +52,7 @@ impl BridgeToken {
         self.token.mint(account_id, amount.into());
     }
 
+    #[payable]
     pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
         self.token
             .burn(env::predecessor_account_id(), amount.into());
