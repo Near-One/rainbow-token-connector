@@ -8,3 +8,9 @@ steps:
             echo 'contract changed, please rebuild contract'
             exit 1
           fi
+
+    - label: "test erc20-connector"
+      command: |
+          cd erc20-connector
+          yarn
+          yarn test
