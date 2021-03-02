@@ -1071,7 +1071,9 @@ pragma solidity ^0.6.12;
 
 
 
+
 contract ERC20Locker is Locker {
+    using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     event Locked (
@@ -1103,6 +1105,7 @@ contract ERC20Locker is Locker {
     }
 
     function lockToken(address ethToken, uint256 amount, string memory accountId) public {
+        require(IERC20(ethToken).balanceOf(address(this)).add(amount) <= ((uint256(1) << 128) - 1), "Maximum tokens locked exceeded (< 2^128 - 1)");
         IERC20(ethToken).safeTransferFrom(msg.sender, address(this), amount);
         emit Locked(address(ethToken), msg.sender, amount, accountId);
     }

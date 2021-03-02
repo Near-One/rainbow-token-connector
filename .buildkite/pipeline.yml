@@ -11,6 +11,7 @@ steps:
 
     - label: "test erc20-connector"
       command: |
+          source ~/.yarn/yarn.sh
           cd erc20-connector
           yarn
           yarn test
