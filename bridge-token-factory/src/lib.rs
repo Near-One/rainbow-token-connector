@@ -1,16 +1,12 @@
-use borsh::{BorshDeserialize, BorshSerialize};
-use near_sdk::{
-    env, ext_contract, near_bindgen, AccountId, Balance, Gas, Promise, PromiseResult, PublicKey,
-};
+use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
+use near_sdk::{AccountId, Balance, env, ext_contract, Gas, near_bindgen, Promise, PromiseResult, PublicKey, PromiseOrValue};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedSet;
-use near_sdk::json_types::U128;
-
-use near_lib::token::ext_nep21;
+use near_sdk::json_types::{U128, ValidAccountId};
 
 pub use lock_event::EthLockedEvent;
 use prover::*;
-pub use prover::{validate_eth_address, Proof};
+pub use prover::{Proof, validate_eth_address};
 pub use unlock_event::EthUnlockedEvent;
 
 mod lock_event;
@@ -31,14 +27,20 @@ const BRIDGE_TOKEN_NEW: Gas = 10_000_000_000_000;
 /// Initial balance for the BridgeToken contract to cover storage and related.
 const BRIDGE_TOKEN_INIT_BALANCE: Balance = 30_000_000_000_000_000_000_000_000; // 3e25yN, 30N
 
-const TRANSFER_FROM_GAS: Gas = 10_000_000_000_000;
-
 const TRANSFER_GAS: Gas = 10_000_000_000_000;
 
 #[derive(Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum ResultType {
     Withdraw,
     Lock,
+}
+
+#[derive(BorshSerialize, BorshDeserialize)]
+struct LockEvent {
+    result_type: ResultType,
+    token: String,
+    amount: Balance,
+    recipient: [u8; 20],
 }
 
 #[near_bindgen]
@@ -77,14 +79,6 @@ pub trait ExtBridgeTokenFactory {
     ) -> Promise;
 
     #[result_serializer(borsh)]
-    fn finish_lock(
-        &self,
-        #[serializer(borsh)] amount: Balance,
-        #[serializer(borsh)] recipient: [u8; 20],
-        #[serializer(borsh)] token: String,
-    ) -> (U128, [u8; 20], String);
-
-    #[result_serializer(borsh)]
     fn finish_unlock(
         &self,
         #[callback]
@@ -95,6 +89,11 @@ pub trait ExtBridgeTokenFactory {
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] proof: Proof,
     ) -> Promise;
+}
+
+#[ext_contract(ext_fungible_token)]
+pub trait FungibleToken {
+    fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
 }
 
 #[ext_contract(ext_bridge_token)]
@@ -275,43 +274,6 @@ impl BridgeTokenFactory {
         format!("{}.{}", address, env::current_account_id())
     }
 
-    /// Locks NEP-21 token on NEAR side to mint on Ethereum it's counterpart.
-    #[payable]
-    pub fn lock(&mut self, token: AccountId, amount: U128, recipient: String) -> Promise {
-        assert!(false, "Native NEP21 on Ethereum is disabled.");
-        let address = validate_eth_address(recipient);
-        ext_nep21::transfer_from(
-            env::predecessor_account_id(),
-            env::current_account_id(),
-            amount,
-            &token,
-            env::attached_deposit(),
-            TRANSFER_FROM_GAS,
-        )
-        .then(ext_self::finish_lock(
-            amount.into(),
-            address,
-            token,
-            &env::current_account_id(),
-            NO_DEPOSIT,
-            env::prepaid_gas() / 3,
-        ))
-    }
-
-    /// Callback after transfer_from happened.
-    #[result_serializer(borsh)]
-    pub fn finish_lock(
-        &self,
-        #[serializer(borsh)] amount: Balance,
-        #[serializer(borsh)] recipient: [u8; 20],
-        #[serializer(borsh)] token: String,
-    ) -> (ResultType, String, u128, [u8; 20]) {
-        assert!(false, "Native NEP21 on Ethereum is disabled.");
-        assert_self();
-        assert!(is_promise_success());
-        (ResultType::Lock, token, amount.into(), recipient)
-    }
-
     #[payable]
     pub fn unlock(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
         assert!(false, "Native NEP21 on Ethereum is disabled.");
@@ -362,11 +324,12 @@ impl BridgeTokenFactory {
         assert_self();
         assert!(verification_success, "Failed to verify the proof");
         self.record_proof(&proof);
-        ext_nep21::transfer(
+        ext_fungible_token::ft_transfer(
             recipient,
             amount.into(),
+            None,
             &token,
-            env::attached_deposit(),
+            NO_DEPOSIT,
             TRANSFER_GAS,
         )
     }
@@ -394,12 +357,23 @@ impl BridgeTokenFactory {
     }
 }
 
+#[near_bindgen]
+impl FungibleTokenReceiver for BridgeTokenFactory {
+    fn ft_on_transfer(&mut self, _sender_id: ValidAccountId, amount: U128, msg: String) -> PromiseOrValue<U128> {
+        assert!(false, "Native FT on Ethereum is disabled");
+        let recipient = validate_eth_address(msg);
+        env::log(&LockEvent { result_type: ResultType::Lock, token: env::predecessor_account_id(), amount: amount.into(), recipient }.try_to_vec().unwrap());
+        PromiseOrValue::Value(amount)
+    }
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
-    use near_sdk::testing_env;
-    use near_sdk::MockedBlockchain;
-    use near_test::context::VMContextBuilder;
+    use std::convert::TryInto;
+
+    use near_sdk::{MockedBlockchain, testing_env};
+    use near_sdk::test_utils::{VMContextBuilder};
 
     use super::*;
 
@@ -434,13 +408,13 @@ mod tests {
     #[should_panic]
     fn test_fail_deploy_bridge_token() {
         testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice())
-            .finish());
+            .predecessor_account_id(alice().try_into().unwrap())
+            .build());
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice())
+            .predecessor_account_id(alice().try_into().unwrap())
             .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE)
-            .finish());
+            .build());
         contract.deploy_bridge_token(token_locker());
     }
 
@@ -448,27 +422,27 @@ mod tests {
     #[should_panic]
     fn test_fail_deposit_no_token() {
         testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice())
-            .finish());
+            .predecessor_account_id(alice().try_into().unwrap())
+            .build());
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice())
+            .predecessor_account_id(alice().try_into().unwrap())
             .attached_deposit(STORAGE_PRICE_PER_BYTE * 1000)
-            .finish());
+            .build());
         contract.deposit(sample_proof());
     }
 
     #[test]
     fn test_deploy_bridge_token() {
         testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice())
-            .finish());
+            .predecessor_account_id(alice().try_into().unwrap())
+            .build());
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         testing_env!(VMContextBuilder::new()
-            .current_account_id(bridge_token_factory())
-            .predecessor_account_id(alice())
+            .current_account_id(bridge_token_factory().try_into().unwrap())
+            .predecessor_account_id(alice().try_into().unwrap())
             .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
-            .finish());
+            .build());
         contract.deploy_bridge_token(token_locker());
         assert_eq!(
             contract.get_bridge_token_account_id(token_locker()),
@@ -490,18 +464,18 @@ mod tests {
     #[test]
     fn test_finish_withdraw() {
         testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice())
-            .finish());
+            .predecessor_account_id(alice().try_into().unwrap())
+            .build());
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         testing_env!(VMContextBuilder::new()
-            .predecessor_account_id(alice())
+            .predecessor_account_id(alice().try_into().unwrap())
             .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
-            .finish());
+            .build());
         contract.deploy_bridge_token(token_locker());
         testing_env!(VMContextBuilder::new()
-            .current_account_id(bridge_token_factory())
-            .predecessor_account_id(format!("{}.{}", token_locker(), bridge_token_factory()))
-            .finish());
+            .current_account_id(bridge_token_factory().try_into().unwrap())
+            .predecessor_account_id(format!("{}.{}", token_locker(), bridge_token_factory()).try_into().unwrap())
+            .build());
         let address = validate_eth_address(token_locker());
         assert_eq!(
             contract.finish_withdraw(1_000, token_locker()),
