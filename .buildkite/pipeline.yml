@@ -8,3 +8,10 @@ steps:
             echo 'contract changed, please rebuild contract'
             exit 1
           fi
+
+    - label: "Run solidity tests"
+      command: |
+          source ~/.yarn/yarn.sh
+          cd erc20-connector
+          yarn
+          yarn run test
