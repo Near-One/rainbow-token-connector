@@ -1,25 +1,24 @@
-use borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::json_types::U128;
-use near_sdk::{env, ext_contract, near_bindgen, AccountId, Balance, Promise};
+use std::convert::TryFrom;
 
-use near_lib::token::{FungibleToken, Token};
+use near_contract_standards::fungible_token::FungibleToken;
+use near_contract_standards::fungible_token::metadata::{FT_METADATA_SPEC, FungibleTokenMetadata, FungibleTokenMetadataProvider};
+use near_sdk::{AccountId, Balance, env, ext_contract, near_bindgen, PanicOnDefault, Promise, PromiseOrValue};
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::json_types::{Base64VecU8, U128, ValidAccountId};
 
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+near_sdk::setup_alloc!();
 
 const NO_DEPOSIT: Balance = 0;
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct BridgeToken {
     controller: AccountId,
-    token: Token,
-}
-
-impl Default for BridgeToken {
-    fn default() -> Self {
-        panic!("Bridge Token should be initialized before usage")
-    }
+    token: FungibleToken,
+    name: String,
+    symbol: String,
+    reference: String,
+    reference_hash: Base64VecU8,
 }
 
 #[ext_contract(ext_bridge_token_factory)]
@@ -35,11 +34,15 @@ pub trait ExtBridgeTokenFactory {
 #[near_bindgen]
 impl BridgeToken {
     #[init]
-    pub fn new() -> Self {
+    pub fn new(name: String, symbol: String, reference: String, reference_hash: Base64VecU8) -> Self {
         assert!(!env::state_exists(), "Already initialized");
         Self {
+            token: FungibleToken::new(b"t"),
+            name,
+            symbol,
+            reference,
+            reference_hash,
             controller: env::predecessor_account_id(),
-            token: Token::new(env::predecessor_account_id(), 0u128),
         }
     }
 
@@ -49,12 +52,17 @@ impl BridgeToken {
             self.controller,
             "Only controller can call mint"
         );
-        self.token.mint(account_id, amount.into());
+        // TODO: should this always require payment for storage and just return it back if it's already registered?
+        if !self.token.ar_is_registered(ValidAccountId::try_from(account_id.clone()).unwrap()) {
+            self.token.internal_register_account(&account_id);
+        }
+        self.token.internal_deposit(&account_id, amount.into());
     }
 
     pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
         self.token
-            .burn(env::predecessor_account_id(), amount.into());
+            .internal_withdraw(&env::predecessor_account_id(), amount.into());
+        // TODO: deal with de-allocating storage and sending it back?
         ext_bridge_token_factory::finish_withdraw(
             amount.into(),
             recipient,
@@ -65,38 +73,22 @@ impl BridgeToken {
     }
 }
 
+near_contract_standards::impl_fungible_token_core!(BridgeToken, token);
+near_contract_standards::impl_fungible_token_ar!(BridgeToken, token);
+
 #[near_bindgen]
-impl FungibleToken for BridgeToken {
-    #[payable]
-    fn inc_allowance(&mut self, escrow_account_id: String, amount: U128) {
-        self.token.inc_allowance(escrow_account_id, amount.into());
-    }
-
-    #[payable]
-    fn dec_allowance(&mut self, escrow_account_id: String, amount: U128) {
-        self.token.dec_allowance(escrow_account_id, amount.into());
-    }
-
-    #[payable]
-    fn transfer_from(&mut self, owner_id: String, new_owner_id: String, amount: U128) {
-        self.token
-            .transfer_from(owner_id, new_owner_id, amount.into());
-    }
-
-    #[payable]
-    fn transfer(&mut self, new_owner_id: String, amount: U128) {
-        self.token.transfer(new_owner_id, amount.into());
-    }
-
-    fn get_total_supply(&self) -> U128 {
-        self.token.get_total_supply().into()
-    }
-
-    fn get_balance(&self, owner_id: String) -> U128 {
-        self.token.get_balance(owner_id).into()
-    }
-
-    fn get_allowance(&self, owner_id: String, escrow_account_id: String) -> U128 {
-        self.token.get_allowance(owner_id, escrow_account_id).into()
+impl FungibleTokenMetadataProvider for BridgeToken {
+    fn ft_metadata(&self) -> FungibleTokenMetadata {
+        FungibleTokenMetadata {
+            spec: FT_METADATA_SPEC.to_string(),
+            name: self.name.clone(),
+            symbol: self.symbol.clone(),
+            icon: Some(
+                "https://near.org/wp-content/themes/near-19/assets/img/brand-icon.png".to_string(),
+            ),
+            reference: self.reference.clone(),
+            reference_hash: self.reference_hash.clone(),
+            decimals: 24,
+        }
     }
 }
