@@ -23,8 +23,8 @@ const SCHEMA = {
 };
 
 const UNPAUSED_ALL = 0;
-const PAUSED_LOCK = 1;
-const PAUSED_UNLOCK = 2;
+const PAUSED_LOCK = 1 << 0;
+const PAUSED_UNLOCK = 1 << 1;
 
 contract('TokenLocker', function ([addr, addr1]) {
     const nearToken = 'neartoken';
@@ -34,7 +34,7 @@ contract('TokenLocker', function ([addr, addr1]) {
         let minBlockAcceptanceHeight = 0;
         this.token = await TToken.new();
         this.prover = await NearProverMock.new();
-        this.locker = await ERC20Locker.new(Buffer.from('nearfuntoken', 'utf-8'), this.prover.address, minBlockAcceptanceHeight, addr);
+        this.locker = await ERC20Locker.new(Buffer.from('nearfuntoken', 'utf-8'), this.prover.address, minBlockAcceptanceHeight, addr, UNPAUSED_ALL);
         await this.token.mint(this.locker.address, toWei('100'));
         await this.token.mint(addr1, initialBalanceAddr1);
 
