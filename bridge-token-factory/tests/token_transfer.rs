@@ -289,64 +289,6 @@ fn test_with_invalid_proof() {
 }
 
 #[test]
-fn test_near_token_transfer() {
-    let (mut runtime, factory) = setup_token_factory();
-    let root = "root".to_string();
-    let token = TokenContract::new(
-        &mut runtime,
-        &root,
-        &TEST_TOKEN_WASM_BYTES,
-        TEST_TOKEN.to_string(),
-        &root,
-        "1000",
-    );
-    token
-        .inc_allowance(
-            &mut runtime,
-            &root,
-            FACTORY.to_string(),
-            to_yocto("100").into(),
-        )
-        .unwrap();
-    factory
-        .lock(
-            &mut runtime,
-            root.clone(),
-            TEST_TOKEN.to_string(),
-            to_yocto("100"),
-            SENDER_ADDRESS.to_string(),
-        )
-        .unwrap();
-    assert_eq!(
-        token.get_balance(&mut runtime, root.clone()),
-        to_yocto("900").to_string()
-    );
-    assert_eq!(
-        token.get_total_supply(&mut runtime),
-        to_yocto("1000").to_string()
-    );
-
-    let mut proof = Proof::default();
-    proof.log_entry_data = EthUnlockedEvent {
-        locker_address: validate_eth_address(LOCKER_ADDRESS.to_string()),
-        token: TEST_TOKEN.to_string(),
-        sender: SENDER_ADDRESS.to_string(),
-        amount: 50 * 10u128.pow(24),
-        recipient: ALICE.to_string(),
-    }
-    .to_log_entry_data();
-    factory.unlock(&mut runtime, root.clone(), proof).unwrap();
-    assert_eq!(
-        token.get_balance(&mut runtime, ALICE.to_string()),
-        to_yocto("50").to_string()
-    );
-    assert_eq!(
-        token.get_total_supply(&mut runtime),
-        to_yocto("1000").to_string()
-    );
-}
-
-#[test]
 fn test_bridge_token_failures() {
     let (mut runtime, factory) = setup_token_factory();
     let root = "root".to_string();
