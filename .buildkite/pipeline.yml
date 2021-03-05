@@ -21,5 +21,6 @@ steps:
     command: |
       source ~/.cargo/env
       cd bridge-token-factory
+      mkdir -p target/debug
       ./build.sh
       cargo test --all
