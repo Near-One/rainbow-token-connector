@@ -9,9 +9,14 @@ steps:
             exit 1
           fi
 
-    - label: "Run solidity tests"
+    - label: "Run Ethereum side tests"
       command: |
+          source ~/.nvm/nvm.sh
           source ~/.yarn/yarn.sh
           cd erc20-connector
           yarn
           yarn run test
+
+    - label: "Run NEAR side tests"
+      command: |
+          echo "Run NEAR side tests"
