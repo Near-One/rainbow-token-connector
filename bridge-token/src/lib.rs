@@ -1,10 +1,14 @@
-use std::convert::TryFrom;
+use std::convert::{TryFrom, TryInto};
 
+use near_contract_standards::fungible_token::metadata::{
+    FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC,
+};
 use near_contract_standards::fungible_token::FungibleToken;
-use near_contract_standards::fungible_token::metadata::{FT_METADATA_SPEC, FungibleTokenMetadata, FungibleTokenMetadataProvider};
-use near_sdk::{AccountId, Balance, env, ext_contract, near_bindgen, PanicOnDefault, Promise, PromiseOrValue};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::json_types::{Base64VecU8, U128, ValidAccountId};
+use near_sdk::json_types::{Base64VecU8, ValidAccountId, U128};
+use near_sdk::{
+    env, ext_contract, near_bindgen, AccountId, Balance, PanicOnDefault, Promise, PromiseOrValue,
+};
 
 near_sdk::setup_alloc!();
 
@@ -34,7 +38,12 @@ pub trait ExtBridgeTokenFactory {
 #[near_bindgen]
 impl BridgeToken {
     #[init]
-    pub fn new(name: String, symbol: String, reference: String, reference_hash: Base64VecU8) -> Self {
+    pub fn new(
+        name: String,
+        symbol: String,
+        reference: String,
+        reference_hash: Base64VecU8,
+    ) -> Self {
         assert!(!env::state_exists(), "Already initialized");
         Self {
             token: FungibleToken::new(b"t"),
@@ -46,30 +55,52 @@ impl BridgeToken {
         }
     }
 
-    pub fn mint(&mut self, account_id: AccountId, amount: U128) {
+    #[payable]
+    pub fn mint(&mut self, account_id: AccountId, amount: U128) -> Promise {
         assert_eq!(
             env::predecessor_account_id(),
             self.controller,
             "Only controller can call mint"
         );
-        // TODO: should this always require payment for storage and just return it back if it's already registered?
-        if !self.token.ar_is_registered(ValidAccountId::try_from(account_id.clone()).unwrap()) {
+
+        let mut amount_to_refund = env::attached_deposit();
+        if !self
+            .token
+            .ar_is_registered(ValidAccountId::try_from(account_id.clone()).unwrap())
+        {
             self.token.internal_register_account(&account_id);
+            amount_to_refund -= u128::from(self.ar_registration_fee());
         }
+
         self.token.internal_deposit(&account_id, amount.into());
+        Promise::new(env::predecessor_account_id()).transfer(amount_to_refund)
     }
 
+    #[payable]
     pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
         self.token
             .internal_withdraw(&env::predecessor_account_id(), amount.into());
-        // TODO: deal with de-allocating storage and sending it back?
-        ext_bridge_token_factory::finish_withdraw(
-            amount.into(),
-            recipient,
-            &self.controller,
-            NO_DEPOSIT,
-            env::prepaid_gas() / 2,
-        )
+
+        let mut amount_to_refund = env::attached_deposit();
+
+        if self
+            .token
+            .ft_balance_of(env::predecessor_account_id().try_into().unwrap())
+            == 0u128.into()
+        {
+            self.token.accounts.remove(&env::predecessor_account_id());
+            amount_to_refund += u128::from(self.ar_registration_fee());
+        }
+
+        Promise::new(env::predecessor_account_id())
+            .transfer(amount_to_refund)
+            .then(ext_bridge_token_factory::finish_withdraw(
+                amount.into(),
+                recipient,
+                &self.controller,
+                NO_DEPOSIT,
+                env::prepaid_gas() / 2,
+            ))
     }
 }
 
