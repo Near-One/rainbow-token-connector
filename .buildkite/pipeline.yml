@@ -1,10 +1,26 @@
 steps:
-    - label: "build all solidity contracts"
-      command: |
-          docker-compose up compile-solidity
-          git status
-          changed_files=$$(git status --porcelain --untracked-files=no | wc -l)
-          if [ $$changed_files -gt 0 ]; then
-            echo 'contract changed, please rebuild contract'
-            exit 1
-          fi
+  - label: "build all solidity contracts"
+    command: |
+      docker-compose up compile-solidity
+      git status
+      changed_files=$$(git status --porcelain --untracked-files=no | wc -l)
+      if [ $$changed_files -gt 0 ]; then
+      echo 'contract changed, please rebuild contract'
+      exit 1
+      fi
+
+  - label: "Run Ethereum side tests"
+    command: |
+      source ~/.nvm/nvm.sh
+      source ~/.yarn/yarn.sh
+      cd erc20-connector
+      yarn
+      yarn run test
+
+  - label: "Run NEAR side tests"
+    command: |
+      source ~/.cargo/env
+      cd bridge-token-factory
+      mkdir -p target/debug
+      ./build.sh
+      cargo test --all
