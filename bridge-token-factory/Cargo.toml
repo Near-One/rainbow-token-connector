@@ -27,6 +27,7 @@ uint = { version = "0.8.3", default-features = false }
 wee_alloc = { version = "0.4.5", default-features = false, features = [] }
 near-lib = { git = "https://github.com/ilblackdragon/balancer-near", rev = "a386305c9829d2e5302a78fdc475c8a279fcf6ed"}
 eth-types =  { git = "https://github.com/near/rainbow-bridge" }
+admin-controlled = { git="https://github.com/near/rainbow-bridge.git", rev="ca01d9e39403a08397de63fb5ae544f760ffcedd"}
 rlp = "0.4.2"
 ethabi = "12.0.0"
 hex = "0.4.2"

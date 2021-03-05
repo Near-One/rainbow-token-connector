@@ -6,6 +6,7 @@ use near_sdk::{
 use near_sdk::collections::UnorderedSet;
 use near_sdk::json_types::U128;
 
+use admin_controlled::{AdminControlled, Mask};
 use near_lib::token::ext_nep21;
 
 pub use lock_event::EthLockedEvent;
@@ -41,6 +42,12 @@ pub enum ResultType {
     Lock,
 }
 
+const PAUSE_DEPLOY_TOKEN: Mask = 1 << 0;
+const PAUSE_DEPOSIT: Mask = 1 << 1;
+const PAUSE_WITHDRAW: Mask = 1 << 2;
+const PAUSE_LOCK: Mask = 1 << 3;
+const PAUSE_UNLOCK: Mask = 1 << 4;
+
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct BridgeTokenFactory {
@@ -54,6 +61,8 @@ pub struct BridgeTokenFactory {
     pub used_events: UnorderedSet<Vec<u8>>,
     /// Public key of the account deploying the factory.
     pub owner_pk: PublicKey,
+    /// Mask determining all paused functions
+    paused: Mask,
 }
 
 impl Default for BridgeTokenFactory {
@@ -132,6 +141,7 @@ impl BridgeTokenFactory {
             tokens: UnorderedSet::new(b"t".to_vec()),
             used_events: UnorderedSet::new(b"u".to_vec()),
             owner_pk: env::signer_account_pk(),
+            paused: Mask::default(),
         }
     }
 
@@ -140,6 +150,7 @@ impl BridgeTokenFactory {
     /// Also if this is first time this token is used, need to attach extra to deploy the BridgeToken contract.
     #[payable]
     pub fn deposit(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
+        self.check_not_paused(PAUSE_DEPOSIT);
         let event = EthLockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
             event.locker_address,
@@ -213,6 +224,7 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] recipient: String,
     ) -> (ResultType, u128, [u8; 20], [u8; 20]) {
+        self.check_not_paused(PAUSE_WITHDRAW);
         let token = env::predecessor_account_id();
         let parts: Vec<&str> = token.split(".").collect();
         assert_eq!(
@@ -236,6 +248,7 @@ impl BridgeTokenFactory {
 
     #[payable]
     pub fn deploy_bridge_token(&mut self, address: String) -> Promise {
+        self.check_not_paused(PAUSE_DEPLOY_TOKEN);
         let address = address.to_lowercase();
         let _ = validate_eth_address(address.clone());
         assert!(
@@ -278,6 +291,7 @@ impl BridgeTokenFactory {
     /// Locks NEP-21 token on NEAR side to mint on Ethereum it's counterpart.
     #[payable]
     pub fn lock(&mut self, token: AccountId, amount: U128, recipient: String) -> Promise {
+        self.check_not_paused(PAUSE_LOCK);
         assert!(false, "Native NEP21 on Ethereum is disabled.");
         let address = validate_eth_address(recipient);
         ext_nep21::transfer_from(
@@ -314,6 +328,7 @@ impl BridgeTokenFactory {
 
     #[payable]
     pub fn unlock(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
+        self.check_not_paused(PAUSE_UNLOCK);
         assert!(false, "Native NEP21 on Ethereum is disabled.");
         let event = EthUnlockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
@@ -391,6 +406,17 @@ impl BridgeTokenFactory {
         let required_deposit =
             Balance::from(current_storage - initial_storage) * STORAGE_PRICE_PER_BYTE;
         attached_deposit - required_deposit
+    }
+}
+
+impl AdminControlled for BridgeTokenFactory {
+    fn get_paused(&self) -> Mask {
+        self.paused
+    }
+
+    fn set_paused(&mut self, paused: Mask) {
+        self.assert_owner();
+        self.paused = paused;
     }
 }
 
