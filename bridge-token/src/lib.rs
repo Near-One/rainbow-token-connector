@@ -23,6 +23,7 @@ pub struct BridgeToken {
     symbol: String,
     reference: String,
     reference_hash: Base64VecU8,
+    decimals: u8,
 }
 
 #[ext_contract(ext_bridge_token_factory)]
@@ -52,6 +53,7 @@ impl BridgeToken {
             reference,
             reference_hash,
             controller: env::predecessor_account_id(),
+            decimals: 0,
         }
     }
 
@@ -119,7 +121,7 @@ impl FungibleTokenMetadataProvider for BridgeToken {
             ),
             reference: self.reference.clone(),
             reference_hash: self.reference_hash.clone(),
-            decimals: 24,
+            decimals: self.decimals,
         }
     }
 }

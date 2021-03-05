@@ -315,14 +315,7 @@ impl BridgeTokenFactory {
         assert_self();
         assert!(verification_success, "Failed to verify the proof");
         self.record_proof(&proof);
-        ext_fungible_token::ft_transfer(
-            recipient,
-            amount.into(),
-            None,
-            &token,
-            NO_DEPOSIT,
-            TRANSFER_GAS,
-        )
+        ext_fungible_token::ft_transfer(recipient, amount.into(), None, &token, 1, TRANSFER_GAS)
     }
 
     /// Record proof to make sure it is not re-used later for anther deposit.
