@@ -20,7 +20,7 @@ mod unlock_event;
 static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
 
 /// Price per 1 byte of storage from mainnet genesis config.
-const STORAGE_PRICE_PER_BYTE: Balance = 100_000_000_000_000_000_000; // 1e20yN, 0.0001N
+const STORAGE_PRICE_PER_BYTE: Balance = 10_000_000_000_000_000_000; // 1e19yN, 0.00001N
 
 const NO_DEPOSIT: Balance = 0;
 
@@ -28,7 +28,7 @@ const NO_DEPOSIT: Balance = 0;
 const BRIDGE_TOKEN_NEW: Gas = 10_000_000_000_000;
 
 /// Initial balance for the BridgeToken contract to cover storage and related.
-const BRIDGE_TOKEN_INIT_BALANCE: Balance = 30_000_000_000_000_000_000_000_000; // 3e25yN, 30N
+const BRIDGE_TOKEN_INIT_BALANCE: Balance = 3_000_000_000_000_000_000_000_000; // 3e24yN, 3N
 
 const TRANSFER_GAS: Gas = 10_000_000_000_000;
 
