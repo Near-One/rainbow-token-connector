@@ -6,7 +6,7 @@
     "dependencies": {
         "@openzeppelin/cli": "^2.8.1",
         "@openzeppelin/contracts": "^3.2",
-        "rainbow-bridge": "https://github.com/near/rainbow-bridge#b07303ca31c8a3a446e2a3e46654ca3db2d50f3a",
+        "rainbow-bridge": "https://github.com/near/rainbow-bridge#4826f4573a9039e0ee2f43ba964f709989c0906f",
         "rainbow-bridge-lib": "https://github.com/near/rainbow-bridge-lib",
         "truffle-assertions": "^0.9.2"
     },

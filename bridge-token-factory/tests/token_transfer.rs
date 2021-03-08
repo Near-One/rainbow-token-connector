@@ -1,12 +1,14 @@
-use near_sdk::{AccountId, Balance};
 use near_sdk::borsh::BorshSerialize;
+use near_sdk::{AccountId, Balance};
 use serde_json::json;
 
 use bridge_token::BridgeTokenContract;
-use bridge_token_factory::{EthLockedEvent, EthUnlockedEvent, Proof, validate_eth_address};
 use bridge_token_factory::BridgeTokenFactoryContract;
+use bridge_token_factory::{validate_eth_address, EthLockedEvent, EthUnlockedEvent, Proof};
 use mock_prover::MockProverContract;
-use near_sdk_sim::{call, ContractAccount, deploy, init_simulator, units::to_yocto, UserAccount, view};
+use near_sdk_sim::{
+    call, deploy, init_simulator, units::to_yocto, view, ContractAccount, UserAccount,
+};
 use test_token::ContractContract as TestTokenContract;
 
 const PROVER: &str = "prover";
@@ -50,8 +52,12 @@ fn test_eth_token_transfer() {
     let (user, factory) = setup_token_factory();
     let root = "root".to_string();
 
-    call!(user, factory
-        .deploy_bridge_token(DAI_ADDRESS.to_string()), deposit=to_yocto("35")).assert_success();
+    call!(
+        user,
+        factory.deploy_bridge_token(DAI_ADDRESS.to_string()),
+        deposit = to_yocto("35")
+    )
+    .assert_success();
 
     let token_account_id: String =
         view!(factory.get_bridge_token_account_id(DAI_ADDRESS.to_string())).unwrap_json();
