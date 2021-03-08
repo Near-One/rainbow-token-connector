@@ -127,7 +127,6 @@ impl BridgeTokenFactory {
 
     /// Deposit from Ethereum to NEAR based on the proof of the locked tokens.
     /// Must attach enough NEAR funds to cover for storage of the proof.
-    /// Also if this is first time this token is used, need to attach extra to deploy the BridgeToken contract.
     #[payable]
     pub fn deposit(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
         let event = EthLockedEvent::from_log_entry_data(&proof.log_entry_data);
@@ -188,7 +187,7 @@ impl BridgeTokenFactory {
             new_owner_id,
             amount.into(),
             &self.get_bridge_token_account_id(token),
-            NO_DEPOSIT,
+            env::attached_deposit(),
             env::prepaid_gas() / 2,
         )
     }
@@ -360,7 +359,7 @@ impl FungibleTokenReceiver for BridgeTokenFactory {
             .try_to_vec()
             .unwrap(),
         );
-        PromiseOrValue::Value(amount)
+        PromiseOrValue::Value(U128::from(0))
     }
 }
 

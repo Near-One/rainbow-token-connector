@@ -1,5 +1,3 @@
-use std::convert::{TryFrom, TryInto};
-
 use near_contract_standards::fungible_token::metadata::{
     FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC,
 };
@@ -7,12 +5,11 @@ use near_contract_standards::fungible_token::FungibleToken;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{Base64VecU8, ValidAccountId, U128};
 use near_sdk::{
-    env, ext_contract, near_bindgen, AccountId, Balance, PanicOnDefault, Promise, PromiseOrValue,
+    assert_one_yocto, env, ext_contract, near_bindgen, AccountId, PanicOnDefault, Promise,
+    PromiseOrValue,
 };
 
 near_sdk::setup_alloc!();
-
-const NO_DEPOSIT: Balance = 0;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -47,7 +44,7 @@ impl BridgeToken {
     ) -> Self {
         assert!(!env::state_exists(), "Already initialized");
         Self {
-            token: FungibleToken::new(b"t"),
+            token: FungibleToken::new(b"t".to_vec()),
             name,
             symbol,
             reference,
@@ -66,48 +63,34 @@ impl BridgeToken {
         );
 
         let mut amount_to_refund = env::attached_deposit();
-        if !self
-            .token
-            .ar_is_registered(ValidAccountId::try_from(account_id.clone()).unwrap())
-        {
+        if !self.token.accounts.contains_key(&account_id) {
             self.token.internal_register_account(&account_id);
-            amount_to_refund -= u128::from(self.ar_registration_fee());
+            amount_to_refund -= u128::from(self.storage_balance_bounds().min);
         }
 
         self.token.internal_deposit(&account_id, amount.into());
-        Promise::new(env::predecessor_account_id()).transfer(amount_to_refund)
+        Promise::new(env::signer_account_id()).transfer(amount_to_refund)
     }
 
     #[payable]
     pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
+        assert_one_yocto();
+
         self.token
             .internal_withdraw(&env::predecessor_account_id(), amount.into());
 
-        let mut amount_to_refund = env::attached_deposit();
-
-        if self
-            .token
-            .ft_balance_of(env::predecessor_account_id().try_into().unwrap())
-            == 0u128.into()
-        {
-            self.token.accounts.remove(&env::predecessor_account_id());
-            amount_to_refund += u128::from(self.ar_registration_fee());
-        }
-
-        Promise::new(env::predecessor_account_id())
-            .transfer(amount_to_refund)
-            .then(ext_bridge_token_factory::finish_withdraw(
-                amount.into(),
-                recipient,
-                &self.controller,
-                NO_DEPOSIT,
-                env::prepaid_gas() / 2,
-            ))
+        ext_bridge_token_factory::finish_withdraw(
+            amount.into(),
+            recipient,
+            &self.controller,
+            1,
+            env::prepaid_gas() / 2,
+        )
     }
 }
 
 near_contract_standards::impl_fungible_token_core!(BridgeToken, token);
-near_contract_standards::impl_fungible_token_ar!(BridgeToken, token);
+near_contract_standards::impl_fungible_token_storage!(BridgeToken, token);
 
 #[near_bindgen]
 impl FungibleTokenMetadataProvider for BridgeToken {
@@ -119,8 +102,8 @@ impl FungibleTokenMetadataProvider for BridgeToken {
             icon: Some(
                 "https://near.org/wp-content/themes/near-19/assets/img/brand-icon.png".to_string(),
             ),
-            reference: self.reference.clone(),
-            reference_hash: self.reference_hash.clone(),
+            reference: Some(self.reference.clone()),
+            reference_hash: Some(self.reference_hash.clone()),
             decimals: self.decimals,
         }
     }

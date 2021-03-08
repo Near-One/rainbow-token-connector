@@ -18,8 +18,8 @@ panic = "abort"
 overflow-checks = true
 
 [dependencies]
-near-sdk = { git = "https://github.com/near/near-sdk-rs" }
-near-contract-standards = { git = "https://github.com/near/near-sdk-rs" }
+near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "af0e826f916f3aa3ea51e8b675ecebdd37176671" }
+near-contract-standards = { git = "https://github.com/near/near-sdk-rs", rev = "af0e826f916f3aa3ea51e8b675ecebdd37176671" }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 uint = { version = "0.8.3", default-features = false }
@@ -32,7 +32,7 @@ tiny-keccak = "1.4.0"
 
 [dev-dependencies]
 near-sdk-sim = { git = "https://github.com/near/near-sdk-rs" }
-test-token = { git = "https://github.com/ilblackdragon/contracts" }
+test-token = { git = "https://github.com/mfornet/contracts" }
 bridge-token = { path = "../bridge-token" }
 mock-prover = { path = "../mock-prover" }
 lazy_static = "1.4.0"
