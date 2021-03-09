@@ -8,3 +8,32 @@ steps:
             echo 'contract changed, please rebuild contract'
             exit 1
           fi
+
+    - label: "build all rust contracts"
+      command: |
+          cd bridge-token
+          ./build.sh
+          cd ../bridge-token-factory
+          ./build.sh
+          git status
+          changed_files=$$(git status --porcelain --untracked-files=no | wc -l)
+          if [ $$changed_files -gt 0 ]; then
+            echo 'contract changed, please rebuild contract'
+            exit 1
+          fi
+
+    - label: "erc20 connector"
+      command: |
+          source ~/.nvm/nvm.sh
+          source ~/.yarn/yarn.sh
+          cd erc20-connector
+          yarn
+          yarn run test
+
+    - label: "bridge token factory"
+      command: |
+          source ~/.cargo/env
+          cd bridge-token-factory
+          mkdir -p target/debug
+          ./build.sh
+          cargo test --all
