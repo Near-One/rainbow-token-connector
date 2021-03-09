@@ -1,7 +1,5 @@
-const bs58 = require('bs58');
 const truffleAssert = require('truffle-assertions');
 const BN = require("bn.js");
-const { expectRevert } = require('@openzeppelin/test-helpers');
 
 const { expectRevert } = require('@openzeppelin/test-helpers');
 const { serialize } = require('rainbow-bridge-lib/rainbow/borsh.js');
@@ -29,7 +27,7 @@ const PAUSED_LOCK = 1 << 0;
 const PAUSED_UNLOCK = 1 << 1;
 
 contract('TokenLocker', function ([addr, addr1, addr2]) {
-    const nearToken = 'neartoken';
+    const initialBalanceAddr1 = toWei('5');
     let token;
     let prover;
     let locker;
@@ -41,10 +39,6 @@ contract('TokenLocker', function ([addr, addr1, addr2]) {
         locker = await ERC20Locker.new(Buffer.from('nearfuntoken', 'utf-8'), prover.address, minBlockAcceptanceHeight, addr, UNPAUSED_ALL);
         await token.mint(locker.address, toWei('100'));
         await token.mint(addr1, toWei('5'));
-
-        /*BTOKEN = await locker.newBridgeToken.call(nearToken);
-        await locker.newBridgeToken(nearToken);
-        btoken = await BridgeToken.at(BTOKEN);*/
     });
 
     it('lock to NEAR', async function () {
@@ -243,7 +237,7 @@ contract('TokenLocker', function ([addr, addr1, addr2]) {
     });*/
 
     it('admin functions', async function () {
-        expect(await locker.admin_()).equal(addr)
+        expect(await locker.admin()).equal(addr)
         try {
             await locker.adminTransfer(token.address, addr1, toWei('1'), { from: addr1 })
             assert(false)
