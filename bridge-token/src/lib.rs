@@ -52,16 +52,20 @@ impl BridgeToken {
         self.token.mint(account_id, amount.into());
     }
 
+    #[payable]
     pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
         self.token
             .burn(env::predecessor_account_id(), amount.into());
-        ext_bridge_token_factory::finish_withdraw(
-            amount.into(),
-            recipient,
-            &self.controller,
-            NO_DEPOSIT,
-            env::prepaid_gas() / 2,
-        )
+
+        Promise::new(env::signer_account_id())
+            .transfer(env::attached_deposit())
+            .then(ext_bridge_token_factory::finish_withdraw(
+                amount.into(),
+                recipient,
+                &self.controller,
+                NO_DEPOSIT,
+                env::prepaid_gas() / 2,
+            ))
     }
 }
 

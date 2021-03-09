@@ -8,13 +8,15 @@ const ERC20Locker = artifacts.require('ERC20Locker');
 const NearProverMock = artifacts.require('test/NearProverMock');
 const TToken = artifacts.require('test/TToken');
 
+const UNPAUSED_ALL = 0;
+
 contract('UpdateProver', function ([admin]) {
     beforeEach(async function () {
         let minBlockAcceptanceHeight = 0;
         this.token = await TToken.new();
         this.prover = await NearProverMock.new();
-        this.locker = await ERC20Locker.new(Buffer.from('nearfuntoken', 'utf-8'), this.prover.address, minBlockAcceptanceHeight, admin);
-        this.lockerAdmin = await ERC20Locker.new(Buffer.from('nearfuntoken', 'utf-8'), this.prover.address, minBlockAcceptanceHeight, admin);
+        this.locker = await ERC20Locker.new(Buffer.from('nearfuntoken', 'utf-8'), this.prover.address, minBlockAcceptanceHeight, admin, UNPAUSED_ALL);
+        this.lockerAdmin = await ERC20Locker.new(Buffer.from('nearfuntoken', 'utf-8'), this.prover.address, minBlockAcceptanceHeight, admin, UNPAUSED_ALL);
     });
 
     it('updateContract', async function () {
