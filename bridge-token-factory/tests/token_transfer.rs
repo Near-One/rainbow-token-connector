@@ -20,9 +20,9 @@ const ALICE: &str = "alice";
 const TEST_TOKEN: &str = "test-token";
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
-    TEST_TOKEN_WASM_BYTES => "../../res/test_token.wasm",
-    FACTORY_WASM_BYTES => "../../res/bridge_token_factory.wasm",
-    MOCK_PROVER_WASM_BYTES => "../../res/mock_prover.wasm",
+    TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
+    FACTORY_WASM_BYTES => "../res/bridge_token_factory.wasm",
+    MOCK_PROVER_WASM_BYTES => "../res/mock_prover.wasm",
 }
 
 fn setup_token_factory() -> (UserAccount, ContractAccount<BridgeTokenFactoryContract>) {

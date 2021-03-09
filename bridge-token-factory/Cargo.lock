@@ -308,7 +308,7 @@ name = "bridge-token"
 version = "0.1.0"
 dependencies = [
  "near-contract-standards",
- "near-sdk 3.0.0-pre.3 (git+https://github.com/near/near-sdk-rs?rev=af0e826f916f3aa3ea51e8b675ecebdd37176671)",
+ "near-sdk 3.0.0-pre.3",
 ]
 
 [[package]]
@@ -322,7 +322,7 @@ dependencies = [
  "lazy_static",
  "mock-prover",
  "near-contract-standards",
- "near-sdk 3.0.0-pre.3 (git+https://github.com/near/near-sdk-rs?rev=af0e826f916f3aa3ea51e8b675ecebdd37176671)",
+ "near-sdk 3.0.0-pre.3",
  "near-sdk-sim",
  "rand 0.7.3",
  "rlp 0.4.6",
@@ -1313,7 +1313,7 @@ name = "mock-prover"
 version = "0.1.0"
 dependencies = [
  "near-contract-standards",
- "near-sdk 3.0.0-pre.3 (git+https://github.com/near/near-sdk-rs?rev=af0e826f916f3aa3ea51e8b675ecebdd37176671)",
+ "near-sdk 3.0.0-pre.3",
  "serde",
  "serde_json",
  "uint 0.8.5",
@@ -1325,7 +1325,7 @@ name = "near-contract-standards"
 version = "3.0.0-pre.3"
 source = "git+https://github.com/near/near-sdk-rs?rev=af0e826f916f3aa3ea51e8b675ecebdd37176671#af0e826f916f3aa3ea51e8b675ecebdd37176671"
 dependencies = [
- "near-sdk 3.0.0-pre.3 (git+https://github.com/near/near-sdk-rs?rev=af0e826f916f3aa3ea51e8b675ecebdd37176671)",
+ "near-sdk 3.0.0-pre.3",
 ]
 
 [[package]]
@@ -1543,23 +1543,7 @@ dependencies = [
  "borsh 0.8.2",
  "bs58 0.4.0",
  "near-primitives-core 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "near-sdk-macros 3.0.0-pre.3 (git+https://github.com/near/near-sdk-rs?rev=af0e826f916f3aa3ea51e8b675ecebdd37176671)",
- "near-vm-logic 3.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "serde",
- "serde_json",
- "wee_alloc",
-]
-
-[[package]]
-name = "near-sdk"
-version = "3.0.0-pre.3"
-source = "git+https://github.com/near/near-sdk-rs#af0e826f916f3aa3ea51e8b675ecebdd37176671"
-dependencies = [
- "base64 0.13.0",
- "borsh 0.8.2",
- "bs58 0.4.0",
- "near-primitives-core 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
- "near-sdk-macros 3.0.0-pre.3 (git+https://github.com/near/near-sdk-rs)",
+ "near-sdk-macros 3.0.0-pre.3",
  "near-vm-logic 3.0.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "serde",
  "serde_json",
@@ -1590,17 +1574,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "near-sdk-core"
-version = "3.0.0-pre.3"
-source = "git+https://github.com/near/near-sdk-rs#af0e826f916f3aa3ea51e8b675ecebdd37176671"
-dependencies = [
- "Inflector",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "near-sdk-macros"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1617,18 +1590,7 @@ name = "near-sdk-macros"
 version = "3.0.0-pre.3"
 source = "git+https://github.com/near/near-sdk-rs?rev=af0e826f916f3aa3ea51e8b675ecebdd37176671#af0e826f916f3aa3ea51e8b675ecebdd37176671"
 dependencies = [
- "near-sdk-core 3.0.0-pre.3 (git+https://github.com/near/near-sdk-rs?rev=af0e826f916f3aa3ea51e8b675ecebdd37176671)",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "near-sdk-macros"
-version = "3.0.0-pre.3"
-source = "git+https://github.com/near/near-sdk-rs#af0e826f916f3aa3ea51e8b675ecebdd37176671"
-dependencies = [
- "near-sdk-core 3.0.0-pre.3 (git+https://github.com/near/near-sdk-rs)",
+ "near-sdk-core 3.0.0-pre.3",
  "proc-macro2",
  "quote",
  "syn",
@@ -1637,14 +1599,14 @@ dependencies = [
 [[package]]
 name = "near-sdk-sim"
 version = "3.0.0-pre.3"
-source = "git+https://github.com/near/near-sdk-rs#af0e826f916f3aa3ea51e8b675ecebdd37176671"
+source = "git+https://github.com/near/near-sdk-rs?rev=af0e826f916f3aa3ea51e8b675ecebdd37176671#af0e826f916f3aa3ea51e8b675ecebdd37176671"
 dependencies = [
  "funty",
  "lazy-static-include",
  "near-crypto",
  "near-pool",
  "near-primitives",
- "near-sdk 3.0.0-pre.3 (git+https://github.com/near/near-sdk-rs)",
+ "near-sdk 3.0.0-pre.3",
  "near-store",
  "near-vm-logic 3.0.0 (git+https://github.com/near/nearcore.git?rev=1e88c6c699e3a2c49c6cbd09d284f69885982e80)",
  "node-runtime",
@@ -2629,7 +2591,7 @@ version = "0.1.0"
 source = "git+https://github.com/mfornet/contracts#177acd35c73e251bc1c4d10a2b87ae0b2b49b508"
 dependencies = [
  "near-contract-standards",
- "near-sdk 3.0.0-pre.3 (git+https://github.com/near/near-sdk-rs?rev=af0e826f916f3aa3ea51e8b675ecebdd37176671)",
+ "near-sdk 3.0.0-pre.3",
 ]
 
 [[package]]

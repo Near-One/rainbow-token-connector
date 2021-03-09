@@ -11,7 +11,7 @@ docker run \
      -w /host/bridge-token \
      -e RUSTFLAGS='-C link-arg=-s' \
      nearprotocol/contract-builder \
-     rustup target add wasm32-unknown-unknown && cargo build --target wasm32-unknown-unknown --release
+     /bin/bash -c "rustup target add wasm32-unknown-unknown; cargo build --target wasm32-unknown-unknown --release"
 
 mkdir -p res
 cp $DIR/target/wasm32-unknown-unknown/release/bridge_token.wasm $DIR/../res/

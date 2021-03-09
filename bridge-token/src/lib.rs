@@ -36,22 +36,34 @@ pub trait ExtBridgeTokenFactory {
 #[near_bindgen]
 impl BridgeToken {
     #[init]
-    pub fn new(
-        name: String,
-        symbol: String,
-        reference: String,
-        reference_hash: Base64VecU8,
-    ) -> Self {
+    pub fn new() -> Self {
         assert!(!env::state_exists(), "Already initialized");
         Self {
-            token: FungibleToken::new(b"t".to_vec()),
-            name,
-            symbol,
-            reference,
-            reference_hash,
             controller: env::predecessor_account_id(),
+            token: FungibleToken::new(b"t".to_vec()),
+            name: String::default(),
+            symbol: String::default(),
+            reference: String::default(),
+            reference_hash: Base64VecU8(vec![]),
             decimals: 0,
         }
+    }
+
+    pub fn set_metadata(
+        &mut self,
+        name: Option<String>,
+        symbol: Option<String>,
+        reference: Option<String>,
+        reference_hash: Option<Base64VecU8>,
+        decimals: Option<u8>,
+    ) {
+        // Only owner can change the metadata
+        assert_eq!(env::current_account_id(), env::signer_account_id());
+        name.map(|name| self.name = name);
+        symbol.map(|symbol| self.symbol = symbol);
+        reference.map(|reference| self.reference = reference);
+        reference_hash.map(|reference_hash| self.reference_hash = reference_hash);
+        decimals.map(|decimals| self.decimals = decimals);
     }
 
     #[payable]
