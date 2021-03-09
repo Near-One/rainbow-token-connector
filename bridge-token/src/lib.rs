@@ -5,11 +5,14 @@ use near_contract_standards::fungible_token::FungibleToken;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{Base64VecU8, ValidAccountId, U128};
 use near_sdk::{
-    assert_one_yocto, env, ext_contract, near_bindgen, AccountId, PanicOnDefault, Promise,
-    PromiseOrValue,
+    assert_one_yocto, env, ext_contract, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
+    PromiseOrValue, StorageUsage,
 };
+use std::convert::TryInto;
 
 near_sdk::setup_alloc!();
+
+const NO_DEPOSIT: Balance = 0;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -67,26 +70,21 @@ impl BridgeToken {
     }
 
     #[payable]
-    pub fn mint(&mut self, account_id: AccountId, amount: U128) -> Promise {
+    pub fn mint(&mut self, account_id: AccountId, amount: U128) {
         assert_eq!(
             env::predecessor_account_id(),
             self.controller,
             "Only controller can call mint"
         );
 
-        let mut amount_to_refund = env::attached_deposit();
-        if !self.token.accounts.contains_key(&account_id) {
-            self.token.internal_register_account(&account_id);
-            amount_to_refund -= u128::from(self.storage_balance_bounds().min);
-        }
-
+        self.storage_deposit(Some(account_id.as_str().try_into().unwrap()), None);
         self.token.internal_deposit(&account_id, amount.into());
-        Promise::new(env::signer_account_id()).transfer(amount_to_refund)
     }
 
     #[payable]
     pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
         assert_one_yocto();
+        Promise::new(env::predecessor_account_id()).transfer(1);
 
         self.token
             .internal_withdraw(&env::predecessor_account_id(), amount.into());
@@ -95,9 +93,13 @@ impl BridgeToken {
             amount.into(),
             recipient,
             &self.controller,
-            1,
+            NO_DEPOSIT,
             env::prepaid_gas() / 2,
         )
+    }
+
+    pub fn account_storage_usage(&self) -> StorageUsage {
+        self.token.account_storage_usage
     }
 }
 

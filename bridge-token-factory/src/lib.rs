@@ -59,6 +59,8 @@ pub struct BridgeTokenFactory {
     pub used_events: UnorderedSet<Vec<u8>>,
     /// Public key of the account deploying the factory.
     pub owner_pk: PublicKey,
+    /// Balance required to register a new account in the BridgeToken
+    pub bridge_token_storage_deposit_required: Balance,
 }
 
 impl Default for BridgeTokenFactory {
@@ -101,7 +103,7 @@ pub trait FungibleToken {
 
 #[ext_contract(ext_bridge_token)]
 pub trait ExtBridgeToken {
-    fn mint(&self, account_id: AccountId, amount: U128) -> Promise;
+    fn mint(&self, account_id: AccountId, amount: U128);
 }
 
 pub fn assert_self() {
@@ -122,6 +124,10 @@ impl BridgeTokenFactory {
             tokens: UnorderedSet::new(b"t".to_vec()),
             used_events: UnorderedSet::new(b"u".to_vec()),
             owner_pk: env::signer_account_pk(),
+            bridge_token_storage_deposit_required:
+                near_contract_standards::fungible_token::FungibleToken::new(b"t".to_vec())
+                    .account_storage_usage as Balance
+                    * STORAGE_PRICE_PER_BYTE,
         }
     }
 
@@ -165,6 +171,9 @@ impl BridgeTokenFactory {
             env::prepaid_gas() / 2,
         ))
     }
+    // TODO: Make test that stress devolution on finish_deposit works as expected
+    // - When the account doesn't exist it is created
+    // - If it exist everything is returned
 
     /// Finish depositing once the proof was successfully validated. Can only be called by the contract
     /// itself.
@@ -178,18 +187,27 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] new_owner_id: AccountId,
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] proof: Proof,
-    ) -> Promise {
+    ) {
         assert_self();
         assert!(verification_success, "Failed to verify the proof");
+
+        let initial_storage_usage = env::storage_usage();
         self.record_proof(&proof);
+        let storage_used = env::storage_usage() - initial_storage_usage;
+        let balance_required = storage_used as u128 * STORAGE_PRICE_PER_BYTE;
+
+        assert!(
+            env::attached_deposit()
+                >= balance_required + self.bridge_token_storage_deposit_required
+        );
 
         ext_bridge_token::mint(
             new_owner_id,
             amount.into(),
             &self.get_bridge_token_account_id(token),
-            env::attached_deposit(),
+            env::attached_deposit() - balance_required,
             env::prepaid_gas() / 2,
-        )
+        );
     }
 
     /// Burn given amount of tokens and unlock it on the Ethereum side for the recipient address.
