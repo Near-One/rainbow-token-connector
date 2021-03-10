@@ -404,6 +404,10 @@ mod tests {
     }
 
     fn token_locker() -> String {
+        "11111474e89094c44da98b954eedeac495271d0f".to_string()
+    }
+
+    fn dai() -> String {
         "6b175474e89094c44da98b954eedeac495271d0f".to_string()
     }
 
