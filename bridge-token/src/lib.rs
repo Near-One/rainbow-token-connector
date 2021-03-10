@@ -1,3 +1,4 @@
+use admin_controlled::{AdminControlled, Mask};
 use borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::U128;
 use near_sdk::{env, ext_contract, near_bindgen, AccountId, Balance, Promise};
@@ -14,6 +15,7 @@ const NO_DEPOSIT: Balance = 0;
 pub struct BridgeToken {
     controller: AccountId,
     token: Token,
+    paused: Mask,
 }
 
 impl Default for BridgeToken {
@@ -21,6 +23,8 @@ impl Default for BridgeToken {
         panic!("Bridge Token should be initialized before usage")
     }
 }
+
+const PAUSE_WITHDRAW: Mask = 1 << 0;
 
 #[ext_contract(ext_bridge_token_factory)]
 pub trait ExtBridgeTokenFactory {
@@ -40,6 +44,7 @@ impl BridgeToken {
         Self {
             controller: env::predecessor_account_id(),
             token: Token::new(env::predecessor_account_id(), 0u128),
+            paused: Mask::default(),
         }
     }
 
@@ -54,6 +59,8 @@ impl BridgeToken {
 
     #[payable]
     pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
+        self.check_not_paused(PAUSE_WITHDRAW);
+
         self.token
             .burn(env::predecessor_account_id(), amount.into());
 
@@ -102,5 +109,16 @@ impl FungibleToken for BridgeToken {
 
     fn get_allowance(&self, owner_id: String, escrow_account_id: String) -> U128 {
         self.token.get_allowance(owner_id, escrow_account_id).into()
+    }
+}
+
+impl AdminControlled for BridgeToken {
+    fn get_paused(&self) -> u128 {
+        self.paused
+    }
+
+    fn set_paused(&mut self, paused: u128) {
+        self.assert_owner();
+        self.paused = paused;
     }
 }
