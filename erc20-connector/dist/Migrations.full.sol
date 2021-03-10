@@ -1,4 +1,3 @@
-
 // File: contracts/Migrations.sol
 
 pragma solidity ^0.6;

@@ -2,12 +2,14 @@ pragma solidity ^0.6.12;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "rainbow-bridge/contracts/eth/nearbridge/contracts/AdminControlled.sol";
 import "rainbow-bridge/contracts/eth/nearprover/contracts/ProofDecoder.sol";
 import "rainbow-bridge/contracts/eth/nearbridge/contracts/Borsh.sol";
 import "./Locker.sol";
 
 contract ERC20Locker is Locker, AdminControlled {
+    using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
     event Locked (
@@ -50,6 +52,7 @@ contract ERC20Locker is Locker, AdminControlled {
         public
         pausable (PAUSED_LOCK)
     {
+        require(IERC20(ethToken).balanceOf(address(this)).add(amount) <= ((uint256(1) << 128) - 1), "Maximum tokens locked exceeded (< 2^128 - 1)");
         IERC20(ethToken).safeTransferFrom(msg.sender, address(this), amount);
         emit Locked(address(ethToken), msg.sender, amount, accountId);
     }

@@ -1,4 +1,3 @@
-
 // File: rainbow-bridge/contracts/eth/nearprover/contracts/INearProver.sol
 
 pragma solidity ^0.6;

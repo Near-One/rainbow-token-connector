@@ -11,6 +11,7 @@ use near_sdk::{
 use std::convert::TryInto;
 
 near_sdk::setup_alloc!();
+use admin_controlled::{AdminControlled, Mask};
 
 const NO_DEPOSIT: Balance = 0;
 
@@ -24,7 +25,10 @@ pub struct BridgeToken {
     reference: String,
     reference_hash: Base64VecU8,
     decimals: u8,
+    paused: Mask,
 }
+
+const PAUSE_WITHDRAW: Mask = 1 << 0;
 
 #[ext_contract(ext_bridge_token_factory)]
 pub trait ExtBridgeTokenFactory {
@@ -49,6 +53,7 @@ impl BridgeToken {
             reference: String::default(),
             reference_hash: Base64VecU8(vec![]),
             decimals: 0,
+            paused: Mask::default(),
         }
     }
 
@@ -83,6 +88,8 @@ impl BridgeToken {
 
     #[payable]
     pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
+        self.check_not_paused(PAUSE_WITHDRAW);
+
         assert_one_yocto();
         Promise::new(env::predecessor_account_id()).transfer(1);
 
@@ -120,5 +127,16 @@ impl FungibleTokenMetadataProvider for BridgeToken {
             reference_hash: Some(self.reference_hash.clone()),
             decimals: self.decimals,
         }
+    }
+}
+
+impl AdminControlled for BridgeToken {
+    fn get_paused(&self) -> u128 {
+        self.paused
+    }
+
+    fn set_paused(&mut self, paused: u128) {
+        self.assert_owner();
+        self.paused = paused;
     }
 }

@@ -1,3 +1,4 @@
+use admin_controlled::{AdminControlled, Mask};
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedSet;
@@ -46,6 +47,10 @@ pub enum ResultType {
     },
 }
 
+const PAUSE_DEPLOY_TOKEN: Mask = 1 << 0;
+const PAUSE_DEPOSIT: Mask = 1 << 1;
+const PAUSE_WITHDRAW: Mask = 1 << 2;
+
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct BridgeTokenFactory {
@@ -61,6 +66,8 @@ pub struct BridgeTokenFactory {
     pub owner_pk: PublicKey,
     /// Balance required to register a new account in the BridgeToken
     pub bridge_token_storage_deposit_required: Balance,
+    /// Mask determining all paused functions
+    paused: Mask,
 }
 
 impl Default for BridgeTokenFactory {
@@ -128,6 +135,7 @@ impl BridgeTokenFactory {
                 near_contract_standards::fungible_token::FungibleToken::new(b"t".to_vec())
                     .account_storage_usage as Balance
                     * STORAGE_PRICE_PER_BYTE,
+            paused: Mask::default(),
         }
     }
 
@@ -135,6 +143,7 @@ impl BridgeTokenFactory {
     /// Must attach enough NEAR funds to cover for storage of the proof.
     #[payable]
     pub fn deposit(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
+        self.check_not_paused(PAUSE_DEPOSIT);
         let event = EthLockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
             event.locker_address,
@@ -217,6 +226,7 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] recipient: String,
     ) -> ResultType {
+        self.check_not_paused(PAUSE_WITHDRAW);
         let token = env::predecessor_account_id();
         let parts: Vec<&str> = token.split(".").collect();
         assert_eq!(
@@ -240,6 +250,7 @@ impl BridgeTokenFactory {
 
     #[payable]
     pub fn deploy_bridge_token(&mut self, address: String) -> Promise {
+        self.check_not_paused(PAUSE_DEPLOY_TOKEN);
         let address = address.to_lowercase();
         let _ = validate_eth_address(address.clone());
         assert!(
@@ -377,6 +388,17 @@ impl FungibleTokenReceiver for BridgeTokenFactory {
     }
 }
 
+impl AdminControlled for BridgeTokenFactory {
+    fn get_paused(&self) -> Mask {
+        self.paused
+    }
+
+    fn set_paused(&mut self, paused: Mask) {
+        self.assert_owner();
+        self.paused = paused;
+    }
+}
+
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
@@ -386,6 +408,12 @@ mod tests {
     use near_sdk::{testing_env, MockedBlockchain};
 
     use super::*;
+    use near_sdk::env::sha256;
+    use std::convert::TryInto;
+    use std::panic;
+    use uint::rustc_hex::{FromHex, ToHex};
+
+    const UNPAUSE_ALL: Mask = 0;
 
     fn alice() -> AccountId {
         "alice.near".to_string()
@@ -403,10 +431,45 @@ mod tests {
         "6b175474e89094c44da98b954eedeac495271d0f".to_string()
     }
 
+    /// Generate a valid ethereum address
+    fn ethereum_address_from_id(id: u8) -> String {
+        let mut buffer = vec![id];
+        sha256(buffer.as_mut())
+            .into_iter()
+            .take(20)
+            .collect::<Vec<_>>()
+            .to_hex()
+    }
+
     fn sample_proof() -> Proof {
         Proof {
             log_index: 0,
             log_entry_data: vec![],
+            receipt_index: 0,
+            receipt_data: vec![],
+            header_data: vec![],
+            proof: vec![],
+        }
+    }
+
+    fn create_proof(locker: String, token: String) -> Proof {
+        let event_data = EthLockedEvent {
+            locker_address: locker
+                .from_hex::<Vec<_>>()
+                .unwrap()
+                .as_slice()
+                .try_into()
+                .unwrap(),
+
+            token,
+            sender: "00005474e89094c44da98b954eedeac495271d0f".to_string(),
+            amount: 1000,
+            recipient: "123".to_string(),
+        };
+
+        Proof {
+            log_index: 0,
+            log_entry_data: event_data.to_log_entry_data(),
             receipt_index: 0,
             receipt_data: vec![],
             header_data: vec![],
@@ -499,5 +562,240 @@ mod tests {
                 recipient: address
             }
         );
+    }
+
+    #[test]
+    fn deploy_bridge_token_paused() {
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(alice())
+            .finish());
+
+        // User alice can deploy a new bridge token
+        let mut contract = BridgeTokenFactory::new(prover(), token_locker());
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .predecessor_account_id(alice())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+        contract.deploy_bridge_token(ethereum_address_from_id(0));
+
+        // Admin pause deployment of new token
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(bridge_token_factory())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+        contract.set_paused(PAUSE_DEPLOY_TOKEN);
+
+        // Admin can still deploy new tokens after paused
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(bridge_token_factory())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+        contract.deploy_bridge_token(ethereum_address_from_id(1));
+
+        // User alice can't deploy a new bridge token when it is paused
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(alice())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+        panic::catch_unwind(move || {
+            contract.deploy_bridge_token(ethereum_address_from_id(2));
+        })
+        .unwrap_err();
+    }
+
+    #[test]
+    fn only_admin_can_pause() {
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(alice())
+            .finish());
+        let mut contract = BridgeTokenFactory::new(prover(), token_locker());
+
+        // Admin can pause
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(bridge_token_factory())
+            .finish());
+        contract.set_paused(0b1111);
+
+        // Alice can't pause
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(alice())
+            .finish());
+
+        panic::catch_unwind(move || {
+            contract.set_paused(0);
+        })
+        .unwrap_err();
+    }
+
+    #[test]
+    fn deposit_paused() {
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(alice())
+            .finish());
+        let mut contract = BridgeTokenFactory::new(prover(), token_locker());
+
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(alice())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+        let erc20_address = ethereum_address_from_id(0);
+        contract.deploy_bridge_token(erc20_address.clone());
+
+        // Check it is possible to use deposit while the contract is NOT paused
+        contract.deposit(create_proof(token_locker(), erc20_address.clone()));
+
+        // Pause deposit
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(bridge_token_factory())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+        contract.set_paused(PAUSE_DEPOSIT);
+
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(alice())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+
+        // Check it is NOT possible to use deposit while the contract is paused
+        panic::catch_unwind(move || {
+            contract.deposit(create_proof(token_locker(), erc20_address.clone()));
+        })
+        .unwrap_err();
+    }
+
+    #[test]
+    fn withdraw_paused() {
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(alice())
+            .finish());
+        let mut contract = BridgeTokenFactory::new(prover(), token_locker());
+
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(alice())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+
+        let erc20_address = ethereum_address_from_id(0);
+        let token_name = format!("{}.{}", erc20_address, bridge_token_factory());
+        contract.deploy_bridge_token(erc20_address.clone());
+
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .predecessor_account_id(token_name.clone())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+
+        // Check it is possible to use withdraw while the contract is NOT paused
+        let recipient = ethereum_address_from_id(1);
+        contract.finish_withdraw(0, recipient.clone());
+
+        // Pause withdraw
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(bridge_token_factory())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+        contract.set_paused(PAUSE_WITHDRAW);
+
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .predecessor_account_id(token_name.clone())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+
+        // Check it is NOT possible to use withdraw while the contract is paused
+        panic::catch_unwind(move || {
+            contract.finish_withdraw(0, recipient.clone());
+        })
+        .unwrap_err();
+    }
+
+    /// Check after all is paused deposit is not available
+    #[test]
+    fn all_paused() {
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(alice())
+            .finish());
+        let mut contract = BridgeTokenFactory::new(prover(), token_locker());
+
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(alice())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+        let erc20_address = ethereum_address_from_id(0);
+        contract.deploy_bridge_token(erc20_address.clone());
+
+        // Check it is possible to use deposit while the contract is NOT paused
+        contract.deposit(create_proof(token_locker(), erc20_address.clone()));
+
+        // Pause everything
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(bridge_token_factory())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+        contract.set_paused(PAUSE_DEPLOY_TOKEN | PAUSE_DEPOSIT | PAUSE_WITHDRAW);
+
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(alice())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+
+        // Check it is NOT possible to use deposit while the contract is paused
+        panic::catch_unwind(move || {
+            contract.deposit(create_proof(token_locker(), erc20_address));
+        })
+        .unwrap_err();
+    }
+
+    /// Check after all is paused and unpaused deposit works
+    #[test]
+    fn no_paused() {
+        testing_env!(VMContextBuilder::new()
+            .predecessor_account_id(alice())
+            .finish());
+        let mut contract = BridgeTokenFactory::new(prover(), token_locker());
+
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(alice())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+        let erc20_address = ethereum_address_from_id(0);
+        contract.deploy_bridge_token(erc20_address.clone());
+
+        // Check it is possible to use deposit while the contract is NOT paused
+        contract.deposit(create_proof(token_locker(), erc20_address.clone()));
+
+        // Pause everything
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(bridge_token_factory())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+
+        contract.set_paused(PAUSE_DEPLOY_TOKEN | PAUSE_DEPOSIT | PAUSE_WITHDRAW);
+        contract.set_paused(UNPAUSE_ALL);
+
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(alice())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+
+        // Check the deposit works after pausing and unpausing everything
+        contract.deposit(create_proof(token_locker(), erc20_address));
     }
 }
