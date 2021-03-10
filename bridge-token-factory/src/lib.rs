@@ -679,23 +679,6 @@ mod tests {
             contract.deposit(create_proof(token_locker(), erc20_address.clone()));
         })
         .unwrap_err();
-        
-        // Unpause everything
-        testing_env!(VMContextBuilder::new()
-            .current_account_id(bridge_token_factory())
-            .signer_account_id(bridge_token_factory())
-            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
-            .finish());
-        contract.set_paused(UNPAUSE_ALL);
-
-        testing_env!(VMContextBuilder::new()
-            .current_account_id(bridge_token_factory())
-            .signer_account_id(alice())
-            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
-            .finish());
-            
-        // Check it is possible to use deposit again after the contract is unpaused
-        contract.deposit(create_proof(token_locker(), erc20_address));
     }
 
     #[test]
@@ -744,23 +727,6 @@ mod tests {
             contract.finish_withdraw(0, recipient.clone());
         })
         .unwrap_err();
-        
-        // Unpause everything
-        testing_env!(VMContextBuilder::new()
-            .current_account_id(bridge_token_factory())
-            .signer_account_id(bridge_token_factory())
-            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
-            .finish());
-        contract.set_paused(UNPAUSE_ALL);
-
-        testing_env!(VMContextBuilder::new()
-            .current_account_id(bridge_token_factory())
-            .signer_account_id(alice())
-            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
-            .finish());
-            
-        // Check it is possible to use withdraw again after the contract is unpaused
-        contract.finish_withdraw(0, recipient);
     }
 
     /// Check after all is paused deposit is not available
