@@ -191,21 +191,18 @@ impl BridgeTokenFactory {
         assert_self();
         assert!(verification_success, "Failed to verify the proof");
 
-        let initial_storage_usage = env::storage_usage();
-        self.record_proof(&proof);
-        let storage_used = env::storage_usage() - initial_storage_usage;
-        let balance_required = storage_used as u128 * STORAGE_PRICE_PER_BYTE;
+        let required_deposit = self.record_proof(&proof);
 
         assert!(
             env::attached_deposit()
-                >= balance_required + self.bridge_token_storage_deposit_required
+                >= required_deposit + self.bridge_token_storage_deposit_required
         );
 
         ext_bridge_token::mint(
             new_owner_id,
             amount.into(),
             &self.get_bridge_token_account_id(token),
-            env::attached_deposit() - balance_required,
+            env::attached_deposit() - required_deposit,
             env::prepaid_gas() / 2,
         );
     }
@@ -351,10 +348,9 @@ impl BridgeTokenFactory {
         );
         self.used_events.insert(&key);
         let current_storage = env::storage_usage();
-        let attached_deposit = env::attached_deposit();
         let required_deposit =
             Balance::from(current_storage - initial_storage) * STORAGE_PRICE_PER_BYTE;
-        attached_deposit - required_deposit
+        required_deposit
     }
 }
 

@@ -1,4 +1,4 @@
-use near_sdk::borsh::BorshSerialize;
+use near_sdk::borsh::{self, BorshSerialize};
 use near_sdk::{AccountId, Balance};
 use serde_json::json;
 
@@ -6,8 +6,11 @@ use bridge_token::BridgeTokenContract;
 use bridge_token_factory::BridgeTokenFactoryContract;
 use bridge_token_factory::{validate_eth_address, EthLockedEvent, EthUnlockedEvent, Proof};
 use mock_prover::MockProverContract;
+use near_sdk_sim::runtime::GenesisConfig;
+use near_sdk_sim::transaction::ExecutionStatus;
 use near_sdk_sim::{
-    call, deploy, init_simulator, units::to_yocto, view, ContractAccount, UserAccount,
+    call, deploy, init_simulator, units::to_yocto, view, ContractAccount, ExecutionResult,
+    UserAccount,
 };
 use test_token::ContractContract as TestTokenContract;
 
@@ -21,12 +24,15 @@ const TEST_TOKEN: &str = "test-token";
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
+    TOKEN_WASM_BYTES => "../res/bridge_token.wasm",
     FACTORY_WASM_BYTES => "../res/bridge_token_factory.wasm",
     MOCK_PROVER_WASM_BYTES => "../res/mock_prover.wasm",
 }
 
 fn setup_token_factory() -> (UserAccount, ContractAccount<BridgeTokenFactoryContract>) {
-    let root = init_simulator(None);
+    let mut config = GenesisConfig::default();
+    config.runtime_config.storage_amount_per_byte = 10u128.pow(19);
+    let root = init_simulator(Some(config));
     let prover = deploy!(
         contract: MockProverContract,
         contract_id: PROVER.to_string(),
@@ -42,9 +48,95 @@ fn setup_token_factory() -> (UserAccount, ContractAccount<BridgeTokenFactoryCont
             PROVER.to_string(), LOCKER_ADDRESS.to_string()
         )
     );
-    let alice = root.create_user(ALICE.to_string(), to_yocto("100"));
 
     (root, factory)
+}
+
+#[derive(BorshSerialize)]
+struct AugmentedProof {
+    proof: Proof,
+    skip_call: bool,
+}
+
+impl From<Proof> for AugmentedProof {
+    fn from(proof: Proof) -> Self {
+        Self {
+            proof,
+            skip_call: false,
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! call_json {
+    ($signer:expr, $contract:ident, $method:ident, $arg:tt, $gas:expr, $deposit:expr) => {
+        $signer.call(
+            $contract.clone(),
+            stringify!($method),
+            json!($arg).to_string().into_bytes().as_ref(),
+            $gas,
+            $deposit,
+        )
+    };
+    ($signer:expr, $contract:ident.$method:ident($arg:tt), $gas:expr, $deposit:expr) => {
+        call_json!($signer, $contract, $method, $arg, $gas, $deposit)
+    };
+    ($signer:expr, $contract:ident.$method:ident($arg:tt)) => {
+        call_json!(
+            $signer,
+            $contract,
+            $method,
+            $arg,
+            near_sdk_sim::DEFAULT_GAS,
+            near_sdk_sim::STORAGE_AMOUNT
+        )
+    };
+    ($signer:expr, $contract:ident.$method:ident($arg:tt), deposit=$deposit:expr) => {
+        call_json!(
+            $signer,
+            $contract,
+            $method,
+            $arg,
+            near_sdk_sim::DEFAULT_GAS,
+            $deposit
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! call_borsh {
+    ($signer:expr, $contract:ident, $method:ident, $arg:expr, $gas:expr, $deposit:expr) => {
+        $signer.call(
+            $contract.clone(),
+            stringify!($method),
+            &$arg.try_to_vec().unwrap(),
+            $gas,
+            $deposit,
+        )
+    };
+    ($signer:expr, $contract:ident.$method:ident($arg:expr), $gas:expr, $deposit:expr) => {
+        call_borsh!($signer, $contract, $method, $arg, $gas, $deposit)
+    };
+    ($signer:expr, $contract:ident.$method:ident($arg:expr)) => {
+        call_borsh!(
+            $signer,
+            $contract,
+            $method,
+            $arg,
+            near_sdk_sim::DEFAULT_GAS,
+            near_sdk_sim::STORAGE_AMOUNT
+        )
+    };
+    ($signer:expr, $contract:ident.$method:ident($arg:expr), deposit=$deposit:expr) => {
+        call_borsh!(
+            $signer,
+            $contract,
+            $method,
+            $arg,
+            near_sdk_sim::DEFAULT_GAS,
+            $deposit
+        )
+    };
 }
 
 #[test]
@@ -52,10 +144,13 @@ fn test_eth_token_transfer() {
     let (user, factory) = setup_token_factory();
     let root = "root".to_string();
 
+    let alice = user.create_user(ALICE.to_string(), to_yocto("100"));
+    let factory_id = FACTORY.to_string();
+
     call!(
         user,
         factory.deploy_bridge_token(DAI_ADDRESS.to_string()),
-        deposit = to_yocto("35")
+        deposit = to_yocto("3500")
     )
     .assert_success();
 
@@ -63,12 +158,13 @@ fn test_eth_token_transfer() {
         view!(factory.get_bridge_token_account_id(DAI_ADDRESS.to_string())).unwrap_json();
     assert_eq!(token_account_id, format!("{}.{}", DAI_ADDRESS, FACTORY));
 
-    // TODO: use BridgeTokenContract
-    // let token = BridgeToken {
-    //     contract_id: token_account_id,
-    // };
-    // assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "0");
-    // assert_eq!(token.get_total_supply(&mut runtime), "0");
+    let alice_balance: String =
+        call_json!(user, token_account_id.ft_balance_of({"account_id": ALICE.to_string()}))
+            .unwrap_json();
+    assert_eq!(alice_balance, "0");
+
+    let total_supply: String = call_json!(user, token_account_id.ft_total_supply({})).unwrap_json();
+    assert_eq!(total_supply, "0");
 
     let mut proof = Proof::default();
     proof.log_entry_data = EthLockedEvent {
@@ -79,22 +175,29 @@ fn test_eth_token_transfer() {
         recipient: ALICE.to_string(),
     }
     .to_log_entry_data();
-    call!(user, factory.deposit(proof)).assert_success();
 
-    // assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "1000");
-    // assert_eq!(token.get_total_supply(&mut runtime), "1000");
+    call_borsh!(user, factory_id.deposit(proof)).assert_success();
 
-    // token
-    //     .withdraw(
-    //         &mut runtime,
-    //         ALICE.to_string(),
-    //         "100".to_string(),
-    //         SENDER_ADDRESS.to_string(),
-    //     )
-    //     .unwrap();
-    //
-    // assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "900");
-    // assert_eq!(token.get_total_supply(&mut runtime), "900");
+    let alice_balance: String =
+        call_json!(user, token_account_id.ft_balance_of({"account_id": ALICE.to_string()}))
+            .unwrap_json();
+    assert_eq!(alice_balance, "1000");
+
+    let total_supply: String = call_json!(user, token_account_id.ft_total_supply({})).unwrap_json();
+    assert_eq!(total_supply, "1000");
+
+    call_json!(alice, token_account_id.withdraw({
+                "amount" : "100",
+                "recipient" : SENDER_ADDRESS.to_string()}), deposit=1)
+    .assert_success();
+
+    let alice_balance: String =
+        call_json!(user, token_account_id.ft_balance_of({"account_id": ALICE.to_string()}))
+            .unwrap_json();
+    assert_eq!(alice_balance, "900");
+
+    let total_supply: String = call_json!(user, token_account_id.ft_total_supply({})).unwrap_json();
+    assert_eq!(total_supply, "900");
 }
 
 // #[test]
