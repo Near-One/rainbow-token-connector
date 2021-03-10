@@ -38,7 +38,7 @@ contract('TokenLocker', function ([addr, addr1, addr2]) {
         prover = await NearProverMock.new();
         locker = await ERC20Locker.new(Buffer.from('nearfuntoken', 'utf-8'), prover.address, minBlockAcceptanceHeight, addr, UNPAUSED_ALL);
         await token.mint(locker.address, toWei('100'));
-        await token.mint(addr1, toWei('5'));
+        await token.mint(addr1, initialBalanceAddr1);
     });
 
     it('lock to NEAR', async function () {
