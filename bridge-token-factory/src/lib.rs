@@ -40,7 +40,7 @@ pub enum ResultType {
     Withdraw,
     Lock,
 }
-
+const UNPAUSE_ALL: Mask = 0;
 const PAUSE_DEPLOY_TOKEN: Mask = 1 << 0;
 const PAUSE_DEPOSIT: Mask = 1 << 1;
 const PAUSE_WITHDRAW: Mask = 1 << 2;
@@ -676,9 +676,26 @@ mod tests {
 
         // Check it is NOT possible to use deposit while the contract is paused
         panic::catch_unwind(move || {
-            contract.deposit(create_proof(token_locker(), erc20_address));
+            contract.deposit(create_proof(token_locker(), erc20_address.clone()));
         })
         .unwrap_err();
+        
+        // Unpause everything
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(bridge_token_factory())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+        contract.set_paused(UNPAUSE_ALL);
+
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(alice())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+            
+        // Check it is possible to use deposit again after the contract is unpaused
+        contract.deposit(create_proof(token_locker(), erc20_address));
     }
 
     #[test]
@@ -724,9 +741,26 @@ mod tests {
 
         // Check it is NOT possible to use withdraw while the contract is paused
         panic::catch_unwind(move || {
-            contract.finish_withdraw(0, recipient);
+            contract.finish_withdraw(0, recipient.clone());
         })
         .unwrap_err();
+        
+        // Unpause everything
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(bridge_token_factory())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+        contract.set_paused(UNPAUSE_ALL);
+
+        testing_env!(VMContextBuilder::new()
+            .current_account_id(bridge_token_factory())
+            .signer_account_id(alice())
+            .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
+            .finish());
+            
+        // Check it is possible to use withdraw again after the contract is unpaused
+        contract.finish_withdraw(0, recipient);
     }
 
     /// Check after all is paused deposit is not available
@@ -748,7 +782,7 @@ mod tests {
         // Check it is possible to use deposit while the contract is NOT paused
         contract.deposit(create_proof(token_locker(), erc20_address.clone()));
 
-        // Pause deposit
+        // Pause everything
         testing_env!(VMContextBuilder::new()
             .current_account_id(bridge_token_factory())
             .signer_account_id(bridge_token_factory())
@@ -790,7 +824,7 @@ mod tests {
         // Check it is possible to use deposit while the contract is NOT paused
         contract.deposit(create_proof(token_locker(), erc20_address.clone()));
 
-        // Pause deposit
+        // Pause everything
         testing_env!(VMContextBuilder::new()
             .current_account_id(bridge_token_factory())
             .signer_account_id(bridge_token_factory())
@@ -800,7 +834,7 @@ mod tests {
         contract.set_paused(
             PAUSE_DEPLOY_TOKEN | PAUSE_DEPOSIT | PAUSE_WITHDRAW | PAUSE_LOCK | PAUSE_UNLOCK,
         );
-        contract.set_paused(NO_DEPOSIT);
+        contract.set_paused(UNPAUSE_ALL);
 
         testing_env!(VMContextBuilder::new()
             .current_account_id(bridge_token_factory())
@@ -808,7 +842,7 @@ mod tests {
             .attached_deposit(BRIDGE_TOKEN_INIT_BALANCE * 2)
             .finish());
 
-        // Check it is NOT possible to use deposit while the contract is paused
+        // Check the deposit works after pausing and unpausing everything
         contract.deposit(create_proof(token_locker(), erc20_address));
     }
 }
