@@ -40,7 +40,7 @@ pub enum ResultType {
     Withdraw,
     Lock,
 }
-const UNPAUSE_ALL: Mask = 0;
+
 const PAUSE_DEPLOY_TOKEN: Mask = 1 << 0;
 const PAUSE_DEPOSIT: Mask = 1 << 1;
 const PAUSE_WITHDRAW: Mask = 1 << 2;
@@ -431,6 +431,8 @@ mod tests {
     use std::convert::TryInto;
     use std::panic;
     use uint::rustc_hex::{FromHex, ToHex};
+
+    const UNPAUSE_ALL: Mask = 0;
 
     fn alice() -> AccountId {
         "alice.near".to_string()
