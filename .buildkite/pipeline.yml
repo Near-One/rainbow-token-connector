@@ -28,7 +28,7 @@ steps:
           source ~/.yarn/yarn.sh
           cd erc20-connector
           yarn
-          yarn run test
+          yarn test
 
     - label: "bridge token factory"
       command: |
