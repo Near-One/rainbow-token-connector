@@ -4,7 +4,7 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedSet;
 use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
-    env, ext_contract, near_bindgen, AccountId, Balance, Gas, Promise, PromiseOrValue, PublicKey,
+    env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault, Promise, PublicKey,
 };
 
 type EthereumAddress = [u8; 20];
@@ -52,7 +52,7 @@ const PAUSE_DEPOSIT: Mask = 1 << 1;
 const PAUSE_WITHDRAW: Mask = 1 << 2;
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct BridgeTokenFactory {
     /// The account of the prover that we can use to prove
     pub prover_account: AccountId,
@@ -68,12 +68,6 @@ pub struct BridgeTokenFactory {
     pub bridge_token_storage_deposit_required: Balance,
     /// Mask determining all paused functions
     paused: Mask,
-}
-
-impl Default for BridgeTokenFactory {
-    fn default() -> Self {
-        panic!("Fun token should be initialized before usage")
-    }
 }
 
 #[ext_contract(ext_self)]
