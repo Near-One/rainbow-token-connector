@@ -6,7 +6,7 @@ use near_contract_standards::fungible_token::FungibleToken;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{Base64VecU8, ValidAccountId, U128};
 use near_sdk::{
-    assert_one_yocto, assert_self, env, ext_contract, near_bindgen, AccountId, Balance,
+    assert_one_yocto, assert_self, env, ext_contract, near_bindgen, AccountId, Balance, Gas,
     PanicOnDefault, Promise, PromiseOrValue, StorageUsage,
 };
 use std::convert::TryInto;
@@ -14,6 +14,9 @@ use std::convert::TryInto;
 near_sdk::setup_alloc!();
 
 const NO_DEPOSIT: Balance = 0;
+
+/// Gas to call finish withdraw method on factory.
+const FINISH_WITHDRAW_GAS: Gas = 50_000_000_000_000;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -101,7 +104,7 @@ impl BridgeToken {
             recipient,
             &self.controller,
             NO_DEPOSIT,
-            env::prepaid_gas() / 2,
+            FINISH_WITHDRAW_GAS,
         )
     }
 

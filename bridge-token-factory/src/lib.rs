@@ -23,11 +23,21 @@ const STORAGE_PRICE_PER_BYTE: Balance = 10_000_000_000_000_000_000; // 1e19yN, 0
 
 const NO_DEPOSIT: Balance = 0;
 
+/// Initial balance for the BridgeToken contract to cover storage and related.
+const BRIDGE_TOKEN_INIT_BALANCE: Balance = 3_000_000_000_000_000_000_000_000; // 3e24yN, 3N
+
 /// Gas to initialize BridgeToken contract.
 const BRIDGE_TOKEN_NEW: Gas = 10_000_000_000_000;
 
-/// Initial balance for the BridgeToken contract to cover storage and related.
-const BRIDGE_TOKEN_INIT_BALANCE: Balance = 3_000_000_000_000_000_000_000_000; // 3e24yN, 3N
+/// Gas to call mint method on bridge token.
+const MINT_GAS: Gas = 50_000_000_000_000;
+
+/// Gas to call finish deposit method.
+/// This doesn't cover the gas required for calling mint method.
+const FINISH_DEPOSIT_GAS: Gas = 50_000_000_000_000;
+
+/// Gas to call verify_log_entry on prover.
+const VERIFY_LOG_ENTRY_GAS: Gas = 50_000_000_000_000;
 
 #[derive(Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum ResultType {
@@ -75,18 +85,6 @@ pub trait ExtBridgeTokenFactory {
         verification_success: bool,
         #[serializer(borsh)] token: String,
         #[serializer(borsh)] new_owner_id: AccountId,
-        #[serializer(borsh)] amount: Balance,
-        #[serializer(borsh)] proof: Proof,
-    ) -> Promise;
-
-    #[result_serializer(borsh)]
-    fn finish_unlock(
-        &self,
-        #[callback]
-        #[serializer(borsh)]
-        verification_success: bool,
-        #[serializer(borsh)] token: AccountId,
-        #[serializer(borsh)] recipient: AccountId,
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] proof: Proof,
     ) -> Promise;
@@ -157,7 +155,7 @@ impl BridgeTokenFactory {
             false, // Do not skip bridge call. This is only used for development and diagnostics.
             &self.prover_account,
             NO_DEPOSIT,
-            env::prepaid_gas() / 4,
+            VERIFY_LOG_ENTRY_GAS,
         )
         .then(ext_self::finish_deposit(
             event.token,
@@ -166,12 +164,9 @@ impl BridgeTokenFactory {
             proof_1,
             &env::current_account_id(),
             env::attached_deposit(),
-            env::prepaid_gas() / 2,
+            FINISH_DEPOSIT_GAS + MINT_GAS,
         ))
     }
-    // TODO: Make test that stress devolution on finish_deposit works as expected
-    // - When the account doesn't exist it is created
-    // - If it exist everything is returned
 
     /// Finish depositing once the proof was successfully validated. Can only be called by the contract
     /// itself.
@@ -201,7 +196,7 @@ impl BridgeTokenFactory {
             amount.into(),
             &self.get_bridge_token_account_id(token),
             env::attached_deposit() - required_deposit,
-            env::prepaid_gas() / 2,
+            MINT_GAS,
         );
     }
 
@@ -228,7 +223,6 @@ impl BridgeTokenFactory {
         );
         let token_address = validate_eth_address(parts[0].to_string());
         let recipient_address = validate_eth_address(recipient);
-
         ResultType::Withdraw {
             amount: amount.into(),
             token: token_address,
