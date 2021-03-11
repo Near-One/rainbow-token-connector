@@ -300,16 +300,7 @@ impl BridgeTokenFactory {
     }
 }
 
-impl AdminControlled for BridgeTokenFactory {
-    fn get_paused(&self) -> Mask {
-        self.paused
-    }
-
-    fn set_paused(&mut self, paused: Mask) {
-        self.assert_owner();
-        self.paused = paused;
-    }
-}
+admin_controlled::impl_admin_controlled!(BridgeTokenFactory, paused);
 
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]

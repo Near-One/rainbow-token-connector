@@ -1,4 +1,4 @@
-use admin_controlled::{AdminControlled, Mask};
+use admin_controlled::Mask;
 use near_contract_standards::fungible_token::metadata::{
     FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC,
 };
@@ -130,13 +130,4 @@ impl FungibleTokenMetadataProvider for BridgeToken {
     }
 }
 
-impl AdminControlled for BridgeToken {
-    fn get_paused(&self) -> u128 {
-        self.paused
-    }
-
-    fn set_paused(&mut self, paused: u128) {
-        self.assert_owner();
-        self.paused = paused;
-    }
-}
+admin_controlled::impl_admin_controlled!(BridgeToken, paused);
