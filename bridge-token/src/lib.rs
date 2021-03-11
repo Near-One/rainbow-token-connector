@@ -1,3 +1,4 @@
+use admin_controlled::{AdminControlled, Mask};
 use near_contract_standards::fungible_token::metadata::{
     FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC,
 };
@@ -5,13 +6,12 @@ use near_contract_standards::fungible_token::FungibleToken;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{Base64VecU8, ValidAccountId, U128};
 use near_sdk::{
-    assert_one_yocto, env, ext_contract, near_bindgen, AccountId, Balance, PanicOnDefault, Promise,
-    PromiseOrValue, StorageUsage,
+    assert_one_yocto, assert_self, env, ext_contract, near_bindgen, AccountId, Balance,
+    PanicOnDefault, Promise, PromiseOrValue, StorageUsage,
 };
 use std::convert::TryInto;
 
 near_sdk::setup_alloc!();
-use admin_controlled::{AdminControlled, Mask};
 
 const NO_DEPOSIT: Balance = 0;
 
@@ -66,7 +66,7 @@ impl BridgeToken {
         decimals: Option<u8>,
     ) {
         // Only owner can change the metadata
-        assert_eq!(env::current_account_id(), env::signer_account_id());
+        assert_self();
         name.map(|name| self.name = name);
         symbol.map(|symbol| self.symbol = symbol);
         reference.map(|reference| self.reference = reference);
