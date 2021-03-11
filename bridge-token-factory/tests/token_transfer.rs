@@ -148,7 +148,6 @@ fn test_eth_token_transfer() {
     let alice = user.create_user(ALICE.to_string(), to_yocto("100"));
     let factory_id = FACTORY.to_string();
 
-    // TODO: Use expected deposit
     call!(
         user,
         factory.deploy_bridge_token(DAI_ADDRESS.to_string()),

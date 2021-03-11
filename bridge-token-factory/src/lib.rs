@@ -495,18 +495,23 @@ mod tests {
         // Admin pause deployment of new token
         set_env!(
             current_account_id: bridge_token_factory(),
-            signer_account_id: bridge_token_factory(),
+            predecessor_account_id: bridge_token_factory(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
         contract.set_paused(PAUSE_DEPLOY_TOKEN);
 
+        set_env!(
+            current_account_id: bridge_token_factory(),
+            predecessor_account_id: bridge_token_factory(),
+            attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
+        );
         // Admin can still deploy new tokens after paused
         contract.deploy_bridge_token(ethereum_address_from_id(1));
 
         // User alice can't deploy a new bridge token when it is paused
         set_env!(
             current_account_id: bridge_token_factory(),
-            signer_account_id: alice(),
+            predecessor_account_id: alice(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
         panic::catch_unwind(move || {
@@ -523,14 +528,14 @@ mod tests {
         // Admin can pause
         set_env!(
             current_account_id: bridge_token_factory(),
-            signer_account_id: bridge_token_factory(),
+            predecessor_account_id: bridge_token_factory(),
         );
         contract.set_paused(0b1111);
 
         // Alice can't pause
         set_env!(
             current_account_id: bridge_token_factory(),
-            signer_account_id: alice(),
+            predecessor_account_id: alice(),
         );
 
         panic::catch_unwind(move || {
@@ -546,7 +551,7 @@ mod tests {
 
         set_env!(
             current_account_id: bridge_token_factory(),
-            signer_account_id: alice(),
+            predecessor_account_id: alice(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
         let erc20_address = ethereum_address_from_id(0);
@@ -558,14 +563,14 @@ mod tests {
         // Pause deposit
         set_env!(
             current_account_id: bridge_token_factory(),
-            signer_account_id: bridge_token_factory(),
+            predecessor_account_id: bridge_token_factory(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
         contract.set_paused(PAUSE_DEPOSIT);
 
         set_env!(
             current_account_id: bridge_token_factory(),
-            signer_account_id: alice(),
+            predecessor_account_id: alice(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
 
@@ -584,7 +589,7 @@ mod tests {
 
         set_env!(
             current_account_id: bridge_token_factory(),
-            signer_account_id: alice(),
+            predecessor_account_id: alice(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
         let erc20_address = ethereum_address_from_id(0);
@@ -596,14 +601,14 @@ mod tests {
         // Pause everything
         set_env!(
             current_account_id: bridge_token_factory(),
-            signer_account_id: bridge_token_factory(),
+            predecessor_account_id: bridge_token_factory(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
         contract.set_paused(PAUSE_DEPLOY_TOKEN | PAUSE_DEPOSIT);
 
         set_env!(
             current_account_id: bridge_token_factory(),
-            signer_account_id: alice(),
+            predecessor_account_id: alice(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
 
@@ -622,7 +627,7 @@ mod tests {
 
         set_env!(
             current_account_id: bridge_token_factory(),
-            signer_account_id: alice(),
+            predecessor_account_id: alice(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
         let erc20_address = ethereum_address_from_id(0);
@@ -634,7 +639,7 @@ mod tests {
         // Pause everything
         set_env!(
             current_account_id: bridge_token_factory(),
-            signer_account_id: bridge_token_factory(),
+            predecessor_account_id: bridge_token_factory(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
 
@@ -643,7 +648,7 @@ mod tests {
 
         set_env!(
             current_account_id: bridge_token_factory(),
-            signer_account_id: alice(),
+            predecessor_account_id: alice(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
 
