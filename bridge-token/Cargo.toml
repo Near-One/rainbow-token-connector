@@ -18,6 +18,6 @@ panic = "abort"
 overflow-checks = true
 
 [dependencies]
-near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "af0e826f916f3aa3ea51e8b675ecebdd37176671" }
-near-contract-standards = { git = "https://github.com/near/near-sdk-rs", rev = "af0e826f916f3aa3ea51e8b675ecebdd37176671" }
-admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "ac1c1561eaaa435d5b5cb18206ba81af18d6b132" }
+near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
+near-contract-standards = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
+admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "374b8e4db3e8a19fabb15eb14166a381c5df8497" }
