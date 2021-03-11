@@ -20,8 +20,8 @@ overflow-checks = true
 [dependencies]
 near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
 near-contract-standards = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
-eth-types =  { git = "https://github.com/near/rainbow-bridge" }
-admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "646794537ee7d539636807fb0e40a4a1663139b2" }
+eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "3a60b7eac2f06d160bd7b20b67a181961c08055d" }
+admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "3a60b7eac2f06d160bd7b20b67a181961c08055d" }
 tiny-keccak = "1.4.0"
 ethabi = "12.0.0"
 serde = { version = "*", features = ["derive"] }
