@@ -284,59 +284,6 @@ impl BridgeTokenFactory {
         format!("{}.{}", address, env::current_account_id())
     }
 
-    #[payable]
-    pub fn unlock(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
-        assert!(false, "Native NEP21 on Ethereum is disabled.");
-        let event = EthUnlockedEvent::from_log_entry_data(&proof.log_entry_data);
-        assert_eq!(
-            event.locker_address,
-            self.locker_address,
-            "Event's address {} does not match locker address of this token {}",
-            hex::encode(&event.locker_address),
-            hex::encode(&self.locker_address),
-        );
-        let proof_1 = proof.clone();
-        ext_prover::verify_log_entry(
-            proof.log_index,
-            proof.log_entry_data,
-            proof.receipt_index,
-            proof.receipt_data,
-            proof.header_data,
-            proof.proof,
-            false, // Do not skip bridge call. This is only used for development and diagnostics.
-            &self.prover_account,
-            NO_DEPOSIT,
-            env::prepaid_gas() / 4,
-        )
-        .then(ext_self::finish_unlock(
-            event.token,
-            event.recipient,
-            event.amount,
-            proof_1,
-            &env::current_account_id(),
-            env::attached_deposit(),
-            env::prepaid_gas() / 2,
-        ))
-    }
-
-    #[payable]
-    pub fn finish_unlock(
-        &mut self,
-        #[callback]
-        #[serializer(borsh)]
-        verification_success: bool,
-        #[serializer(borsh)] token: AccountId,
-        #[serializer(borsh)] recipient: AccountId,
-        #[serializer(borsh)] amount: Balance,
-        #[serializer(borsh)] proof: Proof,
-    ) -> Promise {
-        assert!(false, "Native NEP21 on Ethereum is disabled.");
-        assert_self();
-        assert!(verification_success, "Failed to verify the proof");
-        self.record_proof(&proof);
-        ext_fungible_token::ft_transfer(recipient, amount.into(), None, &token, 1, TRANSFER_GAS)
-    }
-
     /// Record proof to make sure it is not re-used later for anther deposit.
     fn record_proof(&mut self, proof: &Proof) -> Balance {
         // TODO: Instead of sending the full proof (clone only relevant parts of the Proof)
@@ -356,29 +303,6 @@ impl BridgeTokenFactory {
         let required_deposit =
             Balance::from(current_storage - initial_storage) * STORAGE_PRICE_PER_BYTE;
         required_deposit
-    }
-}
-
-#[near_bindgen]
-impl FungibleTokenReceiver for BridgeTokenFactory {
-    fn ft_on_transfer(
-        &mut self,
-        _sender_id: ValidAccountId,
-        amount: U128,
-        msg: String,
-    ) -> PromiseOrValue<U128> {
-        assert!(false, "Native FT on Ethereum is disabled");
-        let recipient = validate_eth_address(msg);
-        env::log(
-            &ResultType::Lock {
-                token: env::predecessor_account_id(),
-                amount: amount.into(),
-                recipient,
-            }
-            .try_to_vec()
-            .unwrap(),
-        );
-        PromiseOrValue::Value(U128::from(0))
     }
 }
 
