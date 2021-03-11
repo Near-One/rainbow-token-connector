@@ -49,7 +49,6 @@ pub enum ResultType {
 
 const PAUSE_DEPLOY_TOKEN: Mask = 1 << 0;
 const PAUSE_DEPOSIT: Mask = 1 << 1;
-const PAUSE_WITHDRAW: Mask = 1 << 2;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -220,7 +219,6 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] recipient: String,
     ) -> ResultType {
-        self.check_not_paused(PAUSE_WITHDRAW);
         let token = env::predecessor_account_id();
         let parts: Vec<&str> = token.split(".").collect();
         assert_eq!(
