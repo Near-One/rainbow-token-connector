@@ -1,27 +1,34 @@
-use admin_controlled::{AdminControlled, Mask};
-use borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::json_types::U128;
-use near_sdk::{env, ext_contract, near_bindgen, AccountId, Balance, Promise};
+use admin_controlled::Mask;
+use near_contract_standards::fungible_token::metadata::{
+    FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC,
+};
+use near_contract_standards::fungible_token::FungibleToken;
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::json_types::{Base64VecU8, ValidAccountId, U128};
+use near_sdk::{
+    assert_one_yocto, assert_self, env, ext_contract, near_bindgen, AccountId, Balance, Gas,
+    PanicOnDefault, Promise, PromiseOrValue, StorageUsage,
+};
+use std::convert::TryInto;
 
-use near_lib::token::{FungibleToken, Token};
-
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
+near_sdk::setup_alloc!();
 
 const NO_DEPOSIT: Balance = 0;
 
+/// Gas to call finish withdraw method on factory.
+const FINISH_WITHDRAW_GAS: Gas = 50_000_000_000_000;
+
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct BridgeToken {
     controller: AccountId,
-    token: Token,
+    token: FungibleToken,
+    name: String,
+    symbol: String,
+    reference: String,
+    reference_hash: Base64VecU8,
+    decimals: u8,
     paused: Mask,
-}
-
-impl Default for BridgeToken {
-    fn default() -> Self {
-        panic!("Bridge Token should be initialized before usage")
-    }
 }
 
 const PAUSE_WITHDRAW: Mask = 1 << 0;
@@ -43,82 +50,87 @@ impl BridgeToken {
         assert!(!env::state_exists(), "Already initialized");
         Self {
             controller: env::predecessor_account_id(),
-            token: Token::new(env::predecessor_account_id(), 0u128),
+            token: FungibleToken::new(b"t".to_vec()),
+            name: String::default(),
+            symbol: String::default(),
+            reference: String::default(),
+            reference_hash: Base64VecU8(vec![]),
+            decimals: 0,
             paused: Mask::default(),
         }
     }
 
+    pub fn set_metadata(
+        &mut self,
+        name: Option<String>,
+        symbol: Option<String>,
+        reference: Option<String>,
+        reference_hash: Option<Base64VecU8>,
+        decimals: Option<u8>,
+    ) {
+        // Only owner can change the metadata
+        assert_self();
+        name.map(|name| self.name = name);
+        symbol.map(|symbol| self.symbol = symbol);
+        reference.map(|reference| self.reference = reference);
+        reference_hash.map(|reference_hash| self.reference_hash = reference_hash);
+        decimals.map(|decimals| self.decimals = decimals);
+    }
+
+    #[payable]
     pub fn mint(&mut self, account_id: AccountId, amount: U128) {
         assert_eq!(
             env::predecessor_account_id(),
             self.controller,
             "Only controller can call mint"
         );
-        self.token.mint(account_id, amount.into());
+
+        self.storage_deposit(Some(account_id.as_str().try_into().unwrap()), None);
+        self.token.internal_deposit(&account_id, amount.into());
     }
 
     #[payable]
     pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
         self.check_not_paused(PAUSE_WITHDRAW);
 
-        self.token
-            .burn(env::predecessor_account_id(), amount.into());
+        assert_one_yocto();
+        Promise::new(env::predecessor_account_id()).transfer(1);
 
-        Promise::new(env::signer_account_id())
-            .transfer(env::attached_deposit())
-            .then(ext_bridge_token_factory::finish_withdraw(
-                amount.into(),
-                recipient,
-                &self.controller,
-                NO_DEPOSIT,
-                env::prepaid_gas() / 2,
-            ))
+        self.token
+            .internal_withdraw(&env::predecessor_account_id(), amount.into());
+
+        ext_bridge_token_factory::finish_withdraw(
+            amount.into(),
+            recipient,
+            &self.controller,
+            NO_DEPOSIT,
+            FINISH_WITHDRAW_GAS,
+        )
+    }
+
+    pub fn account_storage_usage(&self) -> StorageUsage {
+        self.token.account_storage_usage
     }
 }
+
+near_contract_standards::impl_fungible_token_core!(BridgeToken, token);
+near_contract_standards::impl_fungible_token_storage!(BridgeToken, token);
 
 #[near_bindgen]
-impl FungibleToken for BridgeToken {
-    #[payable]
-    fn inc_allowance(&mut self, escrow_account_id: String, amount: U128) {
-        self.token.inc_allowance(escrow_account_id, amount.into());
-    }
-
-    #[payable]
-    fn dec_allowance(&mut self, escrow_account_id: String, amount: U128) {
-        self.token.dec_allowance(escrow_account_id, amount.into());
-    }
-
-    #[payable]
-    fn transfer_from(&mut self, owner_id: String, new_owner_id: String, amount: U128) {
-        self.token
-            .transfer_from(owner_id, new_owner_id, amount.into());
-    }
-
-    #[payable]
-    fn transfer(&mut self, new_owner_id: String, amount: U128) {
-        self.token.transfer(new_owner_id, amount.into());
-    }
-
-    fn get_total_supply(&self) -> U128 {
-        self.token.get_total_supply().into()
-    }
-
-    fn get_balance(&self, owner_id: String) -> U128 {
-        self.token.get_balance(owner_id).into()
-    }
-
-    fn get_allowance(&self, owner_id: String, escrow_account_id: String) -> U128 {
-        self.token.get_allowance(owner_id, escrow_account_id).into()
+impl FungibleTokenMetadataProvider for BridgeToken {
+    fn ft_metadata(&self) -> FungibleTokenMetadata {
+        FungibleTokenMetadata {
+            spec: FT_METADATA_SPEC.to_string(),
+            name: self.name.clone(),
+            symbol: self.symbol.clone(),
+            icon: Some(
+                "https://near.org/wp-content/themes/near-19/assets/img/brand-icon.png".to_string(),
+            ),
+            reference: Some(self.reference.clone()),
+            reference_hash: Some(self.reference_hash.clone()),
+            decimals: self.decimals,
+        }
     }
 }
 
-impl AdminControlled for BridgeToken {
-    fn get_paused(&self) -> u128 {
-        self.paused
-    }
-
-    fn set_paused(&mut self, paused: u128) {
-        self.assert_owner();
-        self.paused = paused;
-    }
-}
+admin_controlled::impl_admin_controlled!(BridgeToken, paused);

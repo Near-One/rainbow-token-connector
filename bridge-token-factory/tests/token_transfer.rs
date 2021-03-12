@@ -1,10 +1,15 @@
-use borsh::BorshSerialize;
-use near_sdk::{AccountId, Balance};
-use near_test::test_user::{init_test_runtime, to_yocto, TestRuntime, TxResult};
-use near_test::token::TokenContract;
+use near_sdk::borsh::{self, BorshSerialize};
 use serde_json::json;
 
-use bridge_token_factory::{validate_eth_address, EthLockedEvent, EthUnlockedEvent, Proof};
+use bridge_token_factory::BridgeTokenFactoryContract;
+use bridge_token_factory::{validate_eth_address, EthLockedEvent, Proof};
+use mock_prover::MockProverContract;
+use near_sdk::json_types::ValidAccountId;
+use near_sdk_sim::runtime::GenesisConfig;
+use near_sdk_sim::{
+    call, deploy, init_simulator, units::to_yocto, view, ContractAccount, ExecutionResult,
+    UserAccount,
+};
 
 const PROVER: &str = "prover";
 const FACTORY: &str = "bridge";
@@ -12,209 +17,155 @@ const LOCKER_ADDRESS: &str = "11111474e89094c44da98b954eedeac495271d0f";
 const DAI_ADDRESS: &str = "6b175474e89094c44da98b954eedeac495271d0f";
 const SENDER_ADDRESS: &str = "00005474e89094c44da98b954eedeac495271d0f";
 const ALICE: &str = "alice";
-const TEST_TOKEN: &str = "test-token";
 
-lazy_static::lazy_static! {
-    static ref MOCK_PROVER_WASM_BYTES: &'static [u8] = include_bytes!("../../res/mock_prover.wasm").as_ref();
-    static ref FACTORY_WASM_BYTES: &'static [u8] = include_bytes!("../../res/bridge_token_factory.wasm").as_ref();
-    static ref TEST_TOKEN_WASM_BYTES: &'static [u8] = include_bytes!("../../res/test_token.wasm").as_ref();
+near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
+    TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
+    TOKEN_WASM_BYTES => "../res/bridge_token.wasm",
+    FACTORY_WASM_BYTES => "../res/bridge_token_factory.wasm",
+    MOCK_PROVER_WASM_BYTES => "../res/mock_prover.wasm",
 }
 
-pub struct BridgeToken {
-    pub contract_id: AccountId,
-}
-
-impl BridgeToken {
-    pub fn get_balance(&self, runtime: &mut TestRuntime, owner: String) -> String {
-        TokenContract {
-            contract_id: self.contract_id.clone(),
-        }
-        .get_balance(runtime, owner)
-    }
-
-    pub fn get_total_supply(&self, runtime: &mut TestRuntime) -> String {
-        TokenContract {
-            contract_id: self.contract_id.clone(),
-        }
-        .get_total_supply(runtime)
-    }
-
-    pub fn mint(
-        &self,
-        runtime: &mut TestRuntime,
-        signer_id: AccountId,
-        account_id: AccountId,
-        amount: String,
-    ) -> TxResult {
-        runtime.call(
-            signer_id,
-            self.contract_id.clone(),
-            "mint",
-            json!({"amount": amount, "account_id": account_id}),
-            0,
-        )
-    }
-
-    pub fn withdraw(
-        &self,
-        runtime: &mut TestRuntime,
-        signer_id: AccountId,
-        amount: String,
-        recipient: String,
-    ) -> TxResult {
-        runtime.call(
-            signer_id,
-            self.contract_id.clone(),
-            "withdraw",
-            json!({"amount": amount, "recipient": recipient}),
-            0,
-        )
-    }
-}
-
-pub struct BridgeTokenFactory {
-    contract_id: AccountId,
-}
-
-impl BridgeTokenFactory {
-    pub fn new(
-        runtime: &mut TestRuntime,
-        signer_id: &AccountId,
-        contract_id: AccountId,
-        prover_account: AccountId,
-        locker_address: String,
-    ) -> Self {
-        let _ = runtime
-            .deploy(
-                signer_id.clone(),
-                contract_id.clone(),
-                &FACTORY_WASM_BYTES,
-                json!({"prover_account": prover_account, "locker_address": locker_address}),
-            )
-            .unwrap();
-        Self { contract_id }
-    }
-
-    pub fn deposit(
-        &self,
-        runtime: &mut TestRuntime,
-        signer_id: &AccountId,
-        proof: Proof,
-    ) -> TxResult {
-        runtime.call_args(
-            signer_id.clone(),
-            self.contract_id.clone(),
-            "deposit",
-            proof.try_to_vec().unwrap(),
-            to_yocto("1"),
-        )
-    }
-
-    pub fn deploy_bridge_token(
-        &self,
-        runtime: &mut TestRuntime,
-        signer_id: &AccountId,
-        address: String,
-        deposit: Balance,
-    ) -> TxResult {
-        runtime.call(
-            signer_id.clone(),
-            self.contract_id.clone(),
-            "deploy_bridge_token",
-            json!({ "address": address }),
-            deposit,
-        )
-    }
-
-    pub fn get_bridge_token_account_id(
-        &self,
-        runtime: &mut TestRuntime,
-        address: String,
-    ) -> String {
-        runtime
-            .view(
-                self.contract_id.clone(),
-                "get_bridge_token_account_id",
-                json!({ "address": address }),
-            )
-            .as_str()
-            .unwrap()
-            .to_string()
-    }
-
-    pub fn lock(
-        &self,
-        runtime: &mut TestRuntime,
-        signer_id: AccountId,
-        token: AccountId,
-        amount: Balance,
-        recipient: String,
-    ) -> TxResult {
-        runtime.call(
-            signer_id.clone(),
-            self.contract_id.clone(),
-            "lock",
-            json!({"token": token, "amount": amount.to_string(), "recipient": recipient}),
-            to_yocto("0.005"),
-        )
-    }
-
-    pub fn unlock(
-        &self,
-        runtime: &mut TestRuntime,
-        signer_id: AccountId,
-        proof: Proof,
-    ) -> TxResult {
-        runtime.call_args(
-            signer_id.clone(),
-            self.contract_id.clone(),
-            "unlock",
-            proof.try_to_vec().unwrap(),
-            to_yocto("1"),
-        )
-    }
-}
-
-fn setup_token_factory() -> (TestRuntime, BridgeTokenFactory) {
-    let mut runtime = init_test_runtime();
-    let root = "root".to_string();
-    let _ = runtime
-        .deploy(
-            root.clone(),
-            PROVER.to_string(),
-            &MOCK_PROVER_WASM_BYTES,
-            json!({}),
-        )
-        .unwrap();
-    let factory = BridgeTokenFactory::new(
-        &mut runtime,
-        &root,
-        FACTORY.to_string(),
-        PROVER.to_string(),
-        LOCKER_ADDRESS.to_string(),
+fn setup_token_factory() -> (UserAccount, ContractAccount<BridgeTokenFactoryContract>) {
+    let mut config = GenesisConfig::default();
+    config.runtime_config.storage_amount_per_byte = 10u128.pow(19);
+    let root = init_simulator(Some(config));
+    let _prover = deploy!(
+        contract: MockProverContract,
+        contract_id: PROVER.to_string(),
+        bytes: &MOCK_PROVER_WASM_BYTES,
+        signer_account: root
     );
-    (runtime, factory)
+    let factory = deploy!(
+        contract: BridgeTokenFactoryContract,
+        contract_id: FACTORY.to_string(),
+        bytes: &FACTORY_WASM_BYTES,
+        signer_account: root,
+        init_method: new(
+            PROVER.to_string(), LOCKER_ADDRESS.to_string()
+        )
+    );
+
+    (root, factory)
+}
+
+#[derive(BorshSerialize)]
+struct AugmentedProof {
+    proof: Proof,
+    skip_call: bool,
+}
+
+impl From<Proof> for AugmentedProof {
+    fn from(proof: Proof) -> Self {
+        Self {
+            proof,
+            skip_call: false,
+        }
+    }
+}
+
+#[macro_export]
+macro_rules! call_json {
+    ($signer:expr, $contract:ident, $method:ident, $arg:tt, $gas:expr, $deposit:expr) => {
+        $signer.call(
+            $contract.clone(),
+            stringify!($method),
+            json!($arg).to_string().into_bytes().as_ref(),
+            $gas,
+            $deposit,
+        )
+    };
+    ($signer:expr, $contract:ident.$method:ident($arg:tt), $gas:expr, $deposit:expr) => {
+        call_json!($signer, $contract, $method, $arg, $gas, $deposit)
+    };
+    ($signer:expr, $contract:ident.$method:ident($arg:tt)) => {
+        call_json!(
+            $signer,
+            $contract,
+            $method,
+            $arg,
+            near_sdk_sim::DEFAULT_GAS,
+            near_sdk_sim::STORAGE_AMOUNT
+        )
+    };
+    ($signer:expr, $contract:ident.$method:ident($arg:tt), deposit=$deposit:expr) => {
+        call_json!(
+            $signer,
+            $contract,
+            $method,
+            $arg,
+            near_sdk_sim::DEFAULT_GAS,
+            $deposit
+        )
+    };
+}
+
+#[macro_export]
+macro_rules! call_borsh {
+    ($signer:expr, $contract:ident, $method:ident, $arg:expr, $gas:expr, $deposit:expr) => {
+        $signer.call(
+            $contract.clone(),
+            stringify!($method),
+            &$arg.try_to_vec().unwrap(),
+            $gas,
+            $deposit,
+        )
+    };
+    ($signer:expr, $contract:ident.$method:ident($arg:expr), $gas:expr, $deposit:expr) => {
+        call_borsh!($signer, $contract, $method, $arg, $gas, $deposit)
+    };
+    ($signer:expr, $contract:ident.$method:ident($arg:expr)) => {
+        call_borsh!(
+            $signer,
+            $contract,
+            $method,
+            $arg,
+            near_sdk_sim::DEFAULT_GAS,
+            near_sdk_sim::STORAGE_AMOUNT
+        )
+    };
+    ($signer:expr, $contract:ident.$method:ident($arg:expr), deposit=$deposit:expr) => {
+        call_borsh!(
+            $signer,
+            $contract,
+            $method,
+            $arg,
+            near_sdk_sim::DEFAULT_GAS,
+            $deposit
+        )
+    };
+}
+
+fn err_is(result: &ExecutionResult, expected: &str) {
+    assert!(!result.is_ok(), "Expected error found {:?}", result);
+    let status = format!("{:?}", result.outcome().status);
+    assert!(status.contains(expected), "{}", status);
 }
 
 #[test]
 fn test_eth_token_transfer() {
-    let (mut runtime, factory) = setup_token_factory();
-    let root = "root".to_string();
-    runtime.create_user(root.clone(), ALICE.to_string(), to_yocto("1"));
+    let (user, factory) = setup_token_factory();
 
-    factory
-        .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("35"))
-        .unwrap();
+    let alice = user.create_user(ALICE.to_string(), to_yocto("100"));
+    let factory_id = FACTORY.to_string();
 
-    let token_account_id =
-        factory.get_bridge_token_account_id(&mut runtime, DAI_ADDRESS.to_string());
+    call!(
+        user,
+        factory.deploy_bridge_token(DAI_ADDRESS.to_string()),
+        deposit = to_yocto("35")
+    )
+    .assert_success();
+
+    let token_account_id: String =
+        view!(factory.get_bridge_token_account_id(DAI_ADDRESS.to_string())).unwrap_json();
     assert_eq!(token_account_id, format!("{}.{}", DAI_ADDRESS, FACTORY));
 
-    let token = BridgeToken {
-        contract_id: token_account_id,
-    };
-    assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "0");
-    assert_eq!(token.get_total_supply(&mut runtime), "0");
+    let alice_balance: String =
+        call_json!(user, token_account_id.ft_balance_of({"account_id": ALICE.to_string()}))
+            .unwrap_json();
+    assert_eq!(alice_balance, "0");
+
+    let total_supply: String = call_json!(user, token_account_id.ft_total_supply({})).unwrap_json();
+    assert_eq!(total_supply, "0");
 
     let mut proof = Proof::default();
     proof.log_entry_data = EthLockedEvent {
@@ -225,36 +176,47 @@ fn test_eth_token_transfer() {
         recipient: ALICE.to_string(),
     }
     .to_log_entry_data();
-    factory.deposit(&mut runtime, &root, proof).unwrap();
 
-    assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "1000");
-    assert_eq!(token.get_total_supply(&mut runtime), "1000");
+    call_borsh!(user, factory_id.deposit(proof)).assert_success();
 
-    token
-        .withdraw(
-            &mut runtime,
-            ALICE.to_string(),
-            "100".to_string(),
-            SENDER_ADDRESS.to_string(),
-        )
-        .unwrap();
+    let alice_balance: String =
+        call_json!(user, token_account_id.ft_balance_of({"account_id": ALICE.to_string()}))
+            .unwrap_json();
+    assert_eq!(alice_balance, "1000");
 
-    assert_eq!(token.get_balance(&mut runtime, ALICE.to_string()), "900");
-    assert_eq!(token.get_total_supply(&mut runtime), "900");
+    let total_supply: String = call_json!(user, token_account_id.ft_total_supply({})).unwrap_json();
+    assert_eq!(total_supply, "1000");
+
+    call_json!(alice, token_account_id.withdraw({
+                "amount" : "100",
+                "recipient" : SENDER_ADDRESS.to_string()}), deposit=1)
+    .assert_success();
+
+    let alice_balance: String =
+        call_json!(user, token_account_id.ft_balance_of({"account_id": ALICE.to_string()}))
+            .unwrap_json();
+    assert_eq!(alice_balance, "900");
+
+    let total_supply: String = call_json!(user, token_account_id.ft_total_supply({})).unwrap_json();
+    assert_eq!(total_supply, "900");
 }
 
 #[test]
 fn test_with_invalid_proof() {
-    let (mut runtime, factory) = setup_token_factory();
-    let root = "root".to_string();
-    runtime.create_user(root.clone(), ALICE.to_string(), to_yocto("1"));
+    let (user, factory) = setup_token_factory();
 
-    factory
-        .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("35"))
-        .unwrap();
+    call!(
+        user,
+        factory.deploy_bridge_token(DAI_ADDRESS.to_string()),
+        deposit = to_yocto("35")
+    )
+    .assert_success();
 
-    let token_account_id =
-        factory.get_bridge_token_account_id(&mut runtime, DAI_ADDRESS.to_string());
+    let token_account_id: String = call!(
+        user,
+        factory.get_bridge_token_account_id(DAI_ADDRESS.to_string())
+    )
+    .unwrap_json();
     assert_eq!(token_account_id, format!("{}.{}", DAI_ADDRESS, FACTORY));
 
     let mut proof = Proof::default();
@@ -272,141 +234,113 @@ fn test_with_invalid_proof() {
     // since mock_prover will only accept empty proofs.
     proof.proof = vec![vec![]];
 
-    factory
-        .deposit(&mut runtime, &root, proof.clone())
-        .unwrap_err();
+    let factory_id = FACTORY.to_string();
+    err_is(
+        &call_borsh!(user, factory_id.deposit(proof)),
+        "Failed to verify the proof",
+    );
 
     // Convert the proof in a valid proof that is going to be accepted by the mock_prover.
     proof.proof.clear();
 
     // This deposit event must succeed. Notice that previously a similar deposit
     // was made, but it failed because it had an invalid proof, so this one should succeed.
-    factory.deposit(&mut runtime, &root, proof.clone()).unwrap();
+    call_borsh!(user, factory_id.deposit(proof)).assert_success();
 
     // This deposit event must fail since same deposit event can't be reused.
     // Previous call to deposit with the same event was successful.
-    factory.deposit(&mut runtime, &root, proof).unwrap_err();
+    err_is(
+        &call_borsh!(user, factory_id.deposit(proof)),
+        "Event cannot be reused for depositing.",
+    );
 }
-
-//TODO: At the moment this panics with the error 'Native NEP21 on Ethereum is disabled.'.
-// Uncomment and fix this when the migration to NEP-141 is finished.
-//#[test]
-//fn test_near_token_transfer() {
-//    let (mut runtime, factory) = setup_token_factory();
-//    let root = "root".to_string();
-//    let token = TokenContract::new(
-//        &mut runtime,
-//        &root,
-//        &TEST_TOKEN_WASM_BYTES,
-//        TEST_TOKEN.to_string(),
-//        &root,
-//        "1000",
-//    );
-//    token
-//        .inc_allowance(
-//            &mut runtime,
-//            &root,
-//            FACTORY.to_string(),
-//            to_yocto("100").into(),
-//        )
-//        .unwrap();
-//    factory
-//        .lock(
-//            &mut runtime,
-//            root.clone(),
-//            TEST_TOKEN.to_string(),
-//            to_yocto("100"),
-//            SENDER_ADDRESS.to_string(),
-//        )
-//        .unwrap();
-//    assert_eq!(
-//        token.get_balance(&mut runtime, root.clone()),
-//        to_yocto("900").to_string()
-//    );
-//    assert_eq!(
-//        token.get_total_supply(&mut runtime),
-//        to_yocto("1000").to_string()
-//    );
-//
-//    let mut proof = Proof::default();
-//    proof.log_entry_data = EthUnlockedEvent {
-//        locker_address: validate_eth_address(LOCKER_ADDRESS.to_string()),
-//        token: TEST_TOKEN.to_string(),
-//        sender: SENDER_ADDRESS.to_string(),
-//        amount: 50 * 10u128.pow(24),
-//        recipient: ALICE.to_string(),
-//    }
-//    .to_log_entry_data();
-//    factory.unlock(&mut runtime, root.clone(), proof).unwrap();
-//    assert_eq!(
-//        token.get_balance(&mut runtime, ALICE.to_string()),
-//        to_yocto("50").to_string()
-//    );
-//    assert_eq!(
-//        token.get_total_supply(&mut runtime),
-//        to_yocto("1000").to_string()
-//    );
-//}
 
 #[test]
 fn test_bridge_token_failures() {
-    let (mut runtime, factory) = setup_token_factory();
-    let root = "root".to_string();
-    runtime.create_user(root.clone(), ALICE.to_string(), to_yocto("1"));
-    factory
-        .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("35"))
-        .unwrap();
-    let token = BridgeToken {
-        contract_id: format!("{}.{}", DAI_ADDRESS, FACTORY),
-    };
+    let (user, factory) = setup_token_factory();
 
-    // Fail to withdraw because no coins.
-    token
-        .withdraw(
-            &mut runtime,
-            root.clone(),
-            "100".to_string(),
-            SENDER_ADDRESS.to_string(),
-        )
-        .unwrap_err();
+    call!(
+        user,
+        factory.deploy_bridge_token(DAI_ADDRESS.to_string()),
+        deposit = to_yocto("35")
+    )
+    .assert_success();
 
-    // Fail to mint because sender is not controller.
-    token
-        .mint(
-            &mut runtime,
-            root.clone(),
-            ALICE.to_string(),
-            "100".to_string(),
-        )
-        .unwrap_err();
+    let token_account_id = format!("{}.{}", DAI_ADDRESS, FACTORY);
+
+    // Fail to withdraw because the account is not registered (and have no coins)
+    err_is(
+        &call_json!(user, token_account_id.withdraw({
+                "amount" : "100",
+                "recipient" : SENDER_ADDRESS.to_string()}), deposit=1),
+        "The account is not registered",
+    );
+
+    // Register the account
+    let account_id: Option<ValidAccountId> = None;
+    let registration_only: Option<bool> = None;
+    call_json!(user, token_account_id.storage_deposit({
+        "account_id": account_id,
+        "registration_only": registration_only,
+    }))
+    .assert_success();
+
+    // Fail to withdraw because the account has no enough balance
+    err_is(
+        &call_json!(user, token_account_id.withdraw({
+                "amount" : "100",
+                "recipient" : SENDER_ADDRESS.to_string()}), deposit=1),
+        "The account doesn't have enough balance",
+    );
+
+    // Fail to mint because the caller is not the controller
+    let other_user = user.create_user(ALICE.to_string(), to_yocto("1"));
+    err_is(
+        &call_json!(other_user, token_account_id.mint({
+                "account_id" : ALICE.to_string(),
+                "amount" : "100"}), deposit=1),
+        "Only controller can call mint",
+    );
 }
 
-/// TODO: instead of just unwrap_err check the specific errors.
 #[test]
 fn test_deploy_failures() {
-    let (mut runtime, factory) = setup_token_factory();
-    let root = "root".to_string();
+    let (user, factory) = setup_token_factory();
 
     // Fails with not enough deposit.
-    factory
-        .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), 0)
-        .unwrap_err();
+    err_is(
+        &call!(
+            user,
+            factory.deploy_bridge_token(DAI_ADDRESS.to_string()),
+            deposit = to_yocto("0")
+        ),
+        "Not enough attached deposit to complete bridge token creation",
+    );
 
     // Fails with address is invalid.
-    factory
-        .deploy_bridge_token(
-            &mut runtime,
-            &root,
-            "not_a_hex".to_string(),
-            to_yocto("100"),
-        )
-        .unwrap_err();
+    err_is(
+        &call!(
+            user,
+            factory.deploy_bridge_token("not_a_hex".to_string()),
+            deposit = to_yocto("0")
+        ),
+        "address should be a valid hex string.: OddLength",
+    );
 
     // Fails second time because already exists.
-    factory
-        .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("35"))
-        .unwrap();
-    factory
-        .deploy_bridge_token(&mut runtime, &root, DAI_ADDRESS.to_string(), to_yocto("35"))
-        .unwrap_err();
+    call!(
+        user,
+        factory.deploy_bridge_token(DAI_ADDRESS.to_string()),
+        deposit = to_yocto("35")
+    )
+    .assert_success();
+
+    err_is(
+        &call!(
+            user,
+            factory.deploy_bridge_token(DAI_ADDRESS.to_string()),
+            deposit = to_yocto("35")
+        ),
+        "BridgeToken contract already exists.",
+    );
 }

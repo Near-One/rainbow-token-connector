@@ -18,22 +18,22 @@ panic = "abort"
 overflow-checks = true
 
 [dependencies]
+near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
+near-contract-standards = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
+eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "3a60b7eac2f06d160bd7b20b67a181961c08055d" }
+admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "3a60b7eac2f06d160bd7b20b67a181961c08055d" }
+tiny-keccak = "1.4.0"
+ethabi = "12.0.0"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
-near-sdk = "0.11.0"
-borsh = "0.6.2"
-# near-sdk = "1.0.0"
 uint = { version = "0.8.3", default-features = false }
-wee_alloc = { version = "0.4.5", default-features = false, features = [] }
-near-lib = { git = "https://github.com/ilblackdragon/balancer-near", rev = "a386305c9829d2e5302a78fdc475c8a279fcf6ed"}
-eth-types =  { git = "https://github.com/near/rainbow-bridge" }
-admin-controlled = { git="https://github.com/near/rainbow-bridge.git", rev="ca01d9e39403a08397de63fb5ae544f760ffcedd"}
 rlp = "0.4.2"
-ethabi = "12.0.0"
 hex = "0.4.2"
-tiny-keccak = "1.4.0"
 
 [dev-dependencies]
-near-test = { git = "https://github.com/ilblackdragon/balancer-near", rev = "a386305c9829d2e5302a78fdc475c8a279fcf6ed"}
+near-sdk-sim = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
+test-token = { git = "https://github.com/mfornet/contracts", rev = "9e115e54bec56842d1380c6ebdd884eab3170583" }
+bridge-token = { path = "../bridge-token" }
+mock-prover = { path = "../mock-prover" }
 lazy_static = "1.4.0"
 rand = "0.7.3"

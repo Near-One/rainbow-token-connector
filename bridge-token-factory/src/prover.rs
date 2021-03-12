@@ -1,12 +1,11 @@
 use std::convert::From;
 
-use borsh::{BorshDeserialize, BorshSerialize};
 use eth_types::*;
-use ethabi::param_type::Writer;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog, Token};
-//use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use ethabi::param_type::Writer;
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::ext_contract;
-
+use near_sdk::serde::{Serialize, Deserialize};
 use tiny_keccak::Keccak;
 
 pub type EthAddress = [u8; 20];
@@ -34,7 +33,7 @@ pub trait Prover {
     ) -> bool;
 }
 
-#[derive(Default, BorshDeserialize, BorshSerialize, Clone)]
+#[derive(Default, BorshDeserialize, BorshSerialize, Clone, Serialize, Deserialize)]
 pub struct Proof {
     pub log_index: u64,
     pub log_entry_data: Vec<u8>,
