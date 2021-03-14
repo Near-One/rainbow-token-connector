@@ -168,6 +168,11 @@ impl BridgeTokenFactory {
         ))
     }
 
+    /// Return all registered tokens
+    pub fn get_tokens(&self) -> Vec<String> {
+        self.tokens.iter().collect::<Vec<_>>()
+    }
+
     /// Finish depositing once the proof was successfully validated. Can only be called by the contract
     /// itself.
     #[payable]
