@@ -185,7 +185,7 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] new_owner_id: AccountId,
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] proof: Proof,
-    ) {
+    ) -> Promise {
         assert_self();
         assert!(verification_success, "Failed to verify the proof");
 
@@ -202,7 +202,7 @@ impl BridgeTokenFactory {
             &self.get_bridge_token_account_id(token),
             env::attached_deposit() - required_deposit,
             MINT_GAS,
-        );
+        )
     }
 
     /// Burn given amount of tokens and unlock it on the Ethereum side for the recipient address.
