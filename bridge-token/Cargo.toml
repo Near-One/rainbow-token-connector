@@ -20,4 +20,4 @@ overflow-checks = true
 [dependencies]
 near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
 near-contract-standards = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
-admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "3a60b7eac2f06d160bd7b20b67a181961c08055d" }
+admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "9ffb08e6613788096f26636f695b4c7e5fa5b261" }
