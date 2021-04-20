@@ -1,7 +1,7 @@
 use admin_controlled::{AdminControlled, Mask};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedSet;
-use near_sdk::json_types::U128;
+use near_sdk::json_types::{ValidAccountId, U128};
 use near_sdk::{
     env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault, Promise, PublicKey,
 };
@@ -10,6 +10,7 @@ type EthereumAddress = [u8; 20];
 pub use lock_event::EthLockedEvent;
 use prover::*;
 pub use prover::{validate_eth_address, Proof};
+use std::convert::TryInto;
 pub use unlock_event::EthUnlockedEvent;
 
 mod lock_event;
@@ -31,6 +32,9 @@ const BRIDGE_TOKEN_NEW: Gas = 10_000_000_000_000;
 
 /// Gas to call mint method on bridge token.
 const MINT_GAS: Gas = 50_000_000_000_000;
+
+/// Gas to call ft_transfer_call when the target of deposit is a contract
+const FT_TRANSFER_CALL_GAS: Gas = 50_000_000_000_000;
 
 /// Gas to call finish deposit method.
 /// This doesn't cover the gas required for calling mint method.
@@ -98,10 +102,65 @@ pub trait FungibleToken {
 #[ext_contract(ext_bridge_token)]
 pub trait ExtBridgeToken {
     fn mint(&self, account_id: AccountId, amount: U128);
+
+    fn ft_transfer_call(
+        &mut self,
+        receiver_id: ValidAccountId,
+        amount: U128,
+        memo: Option<String>,
+        msg: String,
+    ) -> PromiseOrValue<U128>;
 }
 
 pub fn assert_self() {
     assert_eq!(env::predecessor_account_id(), env::current_account_id());
+}
+
+enum Recipient {
+    AccountId(AccountId),
+    ContractId {
+        evm_address: AccountId,
+        message: String,
+    },
+}
+
+/// `recipient` is the target account id receiving current ERC-20 tokens.
+///
+/// If `recipient` doesn't contain a semicolon (:) then it is interpreted as a NEAR account id
+/// and token are minted as NEP-141 directly on `recipient` account id.
+///
+/// Otherwise, the format expected is: <target_address>:<message>
+///
+/// @target_address: Account id of the contract to transfer current funds
+/// @message: Free form message to be send to the target using ft_transfer_call
+///
+/// The final message sent to the `target_address` has the format:
+///
+/// <message>:<predecessor_account_id>
+///
+/// Where `message` is the free form string that was passed,
+/// then a semicolon (:) as a separator between `message` and `predecessor_account_id`
+/// and `predecessor_account_id` is the caller of this function.
+fn parse_recipient(recipient: String) -> Recipient {
+    if recipient.contains(':') {
+        let mut iter = recipient.split(':');
+        let evm_address = iter.next().unwrap().into();
+        let message = format!(
+            "{}:{}",
+            iter.collect::<Vec<&str>>().join(":"),
+            env::predecessor_account_id()
+        );
+        Recipient::ContractId {
+            evm_address,
+            message,
+        }
+    } else {
+        Recipient::AccountId(recipient)
+    }
+}
+
+fn is_recipient_near_account_id(recipient: &String) -> bool {
+    !recipient.contains(':')
 }
 
 #[near_bindgen]
@@ -164,7 +223,7 @@ impl BridgeTokenFactory {
             proof_1,
             &env::current_account_id(),
             env::attached_deposit(),
-            FINISH_DEPOSIT_GAS + MINT_GAS,
+            FINISH_DEPOSIT_GAS + MINT_GAS + FT_TRANSFER_CALL_GAS,
         ))
     }
 
@@ -182,7 +241,7 @@ impl BridgeTokenFactory {
         #[serializer(borsh)]
         verification_success: bool,
         #[serializer(borsh)] token: String,
-        #[serializer(borsh)] new_owner_id: AccountId,
+        #[serializer(borsh)] new_owner_id: String,
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] proof: Proof,
     ) -> Promise {
@@ -196,13 +255,34 @@ impl BridgeTokenFactory {
                 >= required_deposit + self.bridge_token_storage_deposit_required
         );
 
-        ext_bridge_token::mint(
-            new_owner_id,
-            amount.into(),
-            &self.get_bridge_token_account_id(token),
-            env::attached_deposit() - required_deposit,
-            MINT_GAS,
-        )
+        match parse_recipient(new_owner_id) {
+            Recipient::AccountId(account_id) => ext_bridge_token::mint(
+                account_id,
+                amount.into(),
+                &self.get_bridge_token_account_id(token),
+                env::attached_deposit() - required_deposit,
+                MINT_GAS,
+            ),
+            Recipient::ContractId {
+                evm_address,
+                message,
+            } => ext_bridge_token::mint(
+                env::current_account_id(),
+                amount.into(),
+                &self.get_bridge_token_account_id(token),
+                env::attached_deposit() - required_deposit,
+                MINT_GAS,
+            )
+            .then(ext_bridge_token::ft_transfer_call(
+                evm_address.try_into().unwrap(),
+                amount.into(),
+                None,
+                message,
+                &self.get_bridge_token_account_id(token),
+                0,
+                FT_TRANSFER_CALL_GAS,
+            )),
+        }
     }
 
     /// Burn given amount of tokens and unlock it on the Ethereum side for the recipient address.
