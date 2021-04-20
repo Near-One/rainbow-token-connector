@@ -9,7 +9,7 @@ checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
 [[package]]
 name = "admin-controlled"
 version = "0.1.0"
-source = "git+https://github.com/near/rainbow-bridge?rev=3a60b7eac2f06d160bd7b20b67a181961c08055d#3a60b7eac2f06d160bd7b20b67a181961c08055d"
+source = "git+https://github.com/near/rainbow-bridge?rev=9ffb08e6613788096f26636f695b4c7e5fa5b261#9ffb08e6613788096f26636f695b4c7e5fa5b261"
 dependencies = [
  "near-sdk 3.0.0-pre.3 (git+https://github.com/near/near-sdk-rs?rev=613adcab6322e4f830efb4d5bde2a810ae642158)",
 ]
@@ -664,7 +664,7 @@ dependencies = [
 [[package]]
 name = "eth-types"
 version = "0.1.0"
-source = "git+https://github.com/near/rainbow-bridge?rev=3a60b7eac2f06d160bd7b20b67a181961c08055d#3a60b7eac2f06d160bd7b20b67a181961c08055d"
+source = "git+https://github.com/near/rainbow-bridge?rev=9ffb08e6613788096f26636f695b4c7e5fa5b261#9ffb08e6613788096f26636f695b4c7e5fa5b261"
 dependencies = [
  "borsh",
  "derive_more",
