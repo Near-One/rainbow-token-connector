@@ -116,12 +116,9 @@ pub fn assert_self() {
     assert_eq!(env::predecessor_account_id(), env::current_account_id());
 }
 
-enum Recipient {
-    AccountId(AccountId),
-    ContractId {
-        evm_address: AccountId,
-        message: String,
-    },
+struct Recipient {
+    target: AccountId,
+    message: Option<String>,
 }
 
 /// `recipient` is the target account id receiving current ERC-20 tokens.
@@ -144,18 +141,18 @@ enum Recipient {
 fn parse_recipient(recipient: String) -> Recipient {
     if recipient.contains(':') {
         let mut iter = recipient.split(':');
-        let evm_address = iter.next().unwrap().into();
-        let message = format!(
-            "{}:{}",
-            iter.collect::<Vec<&str>>().join(":"),
-            env::predecessor_account_id()
-        );
-        Recipient::ContractId {
-            evm_address,
-            message,
+        let target = iter.next().unwrap().into();
+        let message = iter.collect::<Vec<&str>>().join(":");
+
+        Recipient {
+            target,
+            message: Some(message),
         }
     } else {
-        Recipient::AccountId(recipient)
+        Recipient {
+            target: recipient,
+            message: None,
+        }
     }
 }
 
@@ -255,26 +252,18 @@ impl BridgeTokenFactory {
                 >= required_deposit + self.bridge_token_storage_deposit_required
         );
 
-        match parse_recipient(new_owner_id) {
-            Recipient::AccountId(account_id) => ext_bridge_token::mint(
-                account_id,
-                amount.into(),
-                &self.get_bridge_token_account_id(token),
-                env::attached_deposit() - required_deposit,
-                MINT_GAS,
-            ),
-            Recipient::ContractId {
-                evm_address,
-                message,
-            } => ext_bridge_token::mint(
+        let Recipient { target, message } = parse_recipient(new_owner_id);
+
+        match message {
+            Some(message) => ext_bridge_token::mint(
                 env::current_account_id(),
                 amount.into(),
-                &self.get_bridge_token_account_id(token),
+                &self.get_bridge_token_account_id(token.clone()),
                 env::attached_deposit() - required_deposit,
                 MINT_GAS,
             )
             .then(ext_bridge_token::ft_transfer_call(
-                evm_address.try_into().unwrap(),
+                target.try_into().unwrap(),
                 amount.into(),
                 None,
                 message,
@@ -282,6 +271,13 @@ impl BridgeTokenFactory {
                 0,
                 FT_TRANSFER_CALL_GAS,
             )),
+            None => ext_bridge_token::mint(
+                target,
+                amount.into(),
+                &self.get_bridge_token_account_id(token),
+                env::attached_deposit() - required_deposit,
+                MINT_GAS,
+            ),
         }
     }
 
