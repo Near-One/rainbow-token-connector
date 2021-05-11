@@ -26,7 +26,7 @@ const UNPAUSED_ALL = 0;
 const PAUSED_LOCK = 1 << 0;
 const PAUSED_UNLOCK = 1 << 1;
 
-contract('TokenLocker', function ([addr, addr1, addr2]) {
+contract('TokenLocker', function ([adminAddress, addr1, addr2]) {
     const initialBalanceAddr1 = toWei('5');
     let token;
     let prover;
@@ -36,7 +36,7 @@ contract('TokenLocker', function ([addr, addr1, addr2]) {
         let minBlockAcceptanceHeight = 0;
         token = await TToken.new();
         prover = await NearProverMock.new();
-        locker = await ERC20Locker.new(Buffer.from('nearfuntoken', 'utf-8'), prover.address, minBlockAcceptanceHeight, addr, UNPAUSED_ALL);
+        locker = await ERC20Locker.new(Buffer.from('nearfuntoken', 'utf-8'), prover.address, minBlockAcceptanceHeight, adminAddress, UNPAUSED_ALL);
         await token.mint(locker.address, toWei('100'));
         await token.mint(addr1, initialBalanceAddr1);
     });
@@ -121,7 +121,7 @@ contract('TokenLocker', function ([addr, addr1, addr2]) {
             });
 
             // Let's pause the Lock method
-            await locker.adminPause(PAUSED_LOCK, { from: addr });
+            await locker.adminPause(PAUSED_LOCK, { from: adminAddress });
 
             // Let's try to lock some tokens while the lock is paused.
             // The balance shouldn't be changed and the revert should occur
@@ -131,7 +131,7 @@ contract('TokenLocker', function ([addr, addr1, addr2]) {
             expect(fromWei(afterBalance2)).equal(fromWei(afterBalance1));
 
             // Let's unpause the Lock method
-            await locker.adminPause(UNPAUSED_ALL, { from: addr });
+            await locker.adminPause(UNPAUSED_ALL, { from: adminAddress });
 
             // Let's try to lock some tokens one more time after unpausing.
             // This should work again - the balance should be changed and the `Locked` event emitted
@@ -163,7 +163,7 @@ contract('TokenLocker', function ([addr, addr1, addr2]) {
             const lockerPreBalance1 = await token.balanceOf(locker.address);
             const receiverPreBalance1 = await token.balanceOf(addr1);
 
-            const tx1 = await locker.unlockToken(borshifyOutcomeProof(proof), proofBlockHeight);
+            const tx1 = await locker.unlockToken(borshifyOutcomeProof(proof), proofBlockHeight, { from: addr1 });
             truffleAssert.eventEmitted(tx1, 'Unlocked', (event) => {
                 return fromWei(event.amount) == fromWei(amountToUnlock)
                     && event.recipient == addr1;
@@ -175,25 +175,28 @@ contract('TokenLocker', function ([addr, addr1, addr2]) {
             expect((fromWei(receiverAfterBalance1) - fromWei(receiverPreBalance1)).toString()).equal(fromWei(amountToUnlock));
 
             // Let's pause the Unlock method
-            await locker.adminPause(PAUSED_UNLOCK, { from: addr });
+            await locker.adminPause(PAUSED_UNLOCK, { from: adminAddress });
 
             // Let's try to unlock while the unlock is paused.
+            let proof2 = proof;
+            // Change the receipt_id (to 'AAA..AAA') for the proof2 to make it another proof
+            proof2.outcome_proof.outcome.receipt_ids[0] = 'A'.repeat(44);
             // The balance shouldn't be changed and the revert should occur
-            await expectRevert.unspecified(locker.unlockToken(borshifyOutcomeProof(proof), proofBlockHeight));
+            await expectRevert.unspecified(locker.unlockToken(borshifyOutcomeProof(proof2), proofBlockHeight, { from: addr1 }));
             const lockerAfterBalance2 = await token.balanceOf(locker.address);
             expect(fromWei(lockerAfterBalance1)).equal(fromWei(lockerAfterBalance2));
             const receiverAfterBalance2 = await token.balanceOf(addr1);
             expect(fromWei(receiverAfterBalance1)).equal(fromWei(receiverAfterBalance2));
 
             // Let's unpause the Unlock method
-            await locker.adminPause(UNPAUSED_ALL, { from: addr });
+            await locker.adminPause(UNPAUSED_ALL, { from: adminAddress });
 
             // Let's try to lock some tokens one more time after unpausing.
             // This should work again - the balance should be changed and the `Unlocked` event emitted
-            let proof2 = proof;
-            // Change the receipt_id (to 'AAA..AAA') for the proof2 to make it another proof
-            proof2.outcome_proof.outcome.receipt_ids[0] = 'A'.repeat(44);
-            const tx3 = await locker.unlockToken(borshifyOutcomeProof(proof2), proofBlockHeight);
+            let proof3 = proof;
+            // Change the receipt_id (to 'BBB..BBB') for the proof3 to make it another proof
+            proof3.outcome_proof.outcome.receipt_ids[0] = 'B'.repeat(44);
+            const tx3 = await locker.unlockToken(borshifyOutcomeProof(proof3), proofBlockHeight, { from: addr1 });
             truffleAssert.eventEmitted(tx3, 'Unlocked', (event) => {
                 return fromWei(event.amount) == fromWei(amountToUnlock)
                     && event.recipient == addr1;
@@ -237,12 +240,12 @@ contract('TokenLocker', function ([addr, addr1, addr2]) {
     });*/
 
     it('admin functions', async function () {
-        expect(await locker.admin()).equal(addr)
+        expect(await locker.admin()).equal(adminAddress)
         try {
             await locker.adminTransfer(token.address, addr1, toWei('1'), { from: addr1 })
             assert(false)
         } catch (_) { }
-        await locker.adminTransfer(token.address, addr1, toWei('1'), { from: addr })
+        await locker.adminTransfer(token.address, addr1, toWei('1'), { from: adminAddress })
         expect(fromWei(await token.balanceOf(addr1))).to.be.equal('6')
     });
 });
