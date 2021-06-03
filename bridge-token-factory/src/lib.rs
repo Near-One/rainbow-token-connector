@@ -133,11 +133,9 @@ struct Recipient {
 ///
 /// The final message sent to the `target_address` has the format:
 ///
-/// <message>:<predecessor_account_id>
+/// <message>
 ///
-/// Where `message` is the free form string that was passed,
-/// then a semicolon (:) as a separator between `message` and `predecessor_account_id`
-/// and `predecessor_account_id` is the caller of this function.
+/// Where `message` is the free form string that was passed.
 fn parse_recipient(recipient: String) -> Recipient {
     if recipient.contains(':') {
         let mut iter = recipient.split(':');
