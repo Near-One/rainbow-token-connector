@@ -277,21 +277,24 @@ impl BridgeTokenFactory {
         format!("{}.{}", address, env::current_account_id())
     }
 
+    /// Checks whether the provided proof is already used
+    pub fn is_used_proof(&self, #[serializer(borsh)] proof: Proof) -> bool {
+        self.used_events.contains(&proof.get_key())
+    }
+
     /// Record proof to make sure it is not re-used later for anther deposit.
     fn record_proof(&mut self, proof: &Proof) -> Balance {
         // TODO: Instead of sending the full proof (clone only relevant parts of the Proof)
         //       log_index / receipt_index / header_data
         assert_self();
         let initial_storage = env::storage_usage();
-        let mut data = proof.log_index.try_to_vec().unwrap();
-        data.extend(proof.receipt_index.try_to_vec().unwrap());
-        data.extend(proof.header_data.clone());
-        let key = env::sha256(&data);
+
+        let proof_key = proof.get_key();
         assert!(
-            !self.used_events.contains(&key),
+            !self.used_events.contains(&proof_key),
             "Event cannot be reused for depositing."
         );
-        self.used_events.insert(&key);
+        self.used_events.insert(&proof_key);
         let current_storage = env::storage_usage();
         let required_deposit =
             Balance::from(current_storage - initial_storage) * STORAGE_PRICE_PER_BYTE;
