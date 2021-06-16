@@ -242,7 +242,7 @@ dependencies = [
 [[package]]
 name = "near-contract-standards"
 version = "3.0.0-pre.3"
-source = "git+https://github.com/near/near-sdk-rs#0b3419cac5af87fb7e71136af2a40df7cb4a1ad5"
+source = "git+https://github.com/near/near-sdk-rs?rev=af0e826f916f3aa3ea51e8b675ecebdd37176671#af0e826f916f3aa3ea51e8b675ecebdd37176671"
 dependencies = [
  "near-sdk",
 ]
@@ -305,7 +305,7 @@ dependencies = [
 [[package]]
 name = "near-sdk"
 version = "3.0.0-pre.3"
-source = "git+https://github.com/near/near-sdk-rs#0b3419cac5af87fb7e71136af2a40df7cb4a1ad5"
+source = "git+https://github.com/near/near-sdk-rs?rev=af0e826f916f3aa3ea51e8b675ecebdd37176671#af0e826f916f3aa3ea51e8b675ecebdd37176671"
 dependencies = [
  "base64 0.13.0",
  "borsh",
@@ -321,7 +321,7 @@ dependencies = [
 [[package]]
 name = "near-sdk-core"
 version = "3.0.0-pre.3"
-source = "git+https://github.com/near/near-sdk-rs#0b3419cac5af87fb7e71136af2a40df7cb4a1ad5"
+source = "git+https://github.com/near/near-sdk-rs?rev=af0e826f916f3aa3ea51e8b675ecebdd37176671#af0e826f916f3aa3ea51e8b675ecebdd37176671"
 dependencies = [
  "Inflector",
  "proc-macro2",
@@ -332,7 +332,7 @@ dependencies = [
 [[package]]
 name = "near-sdk-macros"
 version = "3.0.0-pre.3"
-source = "git+https://github.com/near/near-sdk-rs#0b3419cac5af87fb7e71136af2a40df7cb4a1ad5"
+source = "git+https://github.com/near/near-sdk-rs?rev=af0e826f916f3aa3ea51e8b675ecebdd37176671#af0e826f916f3aa3ea51e8b675ecebdd37176671"
 dependencies = [
  "near-sdk-core",
  "proc-macro2",

@@ -31,17 +31,17 @@ const BRIDGE_TOKEN_INIT_BALANCE: Balance = 3_000_000_000_000_000_000_000_000; //
 const BRIDGE_TOKEN_NEW: Gas = 10_000_000_000_000;
 
 /// Gas to call mint method on bridge token.
-const MINT_GAS: Gas = 50_000_000_000_000;
+const MINT_GAS: Gas = 8_000_000_000_000;
 
 /// Gas to call ft_transfer_call when the target of deposit is a contract
-const FT_TRANSFER_CALL_GAS: Gas = 50_000_000_000_000;
+const FT_TRANSFER_CALL_GAS: Gas = 80_000_000_000_000;
 
 /// Gas to call finish deposit method.
 /// This doesn't cover the gas required for calling mint method.
-const FINISH_DEPOSIT_GAS: Gas = 50_000_000_000_000;
+const FINISH_DEPOSIT_GAS: Gas = 30_000_000_000_000;
 
 /// Gas to call verify_log_entry on prover.
-const VERIFY_LOG_ENTRY_GAS: Gas = 50_000_000_000_000;
+const VERIFY_LOG_ENTRY_GAS: Gas = 10_000_000_000_000;
 
 #[derive(Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum ResultType {
@@ -252,6 +252,8 @@ impl BridgeTokenFactory {
 
         let Recipient { target, message } = parse_recipient(new_owner_id);
 
+        env::log(format!("Finish deposit. Target:{} Message:{:?}", target, message).as_bytes());
+
         match message {
             Some(message) => ext_bridge_token::mint(
                 env::current_account_id(),
@@ -266,7 +268,7 @@ impl BridgeTokenFactory {
                 None,
                 message,
                 &self.get_bridge_token_account_id(token),
-                0,
+                1,
                 FT_TRANSFER_CALL_GAS,
             )),
             None => ext_bridge_token::mint(
