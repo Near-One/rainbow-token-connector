@@ -154,10 +154,6 @@ fn parse_recipient(recipient: String) -> Recipient {
     }
 }
 
-fn is_recipient_near_account_id(recipient: &String) -> bool {
-    !recipient.contains(':')
-}
-
 #[near_bindgen]
 impl BridgeTokenFactory {
     /// Initializes the contract.
