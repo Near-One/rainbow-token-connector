@@ -34,7 +34,7 @@ const BRIDGE_TOKEN_NEW: Gas = 10_000_000_000_000;
 const MINT_GAS: Gas = 10_000_000_000_000;
 
 /// Gas to call ft_transfer_call when the target of deposit is a contract
-const FT_TRANSFER_CALL_GAS: Gas = 50_000_000_000_000;
+const FT_TRANSFER_CALL_GAS: Gas = 80_000_000_000_000;
 
 /// Gas to call finish deposit method.
 /// This doesn't cover the gas required for calling mint method.

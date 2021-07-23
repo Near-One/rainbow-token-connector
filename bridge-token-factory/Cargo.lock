@@ -259,7 +259,7 @@ dependencies = [
 
 [[package]]
 name = "bridge-token-factory"
-version = "0.1.4"
+version = "0.1.5"
 dependencies = [
  "admin-controlled",
  "bridge-token",
