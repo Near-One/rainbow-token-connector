@@ -8,12 +8,13 @@ use near_sdk::{
 
 type EthereumAddress = [u8; 20];
 pub use lock_event::EthLockedEvent;
+pub use log_metadata_event::TokenMetadataEvent;
 use prover::*;
 pub use prover::{validate_eth_address, Proof};
 use std::convert::TryInto;
 pub use unlock_event::EthUnlockedEvent;
-
 mod lock_event;
+mod log_metadata_event;
 pub mod prover;
 mod unlock_event;
 
@@ -44,6 +45,9 @@ const FT_TRANSFER_CALL_GAS: Gas = 80_000_000_000_000;
 /// Gas to call finish deposit method.
 /// This doesn't cover the gas required for calling mint method.
 const FINISH_DEPOSIT_GAS: Gas = 30_000_000_000_000;
+
+/// Gas to call finish update_metadata method.
+const FINISH_UPDATE_METADATA_GAS: Gas = 30_000_000_000_000;
 
 /// Gas to call verify_log_entry on prover.
 const VERIFY_LOG_ENTRY_GAS: Gas = 50_000_000_000_000;
@@ -102,6 +106,19 @@ pub trait ExtBridgeTokenFactory {
         #[serializer(borsh)] token: String,
         #[serializer(borsh)] new_owner_id: AccountId,
         #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)] proof: Proof,
+    ) -> Promise;
+
+    #[result_serializer(borsh)]
+    fn finish_updating_metadata(
+        &mut self,
+        #[callback]
+        #[serializer(borsh)]
+        verification_success: bool,
+        #[serializer(borsh)] token: String,
+        #[serializer(borsh)] name: String,
+        #[serializer(borsh)] Symbole: String,
+        #[serializer(borsh)] decimals: u8,
         #[serializer(borsh)] proof: Proof,
     ) -> Promise;
 }
@@ -198,6 +215,45 @@ impl BridgeTokenFactory {
         }
     }
 
+    pub fn update_metadata(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
+        let event = TokenMetadataEvent::from_log_entry_data(&proof.log_entry_data);
+        assert_eq!(
+            event.locker_address,
+            self.locker_address,
+            "Event's address {} does not match contract address of this token {}",
+            hex::encode(&event.locker_address),
+            hex::encode(&self.locker_address),
+        );
+        assert!(
+            self.tokens.contains(&event.token),
+            "Bridge token for {} is not deployed yet",
+            event.token
+        );
+        let proof_1 = proof.clone();
+
+        ext_prover::verify_log_entry(
+            proof.log_index,
+            proof.log_entry_data,
+            proof.receipt_index,
+            proof.receipt_data,
+            proof.header_data,
+            proof.proof,
+            false, // Do not skip bridge call. This is only used for development and diagnostics.
+            &self.prover_account,
+            NO_DEPOSIT,
+            VERIFY_LOG_ENTRY_GAS,
+        )
+        .then(ext_self::finish_updating_metadata(
+            event.token,
+            event.name,
+            event.symbol,
+            event.decimals,
+            proof_1,
+            &env::current_account_id(),
+            env::attached_deposit(),
+            FINISH_UPDATE_METADATA_GAS + MINT_GAS + FT_TRANSFER_CALL_GAS,
+        ))
+    }
     /// Deposit from Ethereum to NEAR based on the proof of the locked tokens.
     /// Must attach enough NEAR funds to cover for storage of the proof.
     #[payable]
@@ -244,6 +300,25 @@ impl BridgeTokenFactory {
     /// Return all registered tokens
     pub fn get_tokens(&self) -> Vec<String> {
         self.tokens.iter().collect::<Vec<_>>()
+    }
+
+    /// Finish updating token metadata once the proof was successfully validated.
+    /// Can only be called by the contract itself.
+    pub fn finish_updating_metadata(
+        &mut self,
+        #[callback]
+        #[serializer(borsh)]
+        verification_success: bool,
+        #[serializer(borsh)] token: String,
+        #[serializer(borsh)] name: String,
+        #[serializer(borsh)] symbole: String,
+        #[serializer(borsh)] decimals: u8,
+        #[serializer(borsh)] proof: Proof,
+    ) -> Promise {
+        assert_self();
+        assert!(verification_success, "Failed to verify the proof");
+        // TODO
+        // ext_bridge_token.set_metadata
     }
 
     /// Finish depositing once the proof was successfully validated. Can only be called by the contract
