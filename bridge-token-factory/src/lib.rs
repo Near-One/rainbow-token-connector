@@ -117,7 +117,7 @@ pub trait ExtBridgeTokenFactory {
         verification_success: bool,
         #[serializer(borsh)] token: String,
         #[serializer(borsh)] name: String,
-        #[serializer(borsh)] Symbole: String,
+        #[serializer(borsh)] symbol: String,
         #[serializer(borsh)] decimals: u8,
         #[serializer(borsh)] proof: Proof,
     ) -> Promise;
@@ -311,14 +311,38 @@ impl BridgeTokenFactory {
         verification_success: bool,
         #[serializer(borsh)] token: String,
         #[serializer(borsh)] name: String,
-        #[serializer(borsh)] symbole: String,
+        #[serializer(borsh)] symbol: String,
         #[serializer(borsh)] decimals: u8,
         #[serializer(borsh)] proof: Proof,
-    ) -> Promise {
+    ) {
         assert_self();
         assert!(verification_success, "Failed to verify the proof");
-        // TODO
-        // ext_bridge_token.set_metadata
+        let required_deposit = self.record_proof(&proof);
+
+        assert!(
+            env::attached_deposit()
+                >= required_deposit + self.bridge_token_storage_deposit_required
+        );
+        env::log(
+            format!(
+                "Finish updating metadata. Name:{} Symbol:{:?} Decimals:{:?}",
+                name, symbol, decimals
+            )
+            .as_bytes(),
+        );
+        let reference: Option<String> = Some(String::default());
+        let reference_hash: Option<Base64VecU8> = Some(Base64VecU8(vec![]));
+
+        ext_bridge_token::set_metadata(
+            name.into(),
+            symbol.into(),
+            reference,
+            reference_hash,
+            decimals.into(),
+            &self.get_bridge_token_account_id(token.clone()),
+            env::attached_deposit() - required_deposit,
+            MINT_GAS,
+        );
     }
 
     /// Finish depositing once the proof was successfully validated. Can only be called by the contract
