@@ -16,7 +16,7 @@ impl TokenMetadataEvent {
     fn event_params() -> EthEventParams {
         vec![
             ("token".to_string(), ParamType::Address, true),
-            ("name".to_string(), ParamType::String, true),
+            ("name".to_string(), ParamType::String, false),
             ("symbol".to_string(), ParamType::String, false),
             ("decimals".to_string(), ParamType::Uint(8), false),
         ]
@@ -34,8 +34,7 @@ impl TokenMetadataEvent {
             .clone()
             .to_uint()
             .unwrap()
-            .as_usize();
-        let decimals = decimals as u8;
+            .as_usize() as u8;
         Self {
             locker_address: event.locker_address,
             token,
