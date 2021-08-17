@@ -9,7 +9,8 @@ pub struct TokenMetadataEvent{
     pub token: String,
     pub name: String,
     pub symbol: String,
-    pub decimals: u8
+    pub decimals: u8,
+    pub timestamp: u64,
 }
 
 impl TokenMetadataEvent {
@@ -19,6 +20,7 @@ impl TokenMetadataEvent {
             ("name".to_string(), ParamType::String, false),
             ("symbol".to_string(), ParamType::String, false),
             ("decimals".to_string(), ParamType::Uint(8), false),
+            ("timestamp".to_string(), ParamType::Uint(64), false),
         ]
     }
 
@@ -35,12 +37,19 @@ impl TokenMetadataEvent {
             .to_uint()
             .unwrap()
             .as_usize() as u8;
+        let timestamp = event.log.params[4]
+            .value
+            .clone()
+            .to_uint()
+            .unwrap()
+            .as_usize() as u64;
         Self {
             locker_address: event.locker_address,
             token,
             name,
             symbol,
             decimals,
+            timestamp
         }
     }
 
@@ -56,6 +65,7 @@ impl TokenMetadataEvent {
                 Token::String(self.name.clone()),
                 Token::String(self.symbol.clone()),
                 Token::Uint(self.decimals.into()),
+                Token::Uint(self.timestamp.into())
             ],
         )
     }
@@ -83,6 +93,7 @@ mod tests {
             name: "TEST".to_string(),
             symbol: "TST".to_string(),
             decimals: 18,
+            timestamp: 13042194
         };
         let data = event_data.to_log_entry_data();
         let result = TokenMetadataEvent::from_log_entry_data(&data);

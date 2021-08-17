@@ -9,12 +9,13 @@ import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
  * @dev emits and retreive ERC-20 metadata
  */
 contract ERC20MetadataLogger {
-    
+
     event Log(
             address indexed erc20,
             string name,
             string symbol,
-            uint8 decimals
+            uint8 decimals,
+            uint256 timestamp
         );
 
     /**
@@ -27,7 +28,8 @@ contract ERC20MetadataLogger {
                 erc20,
                 _erc20.name(),
                 _erc20.symbol(),
-                _erc20.decimals()
+                _erc20.decimals(),
+                block.number
             );
     }
 }

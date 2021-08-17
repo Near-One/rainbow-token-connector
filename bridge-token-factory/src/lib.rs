@@ -47,7 +47,7 @@ const FT_TRANSFER_CALL_GAS: Gas = 80_000_000_000_000;
 const FINISH_DEPOSIT_GAS: Gas = 30_000_000_000_000;
 
 /// Gas to call finish update_metadata method.
-const FINISH_UPDATE_METADATA_GAS: Gas = 30_000_000_000_000;
+const FINISH_UPDATE_METADATA_GAS: Gas = 5_000_000_000_000;
 
 /// Gas to call verify_log_entry on prover.
 const VERIFY_LOG_ENTRY_GAS: Gas = 50_000_000_000_000;
@@ -119,6 +119,7 @@ pub trait ExtBridgeTokenFactory {
         #[serializer(borsh)] name: String,
         #[serializer(borsh)] symbol: String,
         #[serializer(borsh)] decimals: u8,
+        #[serializer(borsh)] timestamp: u64,
         #[serializer(borsh)] proof: Proof,
     ) -> Promise;
 }
@@ -248,6 +249,7 @@ impl BridgeTokenFactory {
             event.name,
             event.symbol,
             event.decimals,
+            event.timestamp,
             proof_1,
             &env::current_account_id(),
             env::attached_deposit(),
@@ -313,6 +315,7 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] name: String,
         #[serializer(borsh)] symbol: String,
         #[serializer(borsh)] decimals: u8,
+        #[serializer(borsh)] timestamp: u64,
         #[serializer(borsh)] proof: Proof,
     ) {
         assert_self();
@@ -325,14 +328,14 @@ impl BridgeTokenFactory {
         );
         env::log(
             format!(
-                "Finish updating metadata. Name:{} Symbol:{:?} Decimals:{:?}",
-                name, symbol, decimals
+                "Finish updating metadata. Name:{} Symbol:{:?} Decimals:{:?} at : {:?}",
+                name, symbol, decimals, timestamp
             )
             .as_bytes(),
         );
         let reference: Option<String> = Some(String::default());
         let reference_hash: Option<Base64VecU8> = Some(Base64VecU8(vec![]));
-
+        // if timestamp > last updated at
         ext_bridge_token::set_metadata(
             name.into(),
             symbol.into(),
