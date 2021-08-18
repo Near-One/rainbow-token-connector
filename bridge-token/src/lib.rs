@@ -29,6 +29,7 @@ pub struct BridgeToken {
     reference_hash: Base64VecU8,
     decimals: u8,
     paused: Mask,
+    icon: Option<String>,
 }
 
 const PAUSE_WITHDRAW: Mask = 1 << 0;
@@ -57,6 +58,7 @@ impl BridgeToken {
             reference_hash: Base64VecU8(vec![]),
             decimals: 0,
             paused: Mask::default(),
+            icon: None,
         }
     }
 
@@ -67,6 +69,7 @@ impl BridgeToken {
         reference: Option<String>,
         reference_hash: Option<Base64VecU8>,
         decimals: Option<u8>,
+        icon: Option<String>,
     ) {
         // Only owner can change the metadata
         assert_self();
@@ -75,6 +78,7 @@ impl BridgeToken {
         reference.map(|reference| self.reference = reference);
         reference_hash.map(|reference_hash| self.reference_hash = reference_hash);
         decimals.map(|decimals| self.decimals = decimals);
+        icon.map(|icon| self.icon = Some(icon));
     }
 
     #[payable]
@@ -123,9 +127,7 @@ impl FungibleTokenMetadataProvider for BridgeToken {
             spec: FT_METADATA_SPEC.to_string(),
             name: self.name.clone(),
             symbol: self.symbol.clone(),
-            icon: Some(
-                "https://near.org/wp-content/themes/near-19/assets/img/brand-icon.png".to_string(),
-            ),
+            icon: self.icon.clone(),
             reference: Some(self.reference.clone()),
             reference_hash: Some(self.reference_hash.clone()),
             decimals: self.decimals,
