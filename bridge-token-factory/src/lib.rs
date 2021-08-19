@@ -19,6 +19,11 @@ mod unlock_event;
 
 near_sdk::setup_alloc!();
 
+const BRIDGE_TOKEN_BINARY: &'static [u8] = include_bytes!(std::env!(
+    "BRIDGE_TOKEN",
+    "Set BRIDGE_TOKEN to be the path of the bridge token binary"
+));
+
 /// Price per 1 byte of storage from mainnet genesis config.
 const STORAGE_PRICE_PER_BYTE: Balance = 10_000_000_000_000_000_000; // 1e19yN, 0.00001N
 
@@ -331,7 +336,7 @@ impl BridgeTokenFactory {
             .create_account()
             .transfer(BRIDGE_TOKEN_INIT_BALANCE)
             .add_full_access_key(self.owner_pk.clone())
-            .deploy_contract(include_bytes!("../../res/bridge_token.wasm").to_vec())
+            .deploy_contract(BRIDGE_TOKEN_BINARY.to_vec())
             .function_call(
                 b"new".to_vec(),
                 b"{}".to_vec(),
