@@ -6,8 +6,8 @@ use near_contract_standards::fungible_token::FungibleToken;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{Base64VecU8, ValidAccountId, U128};
 use near_sdk::{
-    assert_one_yocto, assert_self, env, ext_contract, near_bindgen, AccountId, Balance, Gas,
-    PanicOnDefault, Promise, PromiseOrValue, StorageUsage,
+    assert_one_yocto, env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault,
+    Promise, PromiseOrValue, StorageUsage,
 };
 use std::convert::TryInto;
 
@@ -29,6 +29,7 @@ pub struct BridgeToken {
     reference_hash: Base64VecU8,
     decimals: u8,
     paused: Mask,
+    #[cfg(feature = "migrate_icon")]
     icon: Option<String>,
 }
 
@@ -58,6 +59,7 @@ impl BridgeToken {
             reference_hash: Base64VecU8(vec![]),
             decimals: 0,
             paused: Mask::default(),
+            #[cfg(feature = "migrate_icon")]
             icon: None,
         }
     }
@@ -72,12 +74,14 @@ impl BridgeToken {
         icon: Option<String>,
     ) {
         // Only owner can change the metadata
-        assert_self();
+        assert!(self.controller_or_self());
+
         name.map(|name| self.name = name);
         symbol.map(|symbol| self.symbol = symbol);
         reference.map(|reference| self.reference = reference);
         reference_hash.map(|reference_hash| self.reference_hash = reference_hash);
         decimals.map(|decimals| self.decimals = decimals);
+        #[cfg(feature = "migrate_icon")]
         icon.map(|icon| self.icon = Some(icon));
     }
 
@@ -115,6 +119,12 @@ impl BridgeToken {
     pub fn account_storage_usage(&self) -> StorageUsage {
         self.token.account_storage_usage
     }
+
+    /// Return true if the caller is either self
+    pub fn controller_or_self(&self) -> bool {
+        let caller = env::predecessor_account_id();
+        caller == self.controller || caller == env::current_account_id()
+    }
 }
 
 near_contract_standards::impl_fungible_token_core!(BridgeToken, token);
@@ -127,7 +137,10 @@ impl FungibleTokenMetadataProvider for BridgeToken {
             spec: FT_METADATA_SPEC.to_string(),
             name: self.name.clone(),
             symbol: self.symbol.clone(),
+            #[cfg(feature = "migrate_icon")]
             icon: self.icon.clone(),
+            #[cfg(not(feature = "migrate_icon"))]
+            icon: None,
             reference: Some(self.reference.clone()),
             reference_hash: Some(self.reference_hash.clone()),
             decimals: self.decimals,
@@ -136,3 +149,49 @@ impl FungibleTokenMetadataProvider for BridgeToken {
 }
 
 admin_controlled::impl_admin_controlled!(BridgeToken, paused);
+
+// Migration
+
+#[cfg(feature = "migrate_icon")]
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct BridgeTokenV0 {
+    controller: AccountId,
+    token: FungibleToken,
+    name: String,
+    symbol: String,
+    reference: String,
+    reference_hash: Base64VecU8,
+    decimals: u8,
+    paused: Mask,
+}
+
+#[cfg(feature = "migrate_icon")]
+impl From<BridgeTokenV0> for BridgeToken {
+    fn from(obj: BridgeTokenV0) -> Self {
+        Self {
+            controller: obj.controller,
+            token: obj.token,
+            name: obj.name,
+            symbol: obj.symbol,
+            reference: obj.reference,
+            reference_hash: obj.reference_hash,
+            decimals: obj.decimals,
+            paused: obj.paused,
+            icon: None,
+        }
+    }
+}
+
+#[cfg(feature = "migrate_icon")]
+#[near_bindgen]
+impl BridgeToken {
+    /// Adding icon as suggested here: https://nomicon.io/Standards/FungibleToken/Metadata.html
+    /// This function can only be called from the factory or from the contract itself.
+    #[init(ignore_state)]
+    pub fn migrate_nep_148_add_icon() -> Self {
+        let old_state: BridgeTokenV0 = env::state_read().unwrap();
+        let new_state: BridgeToken = old_state.into();
+        assert!(new_state.controller_or_self());
+        new_state
+    }
+}
