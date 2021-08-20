@@ -1,7 +1,7 @@
 use admin_controlled::{AdminControlled, Mask};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedSet;
-use near_sdk::json_types::{ValidAccountId, U128};
+use near_sdk::json_types::{Base64VecU8, ValidAccountId, U128};
 use near_sdk::{
     env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault, Promise, PublicKey,
 };
@@ -47,6 +47,13 @@ const FINISH_DEPOSIT_GAS: Gas = 30_000_000_000_000;
 
 /// Gas to call verify_log_entry on prover.
 const VERIFY_LOG_ENTRY_GAS: Gas = 50_000_000_000_000;
+
+/// Amount of gas used by set_metadata in the factory, without taking into account
+/// the gas consumed by the promise.
+const OUTER_SET_METADATA_GAS: Gas = 4_000_000_000_000;
+
+/// Controller storage key.
+const CONTROLLER_STORAGE_KEY: &[u8] = b"aCONTROLLER";
 
 #[derive(Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum ResultType {
@@ -115,6 +122,16 @@ pub trait ExtBridgeToken {
         memo: Option<String>,
         msg: String,
     ) -> PromiseOrValue<U128>;
+
+    fn set_metadata(
+        &mut self,
+        name: Option<String>,
+        symbol: Option<String>,
+        reference: Option<String>,
+        reference_hash: Option<Base64VecU8>,
+        decimals: Option<u8>,
+        icon: Option<String>,
+    );
 }
 
 pub fn assert_self() {
@@ -377,6 +394,50 @@ impl BridgeTokenFactory {
         let required_deposit =
             Balance::from(current_storage - initial_storage) * STORAGE_PRICE_PER_BYTE;
         required_deposit
+    }
+
+    pub fn set_metadata(
+        &self,
+        address: String,
+        name: Option<String>,
+        symbol: Option<String>,
+        reference: Option<String>,
+        reference_hash: Option<Base64VecU8>,
+        decimals: Option<u8>,
+        icon: Option<String>,
+    ) -> Promise {
+        assert!(self.controller_or_self());
+        ext_bridge_token::set_metadata(
+            name,
+            symbol,
+            reference,
+            reference_hash,
+            decimals,
+            icon,
+            &self.get_bridge_token_account_id(address),
+            env::attached_deposit(),
+            env::prepaid_gas() - OUTER_SET_METADATA_GAS,
+        )
+    }
+
+    pub fn get_controller(&self) -> Option<AccountId> {
+        env::storage_read(CONTROLLER_STORAGE_KEY)
+            .map(|value| String::from_utf8(value).expect("Invalid controller account id"))
+    }
+
+    pub fn set_controller(&mut self, controller: AccountId) {
+        assert_self();
+        assert!(env::is_valid_account_id(controller.as_bytes()));
+        env::storage_write(CONTROLLER_STORAGE_KEY, controller.as_bytes());
+    }
+
+    pub fn controller_or_self(&self) -> bool {
+        let caller = env::predecessor_account_id();
+        caller == env::current_account_id()
+            || self
+                .get_controller()
+                .map(|controller| controller == caller)
+                .unwrap_or_default()
     }
 }
 

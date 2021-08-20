@@ -83,6 +83,8 @@ impl BridgeToken {
         decimals.map(|decimals| self.decimals = decimals);
         #[cfg(feature = "migrate_icon")]
         icon.map(|icon| self.icon = Some(icon));
+        #[cfg(not(feature = "migrate_icon"))]
+        env::log("Icon is not supported".as_bytes())
     }
 
     #[payable]
@@ -120,7 +122,7 @@ impl BridgeToken {
         self.token.account_storage_usage
     }
 
-    /// Return true if the caller is either self
+    /// Return true if the caller is either controller or self
     pub fn controller_or_self(&self) -> bool {
         let caller = env::predecessor_account_id();
         caller == self.controller || caller == env::current_account_id()
@@ -189,7 +191,8 @@ impl BridgeToken {
     /// This function can only be called from the factory or from the contract itself.
     #[init(ignore_state)]
     pub fn migrate_nep_148_add_icon() -> Self {
-        let old_state: BridgeTokenV0 = env::state_read().unwrap();
+        let old_state: BridgeTokenV0 = env::state_read()
+            .expect("State is not compatible with BridgeTokenV0. Migration not applied.");
         let new_state: BridgeToken = old_state.into();
         assert!(new_state.controller_or_self());
         new_state
