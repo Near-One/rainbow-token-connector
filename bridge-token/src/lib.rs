@@ -84,7 +84,9 @@ impl BridgeToken {
         #[cfg(feature = "migrate_icon")]
         icon.map(|icon| self.icon = Some(icon));
         #[cfg(not(feature = "migrate_icon"))]
-        icon.map(|_| env::log("Icon is not supported".as_bytes()));
+        icon.map(|_| {
+            env::log("Icon was provided, but it's not supported for the token".as_bytes())
+        });
     }
 
     #[payable]
