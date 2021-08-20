@@ -437,7 +437,7 @@ impl BridgeTokenFactory {
             || self
                 .get_controller()
                 .map(|controller| controller == caller)
-                .unwrap_or_default()
+                .unwrap_or(false)
     }
 }
 

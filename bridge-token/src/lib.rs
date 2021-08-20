@@ -84,7 +84,7 @@ impl BridgeToken {
         #[cfg(feature = "migrate_icon")]
         icon.map(|icon| self.icon = Some(icon));
         #[cfg(not(feature = "migrate_icon"))]
-        env::log("Icon is not supported".as_bytes())
+        icon.map(|_| env::log("Icon is not supported".as_bytes()));
     }
 
     #[payable]
@@ -192,7 +192,7 @@ impl BridgeToken {
     #[init(ignore_state)]
     pub fn migrate_nep_148_add_icon() -> Self {
         let old_state: BridgeTokenV0 = env::state_read()
-            .expect("State is not compatible with BridgeTokenV0. Migration not applied.");
+            .expect("State is not compatible with BridgeTokenV0. Migration has not been applied.");
         let new_state: BridgeToken = old_state.into();
         assert!(new_state.controller_or_self());
         new_state
