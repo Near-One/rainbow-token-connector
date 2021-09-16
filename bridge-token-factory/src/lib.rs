@@ -1,26 +1,30 @@
 use admin_controlled::{AdminControlled, Mask};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::UnorderedSet;
-use near_sdk::json_types::{ValidAccountId, U128};
+use near_sdk::collections::{UnorderedMap, UnorderedSet};
+use near_sdk::json_types::{Base64VecU8, ValidAccountId, U128};
 use near_sdk::{
     env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault, Promise, PublicKey,
 };
 
 type EthereumAddress = [u8; 20];
 pub use lock_event::EthLockedEvent;
+pub use log_metadata_event::TokenMetadataEvent;
 use prover::*;
 pub use prover::{validate_eth_address, Proof};
 use std::convert::TryInto;
 pub use unlock_event::EthUnlockedEvent;
 
 mod lock_event;
+mod log_metadata_event;
 pub mod prover;
 mod unlock_event;
 
 near_sdk::setup_alloc!();
 
-/// Price per 1 byte of storage from mainnet genesis config.
-const STORAGE_PRICE_PER_BYTE: Balance = 10_000_000_000_000_000_000; // 1e19yN, 0.00001N
+const BRIDGE_TOKEN_BINARY: &'static [u8] = include_bytes!(std::env!(
+    "BRIDGE_TOKEN",
+    "Set BRIDGE_TOKEN to be the path of the bridge token binary"
+));
 
 const NO_DEPOSIT: Balance = 0;
 
@@ -40,8 +44,29 @@ const FT_TRANSFER_CALL_GAS: Gas = 80_000_000_000_000;
 /// This doesn't cover the gas required for calling mint method.
 const FINISH_DEPOSIT_GAS: Gas = 30_000_000_000_000;
 
+/// Gas to call finish update_metadata method.
+const FINISH_UPDATE_METADATA_GAS: Gas = 5_000_000_000_000;
+
 /// Gas to call verify_log_entry on prover.
 const VERIFY_LOG_ENTRY_GAS: Gas = 50_000_000_000_000;
+
+/// Amount of gas used by set_metadata in the factory, without taking into account
+/// the gas consumed by the promise.
+const OUTER_SET_METADATA_GAS: Gas = 15_000_000_000_000;
+
+/// Amount of gas used by bridge token to set the metadata.
+const SET_METADATA_GAS: Gas = 5_000_000_000_000;
+
+/// Controller storage key.
+const CONTROLLER_STORAGE_KEY: &[u8] = b"aCONTROLLER";
+
+/// Metadata connector address storage key.
+const METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY: &[u8] = b"aM_CONNECTOR";
+
+/// Prefix used to store a map between tokens and timestamp `t`, where `t` stands for the
+/// block on Ethereum where the metadata for given token was emitted.
+/// The prefix is made specially short since it becomes more expensive with larger prefixes.
+const TOKEN_TIMESTAMP_MAP_PREFIX: &[u8] = b"aTT";
 
 #[derive(Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum ResultType {
@@ -92,6 +117,19 @@ pub trait ExtBridgeTokenFactory {
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] proof: Proof,
     ) -> Promise;
+
+    #[result_serializer(borsh)]
+    fn finish_updating_metadata(
+        &mut self,
+        #[callback]
+        #[serializer(borsh)]
+        verification_success: bool,
+        #[serializer(borsh)] token: String,
+        #[serializer(borsh)] name: String,
+        #[serializer(borsh)] symbol: String,
+        #[serializer(borsh)] decimals: u8,
+        #[serializer(borsh)] timestamp: u64,
+    ) -> Promise;
 }
 
 #[ext_contract(ext_fungible_token)]
@@ -110,6 +148,16 @@ pub trait ExtBridgeToken {
         memo: Option<String>,
         msg: String,
     ) -> PromiseOrValue<U128>;
+
+    fn set_metadata(
+        &mut self,
+        name: Option<String>,
+        symbol: Option<String>,
+        reference: Option<String>,
+        reference_hash: Option<Base64VecU8>,
+        decimals: Option<u8>,
+        icon: Option<String>,
+    );
 }
 
 pub fn assert_self() {
@@ -171,11 +219,65 @@ impl BridgeTokenFactory {
             bridge_token_storage_deposit_required:
                 near_contract_standards::fungible_token::FungibleToken::new(b"t".to_vec())
                     .account_storage_usage as Balance
-                    * STORAGE_PRICE_PER_BYTE,
+                    * env::storage_byte_cost(),
             paused: Mask::default(),
         }
     }
 
+    pub fn update_metadata(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
+        let event = TokenMetadataEvent::from_log_entry_data(&proof.log_entry_data);
+
+        let expected_metadata_connector = self.metadata_connector();
+
+        assert_eq!(
+            Some(hex::encode(event.metadata_connector)),
+            expected_metadata_connector,
+            "Event's address {} does not match contract address of this token {:?}",
+            hex::encode(&event.metadata_connector),
+            expected_metadata_connector,
+        );
+
+        assert!(
+            self.tokens.contains(&event.token),
+            "Bridge token for {} is not deployed yet",
+            event.token
+        );
+
+        let last_timestamp = self
+            .token_metadata_last_update()
+            .get(&event.token)
+            .unwrap_or_default();
+
+        // Note that it is allowed for event.timestamp to be equal to last_timestamp.
+        // This disallow replacing the metadata with old information, but allows replacing with information
+        // from the same block. This is useful in case there is a failure in the cross-contract to the
+        // bridge token with storage but timestamp in this contract is updated. In those cases the call
+        // can be made again, to make the replacement effective.
+        assert!(event.timestamp >= last_timestamp);
+
+        ext_prover::verify_log_entry(
+            proof.log_index,
+            proof.log_entry_data,
+            proof.receipt_index,
+            proof.receipt_data,
+            proof.header_data,
+            proof.proof,
+            false, // Do not skip bridge call. This is only used for development and diagnostics.
+            &self.prover_account,
+            NO_DEPOSIT,
+            VERIFY_LOG_ENTRY_GAS,
+        )
+        .then(ext_self::finish_updating_metadata(
+            event.token,
+            event.name,
+            event.symbol,
+            event.decimals,
+            event.timestamp,
+            &env::current_account_id(),
+            env::attached_deposit(),
+            FINISH_UPDATE_METADATA_GAS + SET_METADATA_GAS,
+        ))
+    }
     /// Deposit from Ethereum to NEAR based on the proof of the locked tokens.
     /// Must attach enough NEAR funds to cover for storage of the proof.
     #[payable]
@@ -222,6 +324,60 @@ impl BridgeTokenFactory {
     /// Return all registered tokens
     pub fn get_tokens(&self) -> Vec<String> {
         self.tokens.iter().collect::<Vec<_>>()
+    }
+
+    fn set_token_metadata_timestamp(&mut self, token: &String, timestamp: u64) -> Balance {
+        let initial_storage = env::storage_usage();
+        self.token_metadata_last_update().insert(&token, &timestamp);
+        let current_storage = env::storage_usage();
+        let required_deposit =
+            Balance::from(current_storage - initial_storage) * env::storage_byte_cost();
+        required_deposit
+    }
+
+    /// Finish updating token metadata once the proof was successfully validated.
+    /// Can only be called by the contract itself.
+    pub fn finish_updating_metadata(
+        &mut self,
+        #[callback]
+        #[serializer(borsh)]
+        verification_success: bool,
+        #[serializer(borsh)] token: String,
+        #[serializer(borsh)] name: String,
+        #[serializer(borsh)] symbol: String,
+        #[serializer(borsh)] decimals: u8,
+        #[serializer(borsh)] timestamp: u64,
+    ) {
+        assert_self();
+        assert!(verification_success, "Failed to verify the proof");
+
+        let required_deposit = self.set_token_metadata_timestamp(&token, timestamp);
+
+        assert!(env::attached_deposit() >= required_deposit);
+
+        env::log(
+            format!(
+                "Finish updating metadata. Name: {} Symbol: {:?} Decimals: {:?} at: {:?}",
+                name, symbol, decimals, timestamp
+            )
+            .as_bytes(),
+        );
+
+        let reference = None;
+        let reference_hash = None;
+        let icon = None;
+
+        ext_bridge_token::set_metadata(
+            name.into(),
+            symbol.into(),
+            reference,
+            reference_hash,
+            decimals.into(),
+            icon,
+            &self.get_bridge_token_account_id(token.clone()),
+            env::attached_deposit() - required_deposit,
+            SET_METADATA_GAS,
+        );
     }
 
     /// Finish depositing once the proof was successfully validated. Can only be called by the contract
@@ -323,7 +479,7 @@ impl BridgeTokenFactory {
         assert!(
             env::attached_deposit()
                 >= BRIDGE_TOKEN_INIT_BALANCE
-                    + STORAGE_PRICE_PER_BYTE * (current_storage - initial_storage),
+                    + env::storage_byte_cost() * (current_storage - initial_storage),
             "Not enough attached deposit to complete bridge token creation"
         );
         let bridge_token_account_id = format!("{}.{}", address, env::current_account_id());
@@ -331,7 +487,7 @@ impl BridgeTokenFactory {
             .create_account()
             .transfer(BRIDGE_TOKEN_INIT_BALANCE)
             .add_full_access_key(self.owner_pk.clone())
-            .deploy_contract(include_bytes!("../../res/bridge_token.wasm").to_vec())
+            .deploy_contract(BRIDGE_TOKEN_BINARY.to_vec())
             .function_call(
                 b"new".to_vec(),
                 b"{}".to_vec(),
@@ -370,8 +526,76 @@ impl BridgeTokenFactory {
         self.used_events.insert(&proof_key);
         let current_storage = env::storage_usage();
         let required_deposit =
-            Balance::from(current_storage - initial_storage) * STORAGE_PRICE_PER_BYTE;
+            Balance::from(current_storage - initial_storage) * env::storage_byte_cost();
         required_deposit
+    }
+
+    /// Admin method to set metadata with admin/controller access
+    pub fn set_metadata(
+        &mut self,
+        address: String,
+        name: Option<String>,
+        symbol: Option<String>,
+        reference: Option<String>,
+        reference_hash: Option<Base64VecU8>,
+        decimals: Option<u8>,
+        icon: Option<String>,
+    ) -> Promise {
+        assert!(self.controller_or_self());
+        ext_bridge_token::set_metadata(
+            name,
+            symbol,
+            reference,
+            reference_hash,
+            decimals,
+            icon,
+            &self.get_bridge_token_account_id(address),
+            env::attached_deposit(),
+            env::prepaid_gas() - OUTER_SET_METADATA_GAS,
+        )
+    }
+
+    /// Map between tokens and timestamp `t`, where `t` stands for the
+    /// block on Ethereum where the metadata for given token was emitted.
+    fn token_metadata_last_update(&mut self) -> UnorderedMap<String, u64> {
+        UnorderedMap::new(TOKEN_TIMESTAMP_MAP_PREFIX.to_vec())
+    }
+
+    /// Factory Controller. Controller has extra privileges inside this contract.
+    pub fn controller(&self) -> Option<AccountId> {
+        env::storage_read(CONTROLLER_STORAGE_KEY)
+            .map(|value| String::from_utf8(value).expect("Invalid controller account id"))
+    }
+
+    pub fn set_controller(&mut self, controller: AccountId) {
+        assert!(self.controller_or_self());
+        assert!(env::is_valid_account_id(controller.as_bytes()));
+        env::storage_write(CONTROLLER_STORAGE_KEY, controller.as_bytes());
+    }
+
+    pub fn controller_or_self(&self) -> bool {
+        let caller = env::predecessor_account_id();
+        caller == env::current_account_id()
+            || self
+                .controller()
+                .map(|controller| controller == caller)
+                .unwrap_or(false)
+    }
+
+    /// Ethereum Metadata Connector. This is the address where the contract that emits metadata from tokens
+    /// on ethereum is deployed. Address is encoded as hex.
+    pub fn metadata_connector(&self) -> Option<String> {
+        env::storage_read(METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY)
+            .map(|value| String::from_utf8(value).expect("Invalid metadata connector address"))
+    }
+
+    pub fn set_metadata_connector(&mut self, metadata_connector: String) {
+        assert!(self.controller_or_self());
+        validate_eth_address(metadata_connector.clone());
+        env::storage_write(
+            METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY,
+            metadata_connector.as_bytes(),
+        );
     }
 }
 
@@ -494,7 +718,7 @@ mod tests {
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         set_env!(
             predecessor_account_id: alice(),
-            attached_deposit: STORAGE_PRICE_PER_BYTE * 1000
+            attached_deposit: env::storage_byte_cost() * 1000
         );
         contract.deposit(sample_proof());
     }
