@@ -64,16 +64,6 @@ impl BridgeToken {
         }
     }
 
-    pub fn assert_caller_self_or_factory(&mut self) -> bool {
-        if env::predecessor_account_id() == self.controller
-            || env::predecessor_account_id() == env::current_account_id()
-        {
-            return true;
-        } else {
-            return false;
-        }
-    }
-
     pub fn set_metadata(
         &mut self,
         name: Option<String>,

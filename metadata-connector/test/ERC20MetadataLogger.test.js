@@ -16,7 +16,4 @@ describe("ERC20MetadataLogger", function () {
     expect(args.symbol).to.equal("ERC")
     expect(args.decimals).to.equal(18)
   });
-  it("Should revert if in case of non-erc20 compliant", async function () {
-    //TBD
-  })
 });
