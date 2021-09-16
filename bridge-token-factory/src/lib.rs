@@ -60,8 +60,8 @@ const SET_METADATA_GAS: Gas = 5_000_000_000_000;
 /// Controller storage key.
 const CONTROLLER_STORAGE_KEY: &[u8] = b"aCONTROLLER";
 
-/// Metadata emitter address storage key.
-const METADATA_EMITTER_STORAGE_KEY: &[u8] = b"aM_EMITTER";
+/// Metadata connector address storage key.
+const METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY: &[u8] = b"aM_CONNECTOR";
 
 /// Prefix used to store a map between tokens and timestamp `t`, where `t` stands for the
 /// block on Ethereum where the metadata for given token was emitted.
@@ -227,26 +227,26 @@ impl BridgeTokenFactory {
     pub fn update_metadata(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
         let event = TokenMetadataEvent::from_log_entry_data(&proof.log_entry_data);
 
-        let expected_metadata_emitter = self.metadata_emitter();
+        let expected_metadata_connector = self.metadata_connector();
 
         assert_eq!(
-            Some(hex::encode(event.metadata_emitter)),
-            expected_metadata_emitter,
+            Some(hex::encode(event.metadata_connector)),
+            expected_metadata_connector,
             "Event's address {} does not match contract address of this token {:?}",
-            hex::encode(&event.metadata_emitter),
-            expected_metadata_emitter,
+            hex::encode(&event.metadata_connector),
+            expected_metadata_connector,
         );
-
-        let last_timestamp = self
-            .token_metadata_last_update()
-            .get(&event.token)
-            .unwrap_or_default();
 
         assert!(
             self.tokens.contains(&event.token),
             "Bridge token for {} is not deployed yet",
             event.token
         );
+
+        let last_timestamp = self
+            .token_metadata_last_update()
+            .get(&event.token)
+            .unwrap_or_default();
 
         // Note that it is allowed for event.timestamp to be equal to last_timestamp.
         // This disallow replacing the metadata with old information, but allows replacing with information
@@ -363,8 +363,8 @@ impl BridgeTokenFactory {
             .as_bytes(),
         );
 
-        let reference: Option<String> = Some(String::default());
-        let reference_hash: Option<Base64VecU8> = Some(Base64VecU8(vec![]));
+        let reference = None;
+        let reference_hash = None;
         let icon = None;
 
         ext_bridge_token::set_metadata(
@@ -567,7 +567,7 @@ impl BridgeTokenFactory {
             .map(|value| String::from_utf8(value).expect("Invalid controller account id"))
     }
 
-    pub fn use_controller(&mut self, controller: AccountId) {
+    pub fn set_controller(&mut self, controller: AccountId) {
         assert!(self.controller_or_self());
         assert!(env::is_valid_account_id(controller.as_bytes()));
         env::storage_write(CONTROLLER_STORAGE_KEY, controller.as_bytes());
@@ -582,17 +582,20 @@ impl BridgeTokenFactory {
                 .unwrap_or(false)
     }
 
-    /// Ethereum Metadata Emitter. This is the address where the contract that emits metadata from tokens
+    /// Ethereum Metadata Connector. This is the address where the contract that emits metadata from tokens
     /// on ethereum is deployed. Address is encoded as hex.
-    pub fn metadata_emitter(&self) -> Option<String> {
-        env::storage_read(METADATA_EMITTER_STORAGE_KEY)
-            .map(|value| String::from_utf8(value).expect("Invalid metadata emitter address"))
+    pub fn metadata_connector(&self) -> Option<String> {
+        env::storage_read(METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY)
+            .map(|value| String::from_utf8(value).expect("Invalid metadata connector address"))
     }
 
-    pub fn use_metadata_emitter(&mut self, metadata_emitter: String) {
+    pub fn set_metadata_connector(&mut self, metadata_connector: String) {
         assert!(self.controller_or_self());
-        validate_eth_address(metadata_emitter.clone());
-        env::storage_write(METADATA_EMITTER_STORAGE_KEY, metadata_emitter.as_bytes());
+        validate_eth_address(metadata_connector.clone());
+        env::storage_write(
+            METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY,
+            metadata_connector.as_bytes(),
+        );
     }
 }
 

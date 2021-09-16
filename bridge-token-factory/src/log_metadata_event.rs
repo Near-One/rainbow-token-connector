@@ -5,7 +5,7 @@ use hex::ToHex;
 /// Data that was emitted by the Ethereum Locked event.
 #[derive(Debug, Eq, PartialEq)]
 pub struct TokenMetadataEvent {
-    pub metadata_emitter: EthAddress,
+    pub metadata_connector: EthAddress,
     pub token: String,
     pub name: String,
     pub symbol: String,
@@ -45,7 +45,7 @@ impl TokenMetadataEvent {
             .as_usize() as u64;
 
         Self {
-            metadata_emitter: event.locker_address,
+            metadata_connector: event.locker_address,
             token,
             name,
             symbol,
@@ -58,7 +58,7 @@ impl TokenMetadataEvent {
         EthEvent::to_log_entry_data(
             "Log",
             TokenMetadataEvent::event_params(),
-            self.metadata_emitter,
+            self.metadata_connector,
             vec![hex::decode(self.token.clone()).unwrap()],
             vec![
                 Token::String(self.name.clone()),
@@ -87,7 +87,7 @@ mod tests {
     #[test]
     fn test_event_metadata_data() {
         let event_data = TokenMetadataEvent {
-            metadata_emitter: [0u8; 20],
+            metadata_connector: [0u8; 20],
             token: "6b175474e89094c44da98b954eedeac495271d0f".to_string(),
             name: "TEST".to_string(),
             symbol: "TST".to_string(),
@@ -96,6 +96,6 @@ mod tests {
         };
         let data = event_data.to_log_entry_data();
         let result = TokenMetadataEvent::from_log_entry_data(&data);
-        // assert_eq!(result, event_data);
+        assert_eq!(result, event_data);
     }
 }

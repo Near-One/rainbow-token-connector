@@ -6,9 +6,7 @@
   "scripts": {
     "clean": "rm -rf ./artifacts/ ./cache/",
     "compile": "npx hardhat compile",
-    "test": "npx hardhat test",
-    "deploy:aurora": "yarn clean && yarn compile && npx hardhat run scripts/deploy.js --network aurora",
-    "deploy:ropsten": "yarn clean && yarn compile && npx hardhat run scripts/deploy.js --network ropsten"
+    "test": "npx hardhat test"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-ethers": "^2.0.2",
