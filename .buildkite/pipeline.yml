@@ -11,11 +11,7 @@ steps:
 
     - label: "build all rust contracts"
       command: |
-          cd bridge-token
-          ./build.sh
-          cd ../bridge-token-factory
-          ./build.sh
-          git status
+          make
           changed_files=$$(git status --porcelain --untracked-files=no | wc -l)
           if [ $$changed_files -gt 0 ]; then
             echo 'contract changed, please rebuild contract'
@@ -31,9 +27,10 @@ steps:
           yarn test
 
     - label: "bridge token factory"
+      env:
+          BRIDGE_TOKEN: ../../res/bridge_token.wasm
       command: |
           source ~/.cargo/env
+          make
           cd bridge-token-factory
-          mkdir -p target/debug
-          ./build.sh
           cargo test --all
