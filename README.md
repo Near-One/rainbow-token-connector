@@ -1,4 +1,4 @@
-# Generic ERC20/NEP21 connector for Rainbow Bridge
+# Generic ERC-20/NEP-141 connector for Rainbow Bridge
 
 ## Specification
 
@@ -88,14 +88,14 @@ impl FungibleToken for BridgeToken {
 }
 ```
 
-## Setup new ERC20 on NEAR
+## Setup new ERC-20 on NEAR
 
 To setup token contract on NEAR side, anyone can call `<bridge_token_factory>.deploy_bridge_token(<erc20>)` where `<erc20>` is the address of the token.
 With this call must attach the amount of $NEAR to cover storage for (at least 30 $NEAR currently).
 
 This will create `<<hex(erc20)>.<bridge_token_factory>>` NEP21-compatible contract.
 
-## Setup new NEP21 on Ethereum
+## Setup new NEP-141 on Ethereum
 
 TODO
 
