@@ -52,7 +52,7 @@ const VERIFY_LOG_ENTRY_GAS: Gas = 50_000_000_000_000;
 
 /// Amount of gas used by set_metadata in the factory, without taking into account
 /// the gas consumed by the promise.
-const OUTER_SET_METADATA_GAS: Gas = 4_000_000_000_000;
+const OUTER_SET_METADATA_GAS: Gas = 15_000_000_000_000;
 
 /// Amount of gas used by bridge token to set the metadata.
 const SET_METADATA_GAS: Gas = 5_000_000_000_000;
