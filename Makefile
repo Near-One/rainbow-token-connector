@@ -1,6 +1,6 @@
 CARGO = cargo
 
-all: res/bridge_token.wasm res/bridge_token_factory.wasm
+all: res/bridge_token.wasm res/bridge_token_factory.wasm res/ERC20MetadataLogger.json
 
 res/bridge_token.wasm: $(shell find bridge-token/src -name "*.rs")
 	cd bridge-token && \
@@ -14,6 +14,13 @@ res/bridge_token_factory.wasm: res/bridge_token.wasm $(shell find bridge-token-f
 	$(CARGO) build --target wasm32-unknown-unknown --release && \
 	cp target/wasm32-unknown-unknown/release/bridge_token_factory.wasm ../res/ && \
 	ls -l ../res/bridge_token_factory.wasm
+
+res/ERC20MetadataLogger.json: metadata-connector/contracts/ERC20MetadataLogger.sol
+	cd metadata-connector && \
+	yarn && \
+	yarn compile && \
+	cp artifacts/contracts/ERC20MetadataLogger.sol/ERC20MetadataLogger.json ../res/ && \
+	ls -l ../res/ERC20MetadataLogger.json
 
 # <--
 # For testing purposes only (can be removed at any moment)
