@@ -21,6 +21,8 @@ jobs:
             cmd: ./bridge-token/build.sh
 
           - subject: bridge-token-factory
+            env:
+              BRIDGE_TOKEN: ../res/bridge_token.wasm
             cmd: ./bridge-token-factory/build.sh
 
     name: Build and diff ${{ matrix.subject }}
