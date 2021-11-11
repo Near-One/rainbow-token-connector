@@ -60,7 +60,6 @@ jobs:
         uses: actions/checkout@v2
       - name: Test
         run: |
+          make res/bridge_token_factory.wasm
           cd bridge-token-factory
-          mkdir -p target/debug
-          BRIDGE_TOKEN=../../res/bridge_token.wasm ./build.sh
           cargo test --all
