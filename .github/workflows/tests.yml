@@ -60,6 +60,6 @@ jobs:
         uses: actions/checkout@v2
       - name: Test
         run: |
-          make res/bridge_token_factory.wasm
+          make
           cd bridge-token-factory
           cargo test --all
