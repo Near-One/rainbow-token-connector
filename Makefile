@@ -24,6 +24,11 @@ res/ERC20MetadataLogger.json: metadata-connector/contracts/ERC20MetadataLogger.s
 	cp artifacts/contracts/ERC20MetadataLogger.sol/ERC20MetadataLogger.json ../res/ && \
 	ls -l ../res/ERC20MetadataLogger.json
 
+test: export BRIDGE_TOKEN = $(realpath res/bridge_token.wasm)
+test:
+	cd bridge-token-factory && \
+	cargo test --all
+
 # <--
 # For testing purposes only (can be removed at any moment)
 no_icon: res/bridge_token_no_icon.wasm res/bridge_token_factory_no_icon.wasm
