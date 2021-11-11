@@ -57,9 +57,5 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v2
       - name: Test
-        env:
-          BRIDGE_TOKEN: ../res/bridge_token.wasm
         run: |
-          make
-          cd bridge-token-factory
-          cargo test --all
+          make test
