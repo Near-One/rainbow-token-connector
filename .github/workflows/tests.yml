@@ -18,12 +18,10 @@ jobs:
             cmd: ./erc20-connector/build.sh
 
           - subject: bridge-token
-            cmd: rustup update && ./bridge-token/build.sh
+            cmd: make res/bridge_token.wasm
 
           - subject: bridge-token-factory
-            env:
-              BRIDGE_TOKEN: ../res/bridge_token.wasm
-            cmd: rustup update && ./bridge-token-factory/build.sh
+            cmd: make res/bridge_token_factory.wasm
 
     name: Build and diff ${{ matrix.subject }}
     steps:
@@ -63,7 +61,6 @@ jobs:
       - name: Test
         run: |
           cd bridge-token-factory
-          rustup update
           mkdir -p target/debug
           BRIDGE_TOKEN=../../res/bridge_token.wasm ./build.sh
           cargo test --all
