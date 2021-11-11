@@ -1,0 +1,61 @@
+---
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+name: Tests
+jobs:
+  build:
+    runs-on: self-hosted
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - subject: erc20-connector
+            cmd: ./erc20-connector/build.sh
+
+          - subject: bridge-token
+            cmd: make res/bridge_token.wasm
+
+          - subject: bridge-token-factory
+            cmd: make res/bridge_token_factory.wasm
+
+    name: Build and diff ${{ matrix.subject }}
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v2
+
+      - name: Build
+        run: ${{ matrix.cmd }}
+
+      - name: Diff
+        run: |
+          git status
+          changed_files=$(git status --porcelain --untracked-files=no | wc -l)
+          if [ $changed_files -gt 0 ]; then
+            echo 'contract changed, please rebuild contract'
+            exit 1
+          fi
+
+  test-erc20-connector:
+    runs-on: self-hosted
+    name: Test erc20-connector
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v2
+      - name: Test
+        run: |
+          cd erc20-connector
+          yarn
+          yarn test
+
+  test-bridge-token-factory:
+    runs-on: self-hosted
+    name: Test bridge-token-factory
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v2
+      - name: Test
+        run: |
+          make test

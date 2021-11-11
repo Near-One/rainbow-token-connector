@@ -9,10 +9,7 @@ docker run \
      --rm \
      --mount type=bind,source=$DIR/..,target=/host \
      --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
-     -w /host/bridge-token-factory \
+     -w /host/erc20-connector \
      -e RUSTFLAGS='-C link-arg=-s' \
-     nearprotocol/contract-builder \
-     /bin/bash -c "rustup target add wasm32-unknown-unknown; cargo build --target wasm32-unknown-unknown --release"
-
-mkdir -p res
-cp $DIR/target/wasm32-unknown-unknown/release/bridge_token_factory.wasm $DIR/../res/
+     node:10.23-buster \
+     ./dist.sh
