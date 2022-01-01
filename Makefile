@@ -2,6 +2,9 @@ CARGO = cargo
 
 all: res/bridge_token.wasm res/bridge_token_factory.wasm res/ERC20MetadataLogger.json
 
+prepare:
+	rustup target add wasm32-unknown-unknown
+
 res/bridge_token.wasm: $(shell find bridge-token/src -name "*.rs")
 	cd bridge-token && \
 	export RUSTFLAGS='-C link-arg=-s' && \
