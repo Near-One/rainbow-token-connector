@@ -16,10 +16,10 @@ jobs:
             cmd: ./erc20-connector/build.sh
 
           - subject: bridge-token
-            cmd: make res/bridge_token.wasm
+            cmd: make prepare && make res/bridge_token.wasm
 
           - subject: bridge-token-factory
-            cmd: make res/bridge_token_factory.wasm
+            cmd: make prepare && make res/bridge_token_factory.wasm
 
     name: Build and diff ${{ matrix.subject }}
     steps:
