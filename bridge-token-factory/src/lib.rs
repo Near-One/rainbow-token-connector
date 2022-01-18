@@ -527,6 +527,8 @@ impl BridgeTokenFactory {
         let current_storage = env::storage_usage();
         let required_deposit =
             Balance::from(current_storage - initial_storage) * env::storage_byte_cost();
+
+        env::log(format!("RecordProof:{}", hex::encode(proof_key)).as_bytes());
         required_deposit
     }
 
