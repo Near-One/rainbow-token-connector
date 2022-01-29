@@ -14,8 +14,8 @@ interface INearProver {
 pragma solidity ^0.8;
 
 contract NearProverMock is INearProver {
-    function proveOutcome(bytes memory proofData, uint64 blockHeight) override public view returns(bool) {
+    function proveOutcome(bytes memory /*proofData*/, uint64 /*blockHeight*/) override public pure returns(bool) {
         return true;
     }
 }
-Done in 0.43s.
+Done in 0.44s.

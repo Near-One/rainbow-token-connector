@@ -558,7 +558,7 @@ contract Locker {
     // OutcomeReciptId -> Used
     mapping(bytes32 => bool) public usedProofs_;
 
-    constructor(bytes memory nearTokenFactory, INearProver prover, uint64 minBlockAcceptanceHeight) public {
+    constructor(bytes memory nearTokenFactory, INearProver prover, uint64 minBlockAcceptanceHeight) {
         require(nearTokenFactory.length > 0, "Invalid Near Token Factory address");
         require(address(prover) != address(0), "Invalid Near prover address");
 
@@ -594,4 +594,4 @@ contract Locker {
         require(!result.unknown, "Cannot use unknown execution outcome for unlocking the tokens");
     }
 }
-Done in 0.83s.
+Done in 0.78s.

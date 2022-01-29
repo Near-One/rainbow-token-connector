@@ -503,7 +503,7 @@ contract ERC20 is Context, IERC20, IERC20Metadata {
 pragma solidity ^0.8;
 
 contract TToken is ERC20 {
-    constructor() public ERC20("TestToken", "TT") {
+    constructor() ERC20("TestToken", "TT") {
         _mint(msg.sender, 1000000000);
     }
 
@@ -511,4 +511,4 @@ contract TToken is ERC20 {
         _mint(beneficiary, amount);
     }
 }
-Done in 0.63s.
+Done in 0.59s.

@@ -15,7 +15,7 @@ contract Migrations {
         }
     }
 
-    constructor() public {
+    constructor() {
         owner = msg.sender;
     }
 
@@ -28,4 +28,4 @@ contract Migrations {
         upgraded.setCompleted(lastCompletedMigration);
     }
 }
-Done in 0.50s.
+Done in 0.46s.

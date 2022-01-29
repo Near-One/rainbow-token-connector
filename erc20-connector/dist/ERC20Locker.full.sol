@@ -1251,7 +1251,7 @@ contract Locker {
     // OutcomeReciptId -> Used
     mapping(bytes32 => bool) public usedProofs_;
 
-    constructor(bytes memory nearTokenFactory, INearProver prover, uint64 minBlockAcceptanceHeight) public {
+    constructor(bytes memory nearTokenFactory, INearProver prover, uint64 minBlockAcceptanceHeight) {
         require(nearTokenFactory.length > 0, "Invalid Near Token Factory address");
         require(address(prover) != address(0), "Invalid Near prover address");
 
@@ -1336,7 +1336,6 @@ contract ERC20Locker is Locker, AdminControlled {
                 uint pausedFlags)
         AdminControlled(_admin, pausedFlags)
         Locker(nearTokenFactory, prover, minBlockAcceptanceHeight)
-        public
     {
     }
 
@@ -1368,7 +1367,7 @@ contract ERC20Locker is Locker, AdminControlled {
         result.token = address(uint160(token));
         bytes20 recipient = borshData.decodeBytes20();
         result.recipient = address(uint160(recipient));
-        require(borshData.finished(), "Parse error: EOI expected");
+        borshData.done();
     }
 
     // tokenFallback implements the ContractReceiver interface from ERC223-token-standard.
@@ -1384,4 +1383,4 @@ contract ERC20Locker is Locker, AdminControlled {
         token.safeTransfer(destination, amount);
     }
 }
-Done in 0.90s.
+Done in 0.94s.
