@@ -31,6 +31,7 @@ jobs:
 
       - name: Diff
         run: |
+          git diff
           git status
           changed_files=$(git status --porcelain --untracked-files=no | wc -l)
           if [ $changed_files -gt 0 ]; then
