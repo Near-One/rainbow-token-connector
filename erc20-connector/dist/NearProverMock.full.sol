@@ -18,4 +18,3 @@ contract NearProverMock is INearProver {
         return true;
     }
 }
-Done in 0.44s.

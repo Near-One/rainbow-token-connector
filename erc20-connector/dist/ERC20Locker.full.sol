@@ -1383,4 +1383,3 @@ contract ERC20Locker is Locker, AdminControlled {
         token.safeTransfer(destination, amount);
     }
 }
-Done in 0.94s.

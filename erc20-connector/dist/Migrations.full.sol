@@ -28,4 +28,3 @@ contract Migrations {
         upgraded.setCompleted(lastCompletedMigration);
     }
 }
-Done in 0.46s.

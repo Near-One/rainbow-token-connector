@@ -511,4 +511,3 @@ contract TToken is ERC20 {
         _mint(beneficiary, amount);
     }
 }
-Done in 0.59s.
