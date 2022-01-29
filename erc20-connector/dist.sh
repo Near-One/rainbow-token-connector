@@ -8,16 +8,27 @@ yarn
 # Remove existing files.
 rm -f dist/*.sol
 
-for contract_path in ./contracts/*.sol ./contracts/test/*.sol
-do
-  filename=$(basename -- "$contract_path")
-  # Get contract name without extension and without directories.
-  contract_name="${filename%.*}"
-  yarn run --silent truffle-flattener "${contract_path}" > "dist/${contract_name}.full.sol"
-  # Fix for https://github.com/nomiclabs/truffle-flattener/issues/55
-  sed -i '/^\/\/ SPDX-License-Identifier:/d' "dist/${contract_name}.full.sol"
-  yarn run solcjs --bin --abi --optimize "dist/${contract_name}.full.sol" -o "dist"
-  mv "dist/dist_${contract_name}_full_sol_${contract_name}.abi" "../res/${contract_name}.full.abi"
-  mv "dist/dist_${contract_name}_full_sol_${contract_name}.bin" "../res/${contract_name}.full.bin"
-  rm -f dist/*_sol_*
-done
+# Build contracts
+yarn build
+
+function flatten_contracts_and_prepare_res_files () {
+    contract_files=$1
+    build_test_path_prefix=$2
+
+    for contract_path in ${contract_files}
+    do
+        filename=$(basename -- "$contract_path")
+        # Get contract name without extension and without directories.
+        contract_name="${filename%.*}"
+        echo ${contract_path}
+        yarn hardhat flatten "${contract_path}" > "dist/${contract_name}.full.sol"
+        # Remove two redundant lines containing command info from the previous command
+        sed --in-place '1,2d' "dist/${contract_name}.full.sol" | tee
+        # Fix for https://github.com/nomiclabs/truffle-flattener/issues/55
+        sed --in-place '/^\/\/ SPDX-License-Identifier:/d' "dist/${contract_name}.full.sol"
+        cp build/contracts/${build_test_path_prefix}${contract_name}.sol/${contract_name}.json ../res/.
+    done
+}
+
+flatten_contracts_and_prepare_res_files "./contracts/*.sol"
+flatten_contracts_and_prepare_res_files "./contracts/test/*.sol" "test/"

@@ -30,6 +30,7 @@
         "truffle-flattener": "^1.4.4"
     },
     "scripts": {
+        "build": "yarn hardhat compile",
         "testrpc": "ganache-cli --port 9545 --deterministic --gasLimit 10000000",
         "test": "scripts/test.sh",
         "coverage": "scripts/coverage.sh",
