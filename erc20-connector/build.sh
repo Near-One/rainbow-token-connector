@@ -11,5 +11,5 @@ docker run \
      --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
      -w /host/erc20-connector \
      -e RUSTFLAGS='-C link-arg=-s' \
-     node:10.23-buster \
+     node:17-buster \
      ./dist.sh
