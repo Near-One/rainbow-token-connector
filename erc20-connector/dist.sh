@@ -22,8 +22,9 @@ function flatten_contracts_and_prepare_res_files () {
         contract_name="${filename%.*}"
         echo ${contract_path}
         yarn hardhat flatten "${contract_path}" > "dist/${contract_name}.full.sol"
-        # Remove two redundant lines containing command info from the previous command
-        sed --in-place '1,2d' "dist/${contract_name}.full.sol" | tee
+        # Remove two first redundant lines containing command info from the previous command
+        # and the last line containing command execution time
+        sed --in-place '1,2d;$d' "dist/${contract_name}.full.sol" | tee
         # Fix for https://github.com/nomiclabs/truffle-flattener/issues/55
         sed --in-place '/^\/\/ SPDX-License-Identifier:/d' "dist/${contract_name}.full.sol"
         cp build/contracts/${build_test_path_prefix}${contract_name}.sol/${contract_name}.json ../res/.
