@@ -45,7 +45,6 @@ contract ERC20Locker is Locker, AdminControlled {
                 uint pausedFlags)
         AdminControlled(_admin, pausedFlags)
         Locker(nearTokenFactory, prover, minBlockAcceptanceHeight)
-        public
     {
     }
 
@@ -77,7 +76,7 @@ contract ERC20Locker is Locker, AdminControlled {
         result.token = address(uint160(token));
         bytes20 recipient = borshData.decodeBytes20();
         result.recipient = address(uint160(recipient));
-        require(borshData.finished(), "Parse error: EOI expected");
+        borshData.done();
     }
 
     // tokenFallback implements the ContractReceiver interface from ERC223-token-standard.
