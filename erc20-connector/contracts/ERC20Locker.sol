@@ -1,11 +1,11 @@
-pragma solidity ^0.6.12;
+pragma solidity ^0.8;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
-import "rainbow-bridge/contracts/eth/nearbridge/contracts/AdminControlled.sol";
-import "rainbow-bridge/contracts/eth/nearprover/contracts/ProofDecoder.sol";
-import "rainbow-bridge/contracts/eth/nearbridge/contracts/Borsh.sol";
+import "rainbow-bridge-sol/nearbridge/contracts/AdminControlled.sol";
+import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
+import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 import "./Locker.sol";
 
 contract ERC20Locker is Locker, AdminControlled {

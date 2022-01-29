@@ -1,8 +1,8 @@
-pragma solidity ^0.6.12;
+pragma solidity ^0.8;
 
-import "rainbow-bridge/contracts/eth/nearprover/contracts/INearProver.sol";
-import "rainbow-bridge/contracts/eth/nearprover/contracts/ProofDecoder.sol";
-import "rainbow-bridge/contracts/eth/nearbridge/contracts/Borsh.sol";
+import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
+import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
+import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 
 contract Locker {
     using Borsh for Borsh.Data;
@@ -39,7 +39,7 @@ contract Locker {
         // Unpack the proof and extract the execution outcome.
         Borsh.Data memory borshData = Borsh.from(proofData);
         ProofDecoder.FullOutcomeProof memory fullOutcomeProof = borshData.decodeFullOutcomeProof();
-        require(borshData.finished(), "Argument should be exact borsh serialization");
+        borshData.done();
 
         bytes32 receiptId = fullOutcomeProof.outcome_proof.outcome_with_id.outcome.receipt_ids[0];
         require(!usedProofs_[receiptId], "The burn event proof cannot be reused");
