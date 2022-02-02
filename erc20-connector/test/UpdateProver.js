@@ -20,7 +20,7 @@ contract('UpdateProver', function ([admin]) {
     });
 
     it('updateContract', async function () {
-        const result = await this.locker.prover_();
+        const result = await this.locker.prover();
         console.log(result)
         // const preBalance1 = await this.token.balanceOf(addr1);
         // expect(fromWei(preBalance1)).equal('5');
