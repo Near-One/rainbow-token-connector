@@ -111,11 +111,8 @@ pub trait ExtBridgeTokenFactory {
         &mut self,
         #[callback]
         #[serializer(borsh)]
-        verification_success: bool,
+        metadata: NativeErc20Metadata,
         #[serializer(borsh)] token: String,
-        #[serializer(borsh)] name: String,
-        #[serializer(borsh)] symbol: String,
-        #[serializer(borsh)] decimals: u8,
     ) -> Promise;
 }
 
@@ -147,10 +144,15 @@ pub trait ExtBridgeToken {
     );
 }
 
+#[derive(BorshSerialize, BorshDeserialize, Default, Clone)]
+pub struct NativeErc20Metadata {
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+}
+
 #[ext_contract(ext_aurora)]
 pub trait Aurora {
-    fn mint(&self, account_id: AccountId, amount: U128);
-
     fn ft_transfer_call(
         &mut self,
         receiver_id: ValidAccountId,
@@ -159,15 +161,11 @@ pub trait Aurora {
         msg: String,
     ) -> PromiseOrValue<U128>;
 
-    fn set_metadata(
+    #[result_serializer(borsh)]
+    fn get_erc20_metadata(
         &mut self,
-        name: Option<String>,
-        symbol: Option<String>,
-        reference: Option<String>,
-        reference_hash: Option<Base64VecU8>,
-        decimals: Option<u8>,
-        icon: Option<String>,
-    );
+        #[serializer(borsh)] erc20_address: String,
+    ) -> PromiseOrValue<NativeErc20Metadata>;
 }
 
 pub fn assert_self() {
@@ -233,7 +231,7 @@ impl BridgeTokenFactory {
         }
     }
 
-    pub fn update_metadata(&mut self, token: String, name: String, symbol: String, decimals: u8) -> Promise {
+    pub fn update_metadata(&mut self, token: String) -> Promise {
         self.assert_aurora();
 
         assert!(
@@ -242,15 +240,16 @@ impl BridgeTokenFactory {
             token
         );
 
-        ext_self::finish_updating_metadata(
-            token,
-            name,
-            symbol,
-            decimals,
+        ext_aurora::get_erc20_metadata(token.clone(), 
             &env::current_account_id(),
             env::attached_deposit(),
-            FINISH_UPDATE_METADATA_GAS + SET_METADATA_GAS,
-        )
+            SET_METADATA_GAS)
+            .then(ext_self::finish_updating_metadata(
+                token,
+                &env::current_account_id(),
+                env::attached_deposit(),
+                FINISH_UPDATE_METADATA_GAS + SET_METADATA_GAS,
+            ))
     }
     /// Deposit from Aurora to NEAR
     #[payable]
@@ -285,25 +284,20 @@ impl BridgeTokenFactory {
         self.tokens.iter().collect::<Vec<_>>()
     }
 
-    /// Finish updating token metadata once the proof was successfully validated.
+    /// Finish updating token metadata.
     /// Can only be called by the contract itself.
     pub fn finish_updating_metadata(
         &mut self,
         #[callback]
         #[serializer(borsh)]
-        verification_success: bool,
+        metadata: NativeErc20Metadata,
         #[serializer(borsh)] token: String,
-        #[serializer(borsh)] name: String,
-        #[serializer(borsh)] symbol: String,
-        #[serializer(borsh)] decimals: u8,
-    ) {
-        assert_self();
-        assert!(verification_success, "Failed to verify the proof");
 
+    ) {
         env::log(
             format!(
-                "Finish updating metadata. Name: {} Symbol: {:?} Decimals: {:?}",
-                name, symbol, decimals
+                "Finish updating metadata. Name: {:?} Symbol: {:?} Decimals: {:?}",
+                metadata.name, metadata.symbol, metadata.decimals
             )
             .as_bytes(),
         );
@@ -313,11 +307,11 @@ impl BridgeTokenFactory {
         let icon = None;
 
         ext_bridge_token::set_metadata(
-            name.into(),
-            symbol.into(),
+            Some(metadata.name),
+            Some(metadata.symbol),
             reference,
             reference_hash,
-            decimals.into(),
+            Some(metadata.decimals),
             icon,
             &self.get_bridge_token_account_id(token.clone()),
             env::attached_deposit(),
@@ -393,17 +387,17 @@ impl BridgeTokenFactory {
             "Such BridgeToken does not exist."
         );
         let token_address = validate_eth_address(parts[0].to_string());
-        let recipient_address = validate_eth_address(recipient);
+        let recipient_address = validate_eth_address(recipient.clone());
 
         ext_bridge_token::ft_transfer_call(
-            self.aurora_account.try_into().unwrap(),
+            self.aurora_account.clone().try_into().unwrap(),
             amount.into(),
             None,
-            recipient_address,
+            recipient,
             &self.get_bridge_token_account_id(token),
             1,
             FT_TRANSFER_CALL_GAS,
-        )
+        );
         
         ResultType::Withdraw {
             amount: amount.into(),
