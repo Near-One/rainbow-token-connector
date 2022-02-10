@@ -43,8 +43,11 @@ const FT_TRANSFER_CALL_GAS: Gas = 80_000_000_000_000;
 /// This doesn't cover the gas required for calling mint method.
 const FINISH_DEPOSIT_GAS: Gas = 30_000_000_000_000;
 
+// Gas to call get_erc20_metadata method
+const GET_METADATA_GAS: Gas = 17_000_000_000_000;
+
 /// Gas to call finish update_metadata method.
-const FINISH_UPDATE_METADATA_GAS: Gas = 5_000_000_000_000;
+const FINISH_UPDATE_METADATA_GAS: Gas = 6_000_000_000_000;
 
 /// Amount of gas used by set_metadata in the factory, without taking into account
 /// the gas consumed by the promise.
@@ -55,9 +58,6 @@ const SET_METADATA_GAS: Gas = 5_000_000_000_000;
 
 /// Controller storage key.
 const CONTROLLER_STORAGE_KEY: &[u8] = b"aCONTROLLER";
-
-/// Metadata connector address storage key.
-const METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY: &[u8] = b"aM_CONNECTOR";
 
 #[derive(Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum ResultType {
@@ -164,7 +164,7 @@ pub trait Aurora {
     #[result_serializer(borsh)]
     fn get_erc20_metadata(
         &mut self,
-        #[serializer(borsh)] erc20_address: String,
+        #[serializer(borsh)] erc20_address: EthAddress,
     ) -> PromiseOrValue<NativeErc20Metadata>;
 }
 
@@ -232,18 +232,16 @@ impl BridgeTokenFactory {
     }
 
     pub fn update_metadata(&mut self, token: String) -> Promise {
-        self.assert_aurora();
-
         assert!(
             self.tokens.contains(&token),
             "Bridge token for {} is not deployed yet",
             token
         );
 
-        ext_aurora::get_erc20_metadata(token.clone(), 
-            &env::current_account_id(),
-            env::attached_deposit(),
-            SET_METADATA_GAS)
+        ext_aurora::get_erc20_metadata(validate_eth_address(token.clone()), 
+            &self.aurora_account,
+            NO_DEPOSIT,
+            GET_METADATA_GAS)
             .then(ext_self::finish_updating_metadata(
                 token,
                 &env::current_account_id(),
@@ -492,22 +490,6 @@ impl BridgeTokenFactory {
                 .controller()
                 .map(|controller| controller == caller)
                 .unwrap_or(false)
-    }
-
-    /// Ethereum Metadata Connector. This is the address where the contract that emits metadata from tokens
-    /// on ethereum is deployed. Address is encoded as hex.
-    pub fn metadata_connector(&self) -> Option<String> {
-        env::storage_read(METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY)
-            .map(|value| String::from_utf8(value).expect("Invalid metadata connector address"))
-    }
-
-    pub fn set_metadata_connector(&mut self, metadata_connector: String) {
-        assert!(self.controller_or_self());
-        validate_eth_address(metadata_connector.clone());
-        env::storage_write(
-            METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY,
-            metadata_connector.as_bytes(),
-        );
     }
 
     fn assert_aurora(&mut self) {
