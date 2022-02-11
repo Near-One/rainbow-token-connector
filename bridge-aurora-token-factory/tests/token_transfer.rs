@@ -1,8 +1,8 @@
 use near_sdk::borsh::{self, BorshSerialize};
 use serde_json::json;
 
+use bridge_token_factory::validate_eth_address;
 use bridge_token_factory::BridgeTokenFactoryContract;
-use bridge_token_factory::{validate_eth_address};
 use mock_prover::MockProverContract;
 use near_sdk::json_types::ValidAccountId;
 use near_sdk_sim::runtime::GenesisConfig;
@@ -158,7 +158,8 @@ fn test_eth_token_transfer() {
         "sender": SENDER_ADDRESS.to_string(),
         "amount": 1_000,
         "recipient": ALICE.to_string(),
-    })).assert_success();
+    }))
+    .assert_success();
 
     let alice_balance: String =
         call_json!(user, token_account_id.ft_balance_of({"account_id": ALICE.to_string()}))

@@ -1,6 +1,6 @@
 use admin_controlled::{AdminControlled, Mask};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::{UnorderedSet};
+use near_sdk::collections::UnorderedSet;
 use near_sdk::json_types::{Base64VecU8, ValidAccountId, U128};
 use near_sdk::{
     env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault, Promise, PublicKey,
@@ -38,10 +38,6 @@ const MINT_GAS: Gas = 10_000_000_000_000;
 
 /// Gas to call ft_transfer_call when the target of deposit is a contract
 const FT_TRANSFER_CALL_GAS: Gas = 80_000_000_000_000;
-
-/// Gas to call finish deposit method.
-/// This doesn't cover the gas required for calling mint method.
-const FINISH_DEPOSIT_GAS: Gas = 30_000_000_000_000;
 
 // Gas to call get_erc20_metadata method
 const GET_METADATA_GAS: Gas = 17_000_000_000_000;
@@ -95,17 +91,6 @@ pub struct BridgeTokenFactory {
 
 #[ext_contract(ext_self)]
 pub trait ExtBridgeTokenFactory {
-    #[result_serializer(borsh)]
-    fn finish_deposit(
-        &self,
-        #[callback]
-        #[serializer(borsh)]
-        verification_success: bool,
-        #[serializer(borsh)] token: String,
-        #[serializer(borsh)] new_owner_id: AccountId,
-        #[serializer(borsh)] amount: Balance,
-    ) -> Promise;
-
     #[result_serializer(borsh)]
     fn finish_updating_metadata(
         &mut self,
@@ -238,27 +223,36 @@ impl BridgeTokenFactory {
             token
         );
 
-        ext_aurora::get_erc20_metadata(validate_eth_address(token.clone()), 
+        ext_aurora::get_erc20_metadata(
+            validate_eth_address(token.clone()),
             &self.aurora_account,
             NO_DEPOSIT,
-            GET_METADATA_GAS)
-            .then(ext_self::finish_updating_metadata(
-                token,
-                &env::current_account_id(),
-                env::attached_deposit(),
-                FINISH_UPDATE_METADATA_GAS + SET_METADATA_GAS,
-            ))
+            GET_METADATA_GAS,
+        )
+        .then(ext_self::finish_updating_metadata(
+            token,
+            &env::current_account_id(),
+            env::attached_deposit(),
+            FINISH_UPDATE_METADATA_GAS + SET_METADATA_GAS,
+        ))
     }
     /// Deposit from Aurora to NEAR
     #[payable]
-    pub fn deposit(&mut self, locker_address: EthAddress, token: String, amount: Balance, recipient: AccountId) -> Promise {
+    pub fn deposit(
+        &mut self,
+        locker_address: String,
+        token: String,
+        amount: Balance,
+        recipient: AccountId,
+    ) -> Promise {
         self.check_not_paused(PAUSE_DEPOSIT);
         self.assert_aurora();
+        let locker = validate_eth_address(locker_address);
         assert_eq!(
-            locker_address,
+            locker,
             self.locker_address,
             "Event's address {} does not match locker address of this token {}",
-            hex::encode(&locker_address),
+            hex::encode(&locker),
             hex::encode(&self.locker_address),
         );
         assert!(
@@ -267,72 +261,7 @@ impl BridgeTokenFactory {
             token
         );
 
-        ext_self::finish_deposit(
-            token,
-            recipient,
-            amount,
-            &env::current_account_id(),
-            env::attached_deposit(),
-            FINISH_DEPOSIT_GAS + MINT_GAS + FT_TRANSFER_CALL_GAS,
-        )
-    }
-
-    /// Return all registered tokens
-    pub fn get_tokens(&self) -> Vec<String> {
-        self.tokens.iter().collect::<Vec<_>>()
-    }
-
-    /// Finish updating token metadata.
-    /// Can only be called by the contract itself.
-    pub fn finish_updating_metadata(
-        &mut self,
-        #[callback]
-        #[serializer(borsh)]
-        metadata: NativeErc20Metadata,
-        #[serializer(borsh)] token: String,
-
-    ) {
-        env::log(
-            format!(
-                "Finish updating metadata. Name: {:?} Symbol: {:?} Decimals: {:?}",
-                metadata.name, metadata.symbol, metadata.decimals
-            )
-            .as_bytes(),
-        );
-
-        let reference = None;
-        let reference_hash = None;
-        let icon = None;
-
-        ext_bridge_token::set_metadata(
-            Some(metadata.name),
-            Some(metadata.symbol),
-            reference,
-            reference_hash,
-            Some(metadata.decimals),
-            icon,
-            &self.get_bridge_token_account_id(token.clone()),
-            env::attached_deposit(),
-            SET_METADATA_GAS,
-        );
-    }
-
-    /// Finish depositing. Can only be called by the contract
-    /// itself.
-    #[payable]
-    pub fn finish_deposit(
-        &mut self,
-        #[callback]
-        #[serializer(borsh)]
-        verification_success: bool,
-        #[serializer(borsh)] token: String,
-        #[serializer(borsh)] new_owner_id: String,
-        #[serializer(borsh)] amount: Balance,
-    ) -> Promise {
-        assert_self();
-        assert!(verification_success, "Failed to verify the proof");
-
-        let Recipient { target, message } = parse_recipient(new_owner_id);
+        let Recipient { target, message } = parse_recipient(recipient);
 
         env::log(format!("Finish deposit. Target:{} Message:{:?}", target, message).as_bytes());
 
@@ -361,6 +290,45 @@ impl BridgeTokenFactory {
                 MINT_GAS,
             ),
         }
+    }
+
+    /// Return all registered tokens
+    pub fn get_tokens(&self) -> Vec<String> {
+        self.tokens.iter().collect::<Vec<_>>()
+    }
+
+    /// Finish updating token metadata.
+    /// Can only be called by the contract itself.
+    pub fn finish_updating_metadata(
+        &mut self,
+        #[callback]
+        #[serializer(borsh)]
+        metadata: NativeErc20Metadata,
+        #[serializer(borsh)] token: String,
+    ) {
+        env::log(
+            format!(
+                "Finish updating metadata. Name: {:?} Symbol: {:?} Decimals: {:?}",
+                metadata.name, metadata.symbol, metadata.decimals
+            )
+            .as_bytes(),
+        );
+
+        let reference = None;
+        let reference_hash = None;
+        let icon = None;
+
+        ext_bridge_token::set_metadata(
+            Some(metadata.name),
+            Some(metadata.symbol),
+            reference,
+            reference_hash,
+            Some(metadata.decimals),
+            icon,
+            &self.get_bridge_token_account_id(token.clone()),
+            env::attached_deposit(),
+            SET_METADATA_GAS,
+        );
     }
 
     /// Burn given amount of tokens and unlock it on the Aurora side for the recipient address.
@@ -396,7 +364,7 @@ impl BridgeTokenFactory {
             1,
             FT_TRANSFER_CALL_GAS,
         );
-        
+
         ResultType::Withdraw {
             amount: amount.into(),
             token: token_address,
@@ -493,7 +461,7 @@ impl BridgeTokenFactory {
     }
 
     fn assert_aurora(&mut self) {
-        assert_eq!(env::signer_account_id(), self.aurora_account);
+        assert_eq!(env::predecessor_account_id(), self.aurora_account);
     }
 }
 
@@ -561,8 +529,13 @@ mod tests {
             .to_hex()
     }
 
-    fn create_deposit_data(locker: String, token: String) -> (String, String, String, Balance, AccountId) {
-        (locker.from_hex::<Vec<_>>()
+    fn create_deposit_data(
+        locker: String,
+        token: String,
+    ) -> (String, String, String, Balance, AccountId) {
+        (
+            locker
+                .from_hex::<Vec<_>>()
                 .unwrap()
                 .as_slice()
                 .try_into()
