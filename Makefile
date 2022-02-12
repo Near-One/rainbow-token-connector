@@ -41,6 +41,9 @@ test: export BRIDGE_TOKEN = $(realpath res/bridge_token.wasm)
 test:
 	cd bridge-token-factory && \
 	cargo test --all
+test:
+	cd bridge-aurora-token-factory && \
+	cargo test --all
 
 # <--
 # For testing purposes only (can be removed at any moment)

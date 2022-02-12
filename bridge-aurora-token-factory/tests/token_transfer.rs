@@ -1,9 +1,6 @@
-use near_sdk::borsh::{self, BorshSerialize};
 use serde_json::json;
 
-use bridge_token_factory::validate_eth_address;
-use bridge_token_factory::BridgeTokenFactoryContract;
-use mock_prover::MockProverContract;
+use bridge_aurora_token_factory::BridgeTokenFactoryContract;
 use near_sdk::json_types::ValidAccountId;
 use near_sdk_sim::runtime::GenesisConfig;
 use near_sdk_sim::{
@@ -11,7 +8,7 @@ use near_sdk_sim::{
     UserAccount,
 };
 
-const PROVER: &str = "prover";
+const AURORA: &str = "aurora";
 const FACTORY: &str = "bridge";
 const LOCKER_ADDRESS: &str = "11111474e89094c44da98b954eedeac495271d0f";
 const DAI_ADDRESS: &str = "6b175474e89094c44da98b954eedeac495271d0f";
@@ -21,27 +18,20 @@ const ALICE: &str = "alice";
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
     TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
     TOKEN_WASM_BYTES => "../res/bridge_token.wasm",
-    FACTORY_WASM_BYTES => "../res/bridge_token_factory.wasm",
-    MOCK_PROVER_WASM_BYTES => "../res/mock_prover.wasm",
+    FACTORY_WASM_BYTES => "../res/bridge_aurora_token_factory.wasm",
 }
 
 fn setup_token_factory() -> (UserAccount, ContractAccount<BridgeTokenFactoryContract>) {
     let mut config = GenesisConfig::default();
     config.runtime_config.storage_amount_per_byte = 10u128.pow(19);
     let root = init_simulator(Some(config));
-    let _prover = deploy!(
-        contract: MockProverContract,
-        contract_id: PROVER.to_string(),
-        bytes: &MOCK_PROVER_WASM_BYTES,
-        signer_account: root
-    );
     let factory = deploy!(
         contract: BridgeTokenFactoryContract,
         contract_id: FACTORY.to_string(),
         bytes: &FACTORY_WASM_BYTES,
         signer_account: root,
         init_method: new(
-            PROVER.to_string(), LOCKER_ADDRESS.to_string()
+            AURORA.to_string(), LOCKER_ADDRESS.to_string()
         )
     );
 
@@ -130,6 +120,7 @@ fn err_is(result: &ExecutionResult, expected: &str) {
 fn test_eth_token_transfer() {
     let (user, factory) = setup_token_factory();
 
+    let aurora = user.create_user(AURORA.to_string(), to_yocto("100"));
     let alice = user.create_user(ALICE.to_string(), to_yocto("100"));
     let factory_id = FACTORY.to_string();
 
@@ -152,8 +143,8 @@ fn test_eth_token_transfer() {
     let total_supply: String = call_json!(user, token_account_id.ft_total_supply({})).unwrap_json();
     assert_eq!(total_supply, "0");
 
-    call_json!(user, factory_id.deposit({
-        "locker_address": validate_eth_address(LOCKER_ADDRESS.to_string()),
+    call_json!(aurora, factory_id.deposit({
+        "locker_address": LOCKER_ADDRESS.to_string(),
         "token": DAI_ADDRESS.to_string(),
         "sender": SENDER_ADDRESS.to_string(),
         "amount": 1_000,

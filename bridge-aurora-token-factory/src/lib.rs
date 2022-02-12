@@ -360,7 +360,7 @@ impl BridgeTokenFactory {
             amount.into(),
             None,
             recipient,
-            &self.get_bridge_token_account_id(token),
+            &token,
             1,
             FT_TRANSFER_CALL_GAS,
         );
@@ -477,7 +477,7 @@ mod tests {
     use near_sdk::env::sha256;
     use std::convert::TryInto;
     use std::panic;
-    use uint::rustc_hex::{FromHex, ToHex};
+    use uint::rustc_hex::ToHex;
 
     const UNPAUSE_ALL: Mask = 0;
 
@@ -529,22 +529,8 @@ mod tests {
             .to_hex()
     }
 
-    fn create_deposit_data(
-        locker: String,
-        token: String,
-    ) -> (String, String, String, Balance, AccountId) {
-        (
-            locker
-                .from_hex::<Vec<_>>()
-                .unwrap()
-                .as_slice()
-                .try_into()
-                .unwrap(),
-            token,
-            "00005474e89094c44da98b954eedeac495271d0f".to_string(),
-            1000,
-            "123".to_string(),
-        )
+    fn create_deposit_data() -> (Balance, AccountId) {
+        (1000, "123".to_string())
     }
 
     #[test]
@@ -568,7 +554,7 @@ mod tests {
             predecessor_account_id: alice(),
             attached_deposit: env::storage_byte_cost() * 1000
         );
-        contract.deposit([], "", "", 0, "");
+        contract.deposit("".to_string(), "".to_string(), 0, "".to_string());
     }
 
     #[test]
@@ -705,7 +691,14 @@ mod tests {
         contract.deploy_bridge_token(erc20_address.clone());
 
         // Check it is possible to use deposit while the contract is NOT paused
-        contract.deposit(create_deposit_data(token_locker(), erc20_address.clone()));
+        set_env!(predecessor_account_id: aurora());
+        let (amount, recipient) = create_deposit_data();
+        contract.deposit(
+            token_locker(),
+            erc20_address.clone(),
+            amount,
+            recipient.clone(),
+        );
 
         // Pause deposit
         set_env!(
@@ -717,13 +710,13 @@ mod tests {
 
         set_env!(
             current_account_id: bridge_token_factory(),
-            predecessor_account_id: alice(),
+            predecessor_account_id: aurora(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
 
         // Check it is NOT possible to use deposit while the contract is paused
         panic::catch_unwind(move || {
-            contract.deposit(create_proof(token_locker(), erc20_address.clone()));
+            contract.deposit(token_locker(), erc20_address, amount, recipient);
         })
         .unwrap_err();
     }
@@ -736,14 +729,20 @@ mod tests {
 
         set_env!(
             current_account_id: bridge_token_factory(),
-            predecessor_account_id: alice(),
+            predecessor_account_id: aurora(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
         let erc20_address = ethereum_address_from_id(0);
         contract.deploy_bridge_token(erc20_address.clone());
 
         // Check it is possible to use deposit while the contract is NOT paused
-        contract.deposit(create_deposit_data(token_locker(), erc20_address.clone()));
+        let (amount, recipient) = create_deposit_data();
+        contract.deposit(
+            token_locker(),
+            erc20_address.clone(),
+            amount,
+            recipient.clone(),
+        );
 
         // Pause everything
         set_env!(
@@ -755,13 +754,13 @@ mod tests {
 
         set_env!(
             current_account_id: bridge_token_factory(),
-            predecessor_account_id: alice(),
+            predecessor_account_id: aurora(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
 
         // Check it is NOT possible to use deposit while the contract is paused
         panic::catch_unwind(move || {
-            contract.deposit(create_proof(token_locker(), erc20_address));
+            contract.deposit(token_locker(), erc20_address, amount, recipient);
         })
         .unwrap_err();
     }
@@ -781,7 +780,14 @@ mod tests {
         contract.deploy_bridge_token(erc20_address.clone());
 
         // Check it is possible to use deposit while the contract is NOT paused
-        contract.deposit(create_deposit_data(token_locker(), erc20_address.clone()));
+        set_env!(predecessor_account_id: aurora());
+        let (amount, recipient) = create_deposit_data();
+        contract.deposit(
+            token_locker(),
+            erc20_address.clone(),
+            amount,
+            recipient.clone(),
+        );
 
         // Pause everything
         set_env!(
@@ -795,11 +801,11 @@ mod tests {
 
         set_env!(
             current_account_id: bridge_token_factory(),
-            predecessor_account_id: alice(),
+            predecessor_account_id: aurora(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
 
         // Check the deposit works after pausing and unpausing everything
-        contract.deposit(create_deposit_data(token_locker(), erc20_address));
+        contract.deposit(token_locker(), erc20_address, amount, recipient);
     }
 }

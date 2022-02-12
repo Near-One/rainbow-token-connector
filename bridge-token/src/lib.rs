@@ -16,7 +16,7 @@ near_sdk::setup_alloc!();
 const NO_DEPOSIT: Balance = 0;
 
 /// Gas to call finish withdraw method on factory.
-const FINISH_WITHDRAW_GAS: Gas = 50_000_000_000_000;
+const FINISH_WITHDRAW_GAS: Gas = 200_000_000_000_000;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
