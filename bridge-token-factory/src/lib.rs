@@ -1,11 +1,10 @@
-use admin_controlled::{AdminControlled, Mask};
+use near_plugins::{only, pause, FullAccessKeyFallback, Ownable, Pausable, Upgradable};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap, UnorderedSet};
-use near_sdk::json_types::{Base64VecU8, ValidAccountId, U128};
+use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::{
     env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault, Promise, PublicKey,
 };
-
 type EthereumAddress = [u8; 20];
 pub use lock_event::EthLockedEvent;
 pub use log_metadata_event::TokenMetadataEvent;
@@ -19,8 +18,6 @@ mod log_metadata_event;
 pub mod prover;
 mod unlock_event;
 
-near_sdk::setup_alloc!();
-
 const BRIDGE_TOKEN_BINARY: &'static [u8] = include_bytes!(std::env!(
     "BRIDGE_TOKEN",
     "Set BRIDGE_TOKEN to be the path of the bridge token binary"
@@ -32,33 +29,30 @@ const NO_DEPOSIT: Balance = 0;
 const BRIDGE_TOKEN_INIT_BALANCE: Balance = 3_000_000_000_000_000_000_000_000; // 3e24yN, 3N
 
 /// Gas to initialize BridgeToken contract.
-const BRIDGE_TOKEN_NEW: Gas = 10_000_000_000_000;
+const BRIDGE_TOKEN_NEW: Gas = Gas(10 * Gas::ONE_TERA.0);
 
 /// Gas to call mint method on bridge token.
-const MINT_GAS: Gas = 10_000_000_000_000;
+const MINT_GAS: Gas = Gas(10 * Gas::ONE_TERA.0);
 
 /// Gas to call ft_transfer_call when the target of deposit is a contract
-const FT_TRANSFER_CALL_GAS: Gas = 80_000_000_000_000;
+const FT_TRANSFER_CALL_GAS: Gas = Gas(80 * Gas::ONE_TERA.0);
 
 /// Gas to call finish deposit method.
 /// This doesn't cover the gas required for calling mint method.
-const FINISH_DEPOSIT_GAS: Gas = 30_000_000_000_000;
+const FINISH_DEPOSIT_GAS: Gas = Gas(30 * Gas::ONE_TERA.0);
 
 /// Gas to call finish update_metadata method.
-const FINISH_UPDATE_METADATA_GAS: Gas = 5_000_000_000_000;
+const FINISH_UPDATE_METADATA_GAS: Gas = Gas(5 * Gas::ONE_TERA.0);
 
 /// Gas to call verify_log_entry on prover.
-const VERIFY_LOG_ENTRY_GAS: Gas = 50_000_000_000_000;
+const VERIFY_LOG_ENTRY_GAS: Gas = Gas(50 * Gas::ONE_TERA.0);
 
 /// Amount of gas used by set_metadata in the factory, without taking into account
 /// the gas consumed by the promise.
-const OUTER_SET_METADATA_GAS: Gas = 15_000_000_000_000;
+const OUTER_SET_METADATA_GAS: Gas = Gas(15 * Gas::ONE_TERA.0);
 
 /// Amount of gas used by bridge token to set the metadata.
-const SET_METADATA_GAS: Gas = 5_000_000_000_000;
-
-/// Controller storage key.
-const CONTROLLER_STORAGE_KEY: &[u8] = b"aCONTROLLER";
+const SET_METADATA_GAS: Gas = Gas(5 * Gas::ONE_TERA.0);
 
 /// Metadata connector address storage key.
 const METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY: &[u8] = b"aM_CONNECTOR";
@@ -82,11 +76,16 @@ pub enum ResultType {
     },
 }
 
-const PAUSE_DEPLOY_TOKEN: Mask = 1 << 0;
-const PAUSE_DEPOSIT: Mask = 1 << 1;
-
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+#[derive(
+    BorshDeserialize,
+    BorshSerialize,
+    PanicOnDefault,
+    Ownable,
+    Pausable,
+    FullAccessKeyFallback,
+    Upgradable,
+)]
 pub struct BridgeTokenFactory {
     /// The account of the prover that we can use to prove
     pub prover_account: AccountId,
@@ -100,8 +99,8 @@ pub struct BridgeTokenFactory {
     pub owner_pk: PublicKey,
     /// Balance required to register a new account in the BridgeToken
     pub bridge_token_storage_deposit_required: Balance,
-    /// Mask determining all paused functions
-    paused: Mask,
+    // Deprecated field. Requires migration to be removed.
+    __paused: u128,
 }
 
 #[ext_contract(ext_self)]
@@ -143,11 +142,11 @@ pub trait ExtBridgeToken {
 
     fn ft_transfer_call(
         &mut self,
-        receiver_id: ValidAccountId,
+        receiver_id: AccountId,
         amount: U128,
         memo: Option<String>,
         msg: String,
-    ) -> PromiseOrValue<U128>;
+    ) -> near_sdk::PromiseOrValue<U128>;
 
     fn set_metadata(
         &mut self,
@@ -187,7 +186,7 @@ struct Recipient {
 fn parse_recipient(recipient: String) -> Recipient {
     if recipient.contains(':') {
         let mut iter = recipient.split(':');
-        let target = iter.next().unwrap().into();
+        let target = iter.next().unwrap().to_string().try_into().unwrap();
         let message = iter.collect::<Vec<&str>>().join(":");
 
         Recipient {
@@ -196,7 +195,7 @@ fn parse_recipient(recipient: String) -> Recipient {
         }
     } else {
         Recipient {
-            target: recipient,
+            target: recipient.try_into().unwrap(),
             message: None,
         }
     }
@@ -209,7 +208,6 @@ impl BridgeTokenFactory {
     /// `locker_address`: Ethereum address of the locker contract, in hex.
     #[init]
     pub fn new(prover_account: AccountId, locker_address: String) -> Self {
-        assert!(!env::state_exists(), "Already initialized");
         Self {
             prover_account,
             locker_address: validate_eth_address(locker_address),
@@ -220,7 +218,7 @@ impl BridgeTokenFactory {
                 near_contract_standards::fungible_token::FungibleToken::new(b"t".to_vec())
                     .account_storage_usage as Balance
                     * env::storage_byte_cost(),
-            paused: Mask::default(),
+            __paused: Default::default(),
         }
     }
 
@@ -263,7 +261,7 @@ impl BridgeTokenFactory {
             proof.header_data,
             proof.proof,
             false, // Do not skip bridge call. This is only used for development and diagnostics.
-            &self.prover_account,
+            self.prover_account.clone(),
             NO_DEPOSIT,
             VERIFY_LOG_ENTRY_GAS,
         )
@@ -273,16 +271,16 @@ impl BridgeTokenFactory {
             event.symbol,
             event.decimals,
             event.timestamp,
-            &env::current_account_id(),
+            env::current_account_id(),
             env::attached_deposit(),
             FINISH_UPDATE_METADATA_GAS + SET_METADATA_GAS,
         ))
     }
     /// Deposit from Ethereum to NEAR based on the proof of the locked tokens.
     /// Must attach enough NEAR funds to cover for storage of the proof.
+    #[pause]
     #[payable]
     pub fn deposit(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
-        self.check_not_paused(PAUSE_DEPOSIT);
         let event = EthLockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
             event.locker_address,
@@ -306,7 +304,7 @@ impl BridgeTokenFactory {
             proof.header_data,
             proof.proof,
             false, // Do not skip bridge call. This is only used for development and diagnostics.
-            &self.prover_account,
+            self.prover_account.clone(),
             NO_DEPOSIT,
             VERIFY_LOG_ENTRY_GAS,
         )
@@ -315,7 +313,7 @@ impl BridgeTokenFactory {
             event.recipient,
             event.amount,
             proof_1,
-            &env::current_account_id(),
+            env::current_account_id(),
             env::attached_deposit(),
             FINISH_DEPOSIT_GAS + MINT_GAS + FT_TRANSFER_CALL_GAS,
         ))
@@ -337,6 +335,7 @@ impl BridgeTokenFactory {
 
     /// Finish updating token metadata once the proof was successfully validated.
     /// Can only be called by the contract itself.
+    #[only(self)]
     pub fn finish_updating_metadata(
         &mut self,
         #[callback]
@@ -348,19 +347,18 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] decimals: u8,
         #[serializer(borsh)] timestamp: u64,
     ) {
-        assert_self();
         assert!(verification_success, "Failed to verify the proof");
 
         let required_deposit = self.set_token_metadata_timestamp(&token, timestamp);
 
         assert!(env::attached_deposit() >= required_deposit);
 
-        env::log(
+        env::log_str(
             format!(
                 "Finish updating metadata. Name: {} Symbol: {:?} Decimals: {:?} at: {:?}",
                 name, symbol, decimals, timestamp
             )
-            .as_bytes(),
+            .as_str(),
         );
 
         let reference = None;
@@ -374,7 +372,7 @@ impl BridgeTokenFactory {
             reference_hash,
             decimals.into(),
             icon,
-            &self.get_bridge_token_account_id(token.clone()),
+            self.get_bridge_token_account_id(token.clone()),
             env::attached_deposit() - required_deposit,
             SET_METADATA_GAS,
         );
@@ -382,6 +380,7 @@ impl BridgeTokenFactory {
 
     /// Finish depositing once the proof was successfully validated. Can only be called by the contract
     /// itself.
+    #[only(self)]
     #[payable]
     pub fn finish_deposit(
         &mut self,
@@ -393,7 +392,6 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] proof: Proof,
     ) -> Promise {
-        assert_self();
         assert!(verification_success, "Failed to verify the proof");
 
         let required_deposit = self.record_proof(&proof);
@@ -405,13 +403,13 @@ impl BridgeTokenFactory {
 
         let Recipient { target, message } = parse_recipient(new_owner_id);
 
-        env::log(format!("Finish deposit. Target:{} Message:{:?}", target, message).as_bytes());
+        env::log_str(format!("Finish deposit. Target:{} Message:{:?}", target, message).as_str());
 
         match message {
             Some(message) => ext_bridge_token::mint(
                 env::current_account_id(),
                 amount.into(),
-                &self.get_bridge_token_account_id(token.clone()),
+                self.get_bridge_token_account_id(token.clone()),
                 env::attached_deposit() - required_deposit,
                 MINT_GAS,
             )
@@ -420,14 +418,14 @@ impl BridgeTokenFactory {
                 amount.into(),
                 None,
                 message,
-                &self.get_bridge_token_account_id(token),
+                self.get_bridge_token_account_id(token),
                 1,
                 FT_TRANSFER_CALL_GAS,
             )),
             None => ext_bridge_token::mint(
                 target,
                 amount.into(),
-                &self.get_bridge_token_account_id(token),
+                self.get_bridge_token_account_id(token),
                 env::attached_deposit() - required_deposit,
                 MINT_GAS,
             ),
@@ -445,9 +443,9 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] recipient: String,
     ) -> ResultType {
         let token = env::predecessor_account_id();
-        let parts: Vec<&str> = token.split(".").collect();
+        let parts: Vec<&str> = token.as_str().split(".").collect();
         assert_eq!(
-            token,
+            token.to_string(),
             format!("{}.{}", parts[0], env::current_account_id()),
             "Only sub accounts of BridgeTokenFactory can call this method."
         );
@@ -464,9 +462,9 @@ impl BridgeTokenFactory {
         }
     }
 
+    #[pause]
     #[payable]
     pub fn deploy_bridge_token(&mut self, address: String) -> Promise {
-        self.check_not_paused(PAUSE_DEPLOY_TOKEN);
         let address = address.to_lowercase();
         let _ = validate_eth_address(address.clone());
         assert!(
@@ -482,14 +480,16 @@ impl BridgeTokenFactory {
                     + env::storage_byte_cost() * (current_storage - initial_storage),
             "Not enough attached deposit to complete bridge token creation"
         );
-        let bridge_token_account_id = format!("{}.{}", address, env::current_account_id());
+        let bridge_token_account_id = format!("{}.{}", address, env::current_account_id())
+            .try_into()
+            .unwrap();
         Promise::new(bridge_token_account_id)
             .create_account()
             .transfer(BRIDGE_TOKEN_INIT_BALANCE)
             .add_full_access_key(self.owner_pk.clone())
             .deploy_contract(BRIDGE_TOKEN_BINARY.to_vec())
             .function_call(
-                b"new".to_vec(),
+                "new".to_string(),
                 b"{}".to_vec(),
                 NO_DEPOSIT,
                 BRIDGE_TOKEN_NEW,
@@ -504,6 +504,8 @@ impl BridgeTokenFactory {
             "BridgeToken with such address does not exist."
         );
         format!("{}.{}", address, env::current_account_id())
+            .try_into()
+            .unwrap()
     }
 
     /// Checks whether the provided proof is already used
@@ -512,10 +514,10 @@ impl BridgeTokenFactory {
     }
 
     /// Record proof to make sure it is not re-used later for anther deposit.
+    #[only(self)]
     fn record_proof(&mut self, proof: &Proof) -> Balance {
         // TODO: Instead of sending the full proof (clone only relevant parts of the Proof)
         //       log_index / receipt_index / header_data
-        assert_self();
         let initial_storage = env::storage_usage();
 
         let proof_key = proof.get_key();
@@ -528,11 +530,12 @@ impl BridgeTokenFactory {
         let required_deposit =
             Balance::from(current_storage - initial_storage) * env::storage_byte_cost();
 
-        env::log(format!("RecordProof:{}", hex::encode(proof_key)).as_bytes());
+        env::log_str(format!("RecordProof:{}", hex::encode(proof_key)).as_str());
         required_deposit
     }
 
     /// Admin method to set metadata with admin/controller access
+    #[only(owner)]
     pub fn set_metadata(
         &mut self,
         address: String,
@@ -543,7 +546,6 @@ impl BridgeTokenFactory {
         decimals: Option<u8>,
         icon: Option<String>,
     ) -> Promise {
-        assert!(self.controller_or_self());
         ext_bridge_token::set_metadata(
             name,
             symbol,
@@ -551,7 +553,7 @@ impl BridgeTokenFactory {
             reference_hash,
             decimals,
             icon,
-            &self.get_bridge_token_account_id(address),
+            self.get_bridge_token_account_id(address),
             env::attached_deposit(),
             env::prepaid_gas() - OUTER_SET_METADATA_GAS,
         )
@@ -563,27 +565,6 @@ impl BridgeTokenFactory {
         UnorderedMap::new(TOKEN_TIMESTAMP_MAP_PREFIX.to_vec())
     }
 
-    /// Factory Controller. Controller has extra privileges inside this contract.
-    pub fn controller(&self) -> Option<AccountId> {
-        env::storage_read(CONTROLLER_STORAGE_KEY)
-            .map(|value| String::from_utf8(value).expect("Invalid controller account id"))
-    }
-
-    pub fn set_controller(&mut self, controller: AccountId) {
-        assert!(self.controller_or_self());
-        assert!(env::is_valid_account_id(controller.as_bytes()));
-        env::storage_write(CONTROLLER_STORAGE_KEY, controller.as_bytes());
-    }
-
-    pub fn controller_or_self(&self) -> bool {
-        let caller = env::predecessor_account_id();
-        caller == env::current_account_id()
-            || self
-                .controller()
-                .map(|controller| controller == caller)
-                .unwrap_or(false)
-    }
-
     /// Ethereum Metadata Connector. This is the address where the contract that emits metadata from tokens
     /// on ethereum is deployed. Address is encoded as hex.
     pub fn metadata_connector(&self) -> Option<String> {
@@ -591,8 +572,8 @@ impl BridgeTokenFactory {
             .map(|value| String::from_utf8(value).expect("Invalid metadata connector address"))
     }
 
+    #[only(owner)]
     pub fn set_metadata_connector(&mut self, metadata_connector: String) {
-        assert!(self.controller_or_self());
         validate_eth_address(metadata_connector.clone());
         env::storage_write(
             METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY,
@@ -600,8 +581,6 @@ impl BridgeTokenFactory {
         );
     }
 }
-
-admin_controlled::impl_admin_controlled!(BridgeTokenFactory, paused);
 
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
@@ -614,8 +593,6 @@ mod tests {
     use std::convert::TryInto;
     use std::panic;
     use uint::rustc_hex::{FromHex, ToHex};
-
-    const UNPAUSE_ALL: Mask = 0;
 
     macro_rules! inner_set_env {
         ($builder:ident) => {
@@ -640,15 +617,15 @@ mod tests {
     }
 
     fn alice() -> AccountId {
-        "alice.near".to_string()
+        "alice.near".try_into().unwrap()
     }
 
     fn prover() -> AccountId {
-        "prover".to_string()
+        "prover".try_into().unwrap()
     }
 
     fn bridge_token_factory() -> AccountId {
-        "bridge".to_string()
+        "bridge".try_into().unwrap()
     }
 
     fn token_locker() -> String {
@@ -688,7 +665,7 @@ mod tests {
             token,
             sender: "00005474e89094c44da98b954eedeac495271d0f".to_string(),
             amount: 1000,
-            recipient: "123".to_string(),
+            recipient: "123".try_into().unwrap(),
         };
 
         Proof {

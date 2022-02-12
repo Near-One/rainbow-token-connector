@@ -2,6 +2,7 @@ use crate::prover::{EthAddress, EthEvent, EthEventParams};
 use ethabi::{ParamType, Token};
 use hex::ToHex;
 use near_sdk::{AccountId, Balance};
+use std::convert::TryInto;
 
 /// Data that was emitted by the Ethereum Locked event.
 #[derive(Debug, Eq, PartialEq)]
@@ -42,7 +43,7 @@ impl EthLockedEvent {
             token,
             sender,
             amount,
-            recipient,
+            recipient: recipient.try_into().unwrap(),
         }
     }
 
@@ -57,7 +58,7 @@ impl EthLockedEvent {
             ],
             vec![
                 Token::Uint(self.amount.into()),
-                Token::String(self.recipient.clone()),
+                Token::String(self.recipient.to_string()),
             ],
         )
     }
@@ -84,7 +85,7 @@ mod tests {
             token: "6b175474e89094c44da98b954eedeac495271d0f".to_string(),
             sender: "00005474e89094c44da98b954eedeac495271d0f".to_string(),
             amount: 1000,
-            recipient: "123".to_string(),
+            recipient: "123".to_string().try_into().unwrap(),
         };
         let data = event_data.to_log_entry_data();
         let result = EthLockedEvent::from_log_entry_data(&data);

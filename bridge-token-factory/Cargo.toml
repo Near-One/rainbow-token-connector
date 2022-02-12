@@ -18,10 +18,12 @@ panic = "abort"
 overflow-checks = true
 
 [dependencies]
-near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
-near-contract-standards = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
-eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "9ffb08e6613788096f26636f695b4c7e5fa5b261" }
-admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "9ffb08e6613788096f26636f695b4c7e5fa5b261" }
+near-sdk = "4.0.0-pre.6"
+near-contract-standards = "4.0.0-pre.6"
+# TODO: Needs to be updated rainbow-bridge (https://github.com/aurora-is-near/rainbow-bridge/pull/714) is merged
+eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "88f4fb5" }
+#near-plugins = { git = "https://github.com/mfornet/near-plugins", rev="b095f1f1" }
+near-plugins = { path = "/Users/Marcelo/Documents/near/near-plugins/near-plugins" }
 tiny-keccak = "1.4.0"
 ethabi = "12.0.0"
 serde = { version = "*", features = ["derive"] }
@@ -31,8 +33,8 @@ rlp = "0.4.2"
 hex = "0.4.2"
 
 [dev-dependencies]
-near-sdk-sim = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
-test-token = { git = "https://github.com/mfornet/contracts", rev = "9e115e54bec56842d1380c6ebdd884eab3170583" }
+near-sdk-sim = "4.0.0-pre.6"
+test-token = { git = "https://github.com/mfornet/contracts", rev = "e9ed1e4" }
 bridge-token = { path = "../bridge-token" }
 mock-prover = { path = "../mock-prover" }
 lazy_static = "1.4.0"
