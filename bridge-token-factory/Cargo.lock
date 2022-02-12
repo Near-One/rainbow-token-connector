@@ -345,7 +345,7 @@ name = "bridge-token"
 version = "0.1.0"
 dependencies = [
  "near-contract-standards",
- "near-plugins 0.1.0 (git+https://github.com/mfornet/near-plugins?rev=b095f1f1)",
+ "near-plugins",
  "near-sdk",
 ]
 
@@ -360,7 +360,7 @@ dependencies = [
  "lazy_static",
  "mock-prover",
  "near-contract-standards",
- "near-plugins 0.1.0",
+ "near-plugins",
  "near-sdk",
  "near-sdk-sim",
  "rand 0.7.3",
@@ -1856,18 +1856,9 @@ dependencies = [
 [[package]]
 name = "near-plugins"
 version = "0.1.0"
+source = "git+https://github.com/mfornet/near-plugins?rev=9d17246b#9d17246b0ae7c4446b46b5b75fb4d55bfe6e9392"
 dependencies = [
- "near-plugins-derive 0.1.0",
- "near-sdk",
- "serde",
-]
-
-[[package]]
-name = "near-plugins"
-version = "0.1.0"
-source = "git+https://github.com/mfornet/near-plugins?rev=b095f1f1#b095f1f139bff84c85d9b2316335e92b423f9080"
-dependencies = [
- "near-plugins-derive 0.1.0 (git+https://github.com/mfornet/near-plugins?rev=b095f1f1)",
+ "near-plugins-derive",
  "near-sdk",
  "serde",
 ]
@@ -1875,18 +1866,7 @@ dependencies = [
 [[package]]
 name = "near-plugins-derive"
 version = "0.1.0"
-dependencies = [
- "darling 0.13.1",
- "proc-macro-crate 0.1.5",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "near-plugins-derive"
-version = "0.1.0"
-source = "git+https://github.com/mfornet/near-plugins?rev=b095f1f1#b095f1f139bff84c85d9b2316335e92b423f9080"
+source = "git+https://github.com/mfornet/near-plugins?rev=9d17246b#9d17246b0ae7c4446b46b5b75fb4d55bfe6e9392"
 dependencies = [
  "darling 0.13.1",
  "proc-macro-crate 0.1.5",

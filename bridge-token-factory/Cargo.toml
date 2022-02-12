@@ -22,8 +22,7 @@ near-sdk = "4.0.0-pre.6"
 near-contract-standards = "4.0.0-pre.6"
 # TODO: Needs to be updated rainbow-bridge (https://github.com/aurora-is-near/rainbow-bridge/pull/714) is merged
 eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "88f4fb5" }
-#near-plugins = { git = "https://github.com/mfornet/near-plugins", rev="b095f1f1" }
-near-plugins = { path = "/Users/Marcelo/Documents/near/near-plugins/near-plugins" }
+near-plugins = { git = "https://github.com/mfornet/near-plugins", rev="9d17246b" }
 tiny-keccak = "1.4.0"
 ethabi = "12.0.0"
 serde = { version = "*", features = ["derive"] }
