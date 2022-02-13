@@ -583,7 +583,7 @@ dependencies = [
 [[package]]
 name = "near-plugins"
 version = "0.1.0"
-source = "git+https://github.com/mfornet/near-plugins?rev=9d17246b#9d17246b0ae7c4446b46b5b75fb4d55bfe6e9392"
+source = "git+https://github.com/aurora-is-near/near-plugins?rev=9d17246b#9d17246b0ae7c4446b46b5b75fb4d55bfe6e9392"
 dependencies = [
  "near-plugins-derive",
  "near-sdk",
@@ -593,7 +593,7 @@ dependencies = [
 [[package]]
 name = "near-plugins-derive"
 version = "0.1.0"
-source = "git+https://github.com/mfornet/near-plugins?rev=9d17246b#9d17246b0ae7c4446b46b5b75fb4d55bfe6e9392"
+source = "git+https://github.com/aurora-is-near/near-plugins?rev=9d17246b#9d17246b0ae7c4446b46b5b75fb4d55bfe6e9392"
 dependencies = [
  "darling",
  "proc-macro-crate 0.1.5",
