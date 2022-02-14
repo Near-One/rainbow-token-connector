@@ -157,44 +157,6 @@ pub fn assert_self() {
     assert_eq!(env::predecessor_account_id(), env::current_account_id());
 }
 
-struct Recipient {
-    target: AccountId,
-    message: Option<String>,
-}
-
-/// `recipient` is the target account id receiving current ERC-20 tokens.
-///
-/// If `recipient` doesn't contain a semicolon (:) then it is interpreted as a NEAR account id
-/// and token are minted as NEP-141 directly on `recipient` account id.
-///
-/// Otherwise, the format expected is: <target_address>:<message>
-///
-/// @target_address: Account id of the contract to transfer current funds
-/// @message: Free form message to be send to the target using ft_transfer_call
-///
-/// The final message sent to the `target_address` has the format:
-///
-/// <message>
-///
-/// Where `message` is the free form string that was passed.
-fn parse_recipient(recipient: String) -> Recipient {
-    if recipient.contains(':') {
-        let mut iter = recipient.split(':');
-        let target = iter.next().unwrap().into();
-        let message = iter.collect::<Vec<&str>>().join(":");
-
-        Recipient {
-            target,
-            message: Some(message),
-        }
-    } else {
-        Recipient {
-            target: recipient,
-            message: None,
-        }
-    }
-}
-
 #[near_bindgen]
 impl BridgeTokenFactory {
     /// Initializes the contract.
@@ -261,35 +223,13 @@ impl BridgeTokenFactory {
             token
         );
 
-        let Recipient { target, message } = parse_recipient(recipient);
-
-        env::log(format!("Finish deposit. Target:{} Message:{:?}", target, message).as_bytes());
-
-        match message {
-            Some(message) => ext_bridge_token::mint(
-                env::current_account_id(),
-                amount.into(),
-                &self.get_bridge_token_account_id(token.clone()),
-                env::attached_deposit(),
-                MINT_GAS,
-            )
-            .then(ext_bridge_token::ft_transfer_call(
-                target.try_into().unwrap(),
-                amount.into(),
-                None,
-                message,
-                &self.get_bridge_token_account_id(token),
-                1,
-                FT_TRANSFER_CALL_GAS,
-            )),
-            None => ext_bridge_token::mint(
-                target,
-                amount.into(),
-                &self.get_bridge_token_account_id(token),
-                env::attached_deposit(),
-                MINT_GAS,
-            ),
-        }
+        ext_bridge_token::mint(
+            recipient,
+            amount.into(),
+            &self.get_bridge_token_account_id(token),
+            env::attached_deposit(),
+            MINT_GAS,
+        )
     }
 
     /// Return all registered tokens
