@@ -36,8 +36,8 @@ const BRIDGE_TOKEN_NEW: Gas = 10_000_000_000_000;
 /// Gas to call mint method on bridge token.
 const MINT_GAS: Gas = 10_000_000_000_000;
 
-/// Gas to call ft_transfer_call when the target of deposit is a contract
-const FT_TRANSFER_CALL_GAS: Gas = 80_000_000_000_000;
+/// Gas to call unlock_erc20_tokens method
+const UNLOCK_ERC20_GAS: Gas = 150_000_000_000_000;
 
 // Gas to call get_erc20_metadata method
 const GET_METADATA_GAS: Gas = 17_000_000_000_000;
@@ -138,13 +138,14 @@ pub struct NativeErc20Metadata {
 
 #[ext_contract(ext_aurora)]
 pub trait Aurora {
-    fn ft_transfer_call(
+    #[result_serializer(borsh)]
+    fn unlock_erc20_token(
         &mut self,
-        receiver_id: ValidAccountId,
-        amount: U128,
-        memo: Option<String>,
-        msg: String,
-    ) -> PromiseOrValue<U128>;
+        #[serializer(borsh)] locker_address: EthAddress,
+        #[serializer(borsh)] nep141: AccountId,
+        #[serializer(borsh)] amount: U128,
+        #[serializer(borsh)] recipient: EthAddress,
+    ) -> Promise;
 
     #[result_serializer(borsh)]
     fn get_erc20_metadata(
@@ -272,8 +273,6 @@ impl BridgeTokenFactory {
     }
 
     /// Burn given amount of tokens and unlock it on the Aurora side for the recipient address.
-    /// We return the amount as u128 and the address of the beneficiary as `[u8; 20]` for ease of
-    /// processing on Solidity side.
     /// Caller must be <token_address>.<current_account_id>, where <token_address> exists in the `tokens`.
     #[result_serializer(borsh)]
     pub fn finish_withdraw(
@@ -295,14 +294,14 @@ impl BridgeTokenFactory {
         let token_address = validate_eth_address(parts[0].to_string());
         let recipient_address = validate_eth_address(recipient.clone());
 
-        ext_bridge_token::ft_transfer_call(
-            self.aurora_account.clone().try_into().unwrap(),
+        ext_aurora::unlock_erc20_token(
+            self.locker_address,
+            token.try_into().unwrap(),
             amount.into(),
-            None,
-            recipient,
-            &token,
-            1,
-            FT_TRANSFER_CALL_GAS,
+            recipient_address,
+            &self.aurora_account,
+            env::attached_deposit(),
+            UNLOCK_ERC20_GAS,
         );
 
         ResultType::Withdraw {
