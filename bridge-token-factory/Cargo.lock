@@ -1063,7 +1063,7 @@ dependencies = [
 [[package]]
 name = "eth-types"
 version = "0.1.0"
-source = "git+https://github.com/near/rainbow-bridge?rev=88f4fb5#88f4fb50103ceebc177b831b5df8d2bf3bf228bc"
+source = "git+https://github.com/near/rainbow-bridge?rev=ae2077c#ae2077ccd81438b4eea366cdab984ed9fe6fdb7d"
 dependencies = [
  "borsh 0.9.3",
  "derive_more",
