@@ -208,7 +208,7 @@ contract('TokenLocker', function ([adminAddress, addr1, addr2]) {
         });
     });
 
-    it.only('can not unlock, proof is invalid', async function () {
+    it.only('can not unlock, proof is from the ancient block', async function () {
         let proof = require('./proof_template.json');
         proof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'Unlock', {
             flag: 0,
@@ -222,7 +222,7 @@ contract('TokenLocker', function ([adminAddress, addr1, addr2]) {
         await expectRevert(
             locker.unlockToken(borshifyOutcomeProof(proof), 1099),
             "Proof is from the ancient block"
-            )
+        )
     });
 
     /*it('deposit & withdraw', async function() {
