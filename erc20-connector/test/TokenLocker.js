@@ -208,6 +208,23 @@ contract('TokenLocker', function ([adminAddress, addr1, addr2]) {
         });
     });
 
+    it.only('can not unlock, proof is invalid', async function () {
+        let proof = require('./proof_template.json');
+        proof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'Unlock', {
+            flag: 0,
+            amount: toWei('1'),
+            token: hexToBytes(token.address),
+            recipient: hexToBytes(addr1),
+        }).toString('base64');
+        const lockerBalance = await token.balanceOf(locker.address);
+        const receiverBalance = await token.balanceOf(addr1);
+
+        await expectRevert(
+            locker.unlockToken(borshifyOutcomeProof(proof), 1099),
+            "Proof is from the ancient block"
+            )
+    });
+
     /*it('deposit & withdraw', async function() {
         assert(await locker.isBridgeToken(btoken.address));
         expect(await locker.ethToNearToken(btoken.address)).equal(nearToken);
