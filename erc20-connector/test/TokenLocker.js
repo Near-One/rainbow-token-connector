@@ -209,6 +209,10 @@ contract('TokenLocker', function ([adminAddress, addr1, addr2]) {
     });
 
     it.only('can not unlock, proof is from the ancient block', async function () {
+        // The tx was created on height 1088 and the proof was generated on block 1099
+        let minBlockAcceptanceHeight = 1090;
+        let locker2 = await ERC20Locker.new(Buffer.from('nearfuntoken', 'utf-8'), prover.address, minBlockAcceptanceHeight, adminAddress, UNPAUSED_ALL);
+
         let proof = require('./proof_template.json');
         proof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'Unlock', {
             flag: 0,
@@ -220,7 +224,7 @@ contract('TokenLocker', function ([adminAddress, addr1, addr2]) {
         const receiverBalance = await token.balanceOf(addr1);
 
         await expectRevert(
-            locker.unlockToken(borshifyOutcomeProof(proof), 1099),
+            locker2.unlockToken(borshifyOutcomeProof(proof), 1099),
             "Proof is from the ancient block"
         )
     });
