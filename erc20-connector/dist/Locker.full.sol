@@ -548,23 +548,23 @@ contract Locker {
     using Borsh for Borsh.Data;
     using ProofDecoder for Borsh.Data;
 
-    INearProver public prover_;
-    bytes public nearTokenFactory_;
+    INearProver public prover;
+    bytes public nearTokenFactory;
 
     /// Proofs from blocks that are below the acceptance height will be rejected.
-    // If `minBlockAcceptanceHeight_` value is zero - proofs from block with any height are accepted.
-    uint64 public minBlockAcceptanceHeight_;
+    // If `minBlockAcceptanceHeight` value is zero - proofs from block with any height are accepted.
+    uint64 public minBlockAcceptanceHeight;
 
     // OutcomeReciptId -> Used
-    mapping(bytes32 => bool) public usedProofs_;
+    mapping(bytes32 => bool) public usedProofs;
 
-    constructor(bytes memory nearTokenFactory, INearProver prover, uint64 minBlockAcceptanceHeight) {
-        require(nearTokenFactory.length > 0, "Invalid Near Token Factory address");
-        require(address(prover) != address(0), "Invalid Near prover address");
+    constructor(bytes memory _nearTokenFactory, INearProver _prover, uint64 _minBlockAcceptanceHeight) {
+        require(_nearTokenFactory.length > 0, "Invalid Near Token Factory address");
+        require(address(_prover) != address(0), "Invalid Near prover address");
 
-        nearTokenFactory_ = nearTokenFactory;
-        prover_ = prover;
-        minBlockAcceptanceHeight_ = minBlockAcceptanceHeight;
+        nearTokenFactory = _nearTokenFactory;
+        prover = _prover;
+        minBlockAcceptanceHeight = _minBlockAcceptanceHeight;
     }
 
     /// Parses the provided proof and consumes it if it's not already used.
@@ -573,20 +573,24 @@ contract Locker {
         internal
         returns (ProofDecoder.ExecutionStatus memory result)
     {
-        require(proofBlockHeight >= minBlockAcceptanceHeight_, "Proof is from the ancient block");
-        require(prover_.proveOutcome(proofData, proofBlockHeight), "Proof should be valid");
+        require(prover.proveOutcome(proofData, proofBlockHeight), "Proof should be valid");
 
         // Unpack the proof and extract the execution outcome.
         Borsh.Data memory borshData = Borsh.from(proofData);
         ProofDecoder.FullOutcomeProof memory fullOutcomeProof = borshData.decodeFullOutcomeProof();
         borshData.done();
 
+        require(
+            fullOutcomeProof.block_header_lite.inner_lite.height >= minBlockAcceptanceHeight,
+            "Proof is from the ancient block"
+        );
+
         bytes32 receiptId = fullOutcomeProof.outcome_proof.outcome_with_id.outcome.receipt_ids[0];
-        require(!usedProofs_[receiptId], "The burn event proof cannot be reused");
-        usedProofs_[receiptId] = true;
+        require(!usedProofs[receiptId], "The burn event proof cannot be reused");
+        usedProofs[receiptId] = true;
 
         require(keccak256(fullOutcomeProof.outcome_proof.outcome_with_id.outcome.executor_id)
-                == keccak256(nearTokenFactory_),
+                == keccak256(nearTokenFactory),
                 "Can only unlock tokens from the linked proof producer on Near blockchain");
 
         result = fullOutcomeProof.outcome_proof.outcome_with_id.outcome.status;

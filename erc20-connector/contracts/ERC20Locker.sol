@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
@@ -38,13 +39,13 @@ contract ERC20Locker is Locker, AdminControlled {
 
     // ERC20Locker is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
-    constructor(bytes memory nearTokenFactory,
-                INearProver prover,
-                uint64 minBlockAcceptanceHeight,
+    constructor(bytes memory _nearTokenFactory,
+                INearProver _prover,
+                uint64 _minBlockAcceptanceHeight,
                 address _admin,
-                uint pausedFlags)
-        AdminControlled(_admin, pausedFlags)
-        Locker(nearTokenFactory, prover, minBlockAcceptanceHeight)
+                uint _pausedFlags)
+        AdminControlled(_admin, _pausedFlags)
+        Locker(_nearTokenFactory, _prover, _minBlockAcceptanceHeight)
     {
     }
 
