@@ -1,6 +1,8 @@
-// File: contracts/Migrations.sol
+// Sources flattened with hardhat v2.8.3 https://hardhat.org
 
-pragma solidity ^0.6;
+// File contracts/Migrations.sol
+
+pragma solidity ^0.8;
 
 
 contract Migrations {
@@ -13,7 +15,7 @@ contract Migrations {
         }
     }
 
-    constructor() public {
+    constructor() {
         owner = msg.sender;
     }
 

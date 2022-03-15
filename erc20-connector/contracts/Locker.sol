@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.6.12;
+pragma solidity ^0.8;
 
-import "rainbow-bridge/contracts/eth/nearprover/contracts/INearProver.sol";
-import "rainbow-bridge/contracts/eth/nearprover/contracts/ProofDecoder.sol";
-import "rainbow-bridge/contracts/eth/nearbridge/contracts/Borsh.sol";
+import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
+import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
+import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 
 contract Locker {
     using Borsh for Borsh.Data;
@@ -19,7 +19,7 @@ contract Locker {
     // OutcomeReciptId -> Used
     mapping(bytes32 => bool) public usedProofs;
 
-    constructor(bytes memory _nearTokenFactory, INearProver _prover, uint64 _minBlockAcceptanceHeight) public {
+    constructor(bytes memory _nearTokenFactory, INearProver _prover, uint64 _minBlockAcceptanceHeight) {
         require(_nearTokenFactory.length > 0, "Invalid Near Token Factory address");
         require(address(_prover) != address(0), "Invalid Near prover address");
 
@@ -39,7 +39,8 @@ contract Locker {
         // Unpack the proof and extract the execution outcome.
         Borsh.Data memory borshData = Borsh.from(proofData);
         ProofDecoder.FullOutcomeProof memory fullOutcomeProof = borshData.decodeFullOutcomeProof();
-        require(borshData.finished(), "Argument should be exact borsh serialization");
+        borshData.done();
+
         require(
             fullOutcomeProof.block_header_lite.inner_lite.height >= minBlockAcceptanceHeight,
             "Proof is from the ancient block"
