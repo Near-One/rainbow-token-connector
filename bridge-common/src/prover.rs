@@ -3,9 +3,10 @@ use std::convert::From;
 use eth_types::*;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog, Token};
 use ethabi::param_type::Writer;
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+
 use near_sdk::{env, ext_contract};
-use near_sdk::serde::{Serialize, Deserialize};
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
+use near_sdk::serde::{Deserialize, Serialize};
 use tiny_keccak::Keccak;
 
 pub type EthAddress = [u8; 20];

@@ -483,14 +483,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "near-contract-standards"
-version = "3.0.0-pre.3"
-source = "git+https://github.com/near/near-sdk-rs?rev=613adcab6322e4f830efb4d5bde2a810ae642158#613adcab6322e4f830efb4d5bde2a810ae642158"
-dependencies = [
- "near-sdk",
-]
-
-[[package]]
 name = "near-primitives-core"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -927,24 +919,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c9d3793400a45f954c52e73d068316d76b6f4e36977e3fcebb13a2721e80237"
 dependencies = [
  "crunchy",
-]
-
-[[package]]
-name = "token-locker"
-version = "0.1.0"
-dependencies = [
- "admin-controlled",
- "bridge-common",
- "eth-types",
- "ethabi",
- "hex",
- "near-contract-standards",
- "near-sdk",
- "rlp",
- "serde",
- "serde_json",
- "tiny-keccak 1.5.0",
- "uint",
 ]
 
 [[package]]

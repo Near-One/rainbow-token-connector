@@ -93,11 +93,7 @@ impl FungibleToken for BridgeToken {
 To setup token contract on NEAR side, anyone can call `<bridge_token_factory>.deploy_bridge_token(<erc20>)` where `<erc20>` is the address of the token.
 With this call must attach the amount of $NEAR to cover storage for (at least 30 $NEAR currently).
 
-This will create `<<hex(erc20)>.<bridge_token_factory>>` NEP21-compatible contract.
-
-## Setup new NEP-141 on Ethereum
-
-TODO
+This will create `<<hex(erc20)>.<bridge_token_factory>>` NEP141-compatible contract.
 
 ## Usage flow Ethereum -> NEAR
 
@@ -112,7 +108,30 @@ TODO
 
 ## Usage flow NEAR -> Ethereum
 
-TODO
+1. `token-factory` locks NEP141 tokens on NEAR side.
+
+To deposit funds into the locker, call `ft_transfer_call` where `msg` contains Ethereum address the funds should arrive to.
+This will emit `<token: String, amount: u128, recipient address: EthAddress>` (which arrives to `deposit` on Ethereum side).
+
+Accepts `Unlock(token: String, sender_id: EthAddress, amount: u256, recipient: String)` event from Ethereum side with a proof, verifies its correctness.
+If `recipient` contains ':' will split it into `<recipient, msg>` and do `ft_transfer_call(recipient, amount, None, msg)`. Otherwise will `ft_transfer` to `recipient`.
+
+To get metadata of token to Ethereum, need to call `log_metadata`, which will create a result `<token: String, name: String, symbol: String, decimals: u8, blockHeight: u64>`.
+
+2. `erc20-bridge-token` - `BridgeTokenFactory` and `BridgeToken` Ethereum contracts.
+
+`BridgeTokenFactory` creates new `BridgeToken` that correspond to specific token account id on NEAR side.
+
+`BridgeTokenFactory` receives `deposit` with proof from NEAR, verify them and mint appropriate amounts on recipient addresses.
+
+Calling `withdraw` will burn tokens of this user and will generate event `<token: String, sender_id: EthAddress, amount: u256, recipient: String>` that can be relayed to `token-factory`.
+
+### Caveats
+
+Generally, this connector allows any account to call `ft_transfer_call` opening for potential malicious tokens to be bridged to Ethereum.
+The expectation here is that on Ethereum side, the token lists will handle this, as it's the same attack model as malicious tokens on Uniswap and other DEXs.
+
+Using Ethereum `BridgeTokenFactory` contract can always resolve Ethereum address of a contract back to NEAR one to check that it is indeed bridging token from NEAR and is created by this factory.
 
 ## Testing
 
