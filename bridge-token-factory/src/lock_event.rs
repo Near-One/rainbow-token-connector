@@ -1,4 +1,4 @@
-use crate::prover::{EthAddress, EthEvent, EthEventParams};
+use bridge_common::prover::{EthAddress, EthEvent, EthEventParams};
 use ethabi::{ParamType, Token};
 use hex::ToHex;
 use near_sdk::{AccountId, Balance};

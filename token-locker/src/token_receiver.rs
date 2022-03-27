@@ -1,5 +1,4 @@
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
-use near_sdk::PromiseOrValue;
 
 use crate::*;
 use near_sdk::json_types::ValidAccountId;

@@ -1,15 +1,13 @@
 use std::convert::TryInto;
 
 use admin_controlled::{AdminControlled, Mask};
-use near_sdk::{
-    AccountId, Balance, env, ext_contract, Gas, near_bindgen, PanicOnDefault,
-    Promise,
-};
+use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
+use near_sdk::{AccountId, Balance, env, ext_contract, Gas, near_bindgen, PanicOnDefault, Promise, PromiseOrValue};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedSet;
-use near_sdk::json_types::U128;
+use near_sdk::json_types::{U128, ValidAccountId};
 
-use bridge_common::{FT_TRANSFER_CALL_GAS, FT_TRANSFER_GAS, NO_DEPOSIT, parse_recipient, PAUSE_DEPOSIT, Recipient, VERIFY_LOG_ENTRY_GAS, ResultType};
+use bridge_common::{FT_TRANSFER_CALL_GAS, FT_TRANSFER_GAS, NO_DEPOSIT, parse_recipient, PAUSE_DEPOSIT, Recipient, ResultType, VERIFY_LOG_ENTRY_GAS};
 use bridge_common::prover::{EthAddress, ext_prover, Proof, validate_eth_address};
 
 use crate::unlock_event::EthUnlockedEvent;
@@ -25,6 +23,12 @@ const FINISH_WITHDRAW_GAS: Gas = 30_000_000_000_000;
 
 /// Gas to call finish deposit method.
 const FT_FINISH_DEPOSIT_GAS: Gas = 10_000_000_000_000;
+
+/// Gas for fetching metadata of token.
+const FT_GET_METADATA_GAS: Gas = 10_000_000_000_000;
+
+/// Gas for emitting metadata info.
+const FT_FINISH_LOG_METADATA_GAS: Gas = 30_000_000_000_000;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -42,7 +46,12 @@ pub struct Contract {
 #[ext_contract(ext_self)]
 pub trait ExtContract {
     #[result_serializer(borsh)]
-    fn finish_deposit(&self, #[serializer(borsh)] token: AccountId, #[serializer(borsh)] amount: Balance, #[serializer(borsh)] recipient: EthAddress) -> ResultType;
+    fn finish_deposit(
+        &self,
+        #[serializer(borsh)] token: AccountId,
+        #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)] recipient: EthAddress
+    ) -> ResultType;
 
     #[result_serializer(borsh)]
     fn finish_withdraw(
@@ -55,6 +64,15 @@ pub trait ExtContract {
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] proof: Proof,
     ) -> Promise;
+
+    #[result_serializer(borsh)]
+    fn finish_log_metadata(
+        &self,
+        #[callback]
+        #[serializer(borsh)]
+        metadata: FungibleTokenMetadata,
+        #[serializer(borsh)] token_id: AccountId
+    ) -> ResultType;
 }
 
 #[ext_contract(ext_token)]
@@ -68,6 +86,8 @@ pub trait ExtToken {
         memo: Option<String>,
         msg: String,
     ) -> PromiseOrValue<U128>;
+
+    fn ft_metadata(&self) -> FungibleTokenMetadata;
 }
 
 #[near_bindgen]
@@ -81,6 +101,32 @@ impl Contract {
             used_events: UnorderedSet::new(b"u".to_vec()),
             bridge_address: validate_eth_address(bridge_address),
             paused: Mask::default(),
+        }
+    }
+
+    /// Logs into the result of this transaction a Metadata for given token.
+    pub fn log_metadata(&self, token_id: ValidAccountId) -> Promise {
+        let token_id = AccountId::from(token_id);
+        ext_token::ft_metadata(&token_id, 0, FT_GET_METADATA_GAS)
+            .then(ext_self::finish_log_metadata(token_id, &env::current_account_id(), 0, FT_FINISH_LOG_METADATA_GAS))
+    }
+
+    /// Emits `ResultType` with Metadata of the given token.
+    #[private]
+    #[result_serializer(borsh)]
+    pub fn finish_log_metadata(
+        &self,
+        #[callback]
+        #[serializer(borsh)]
+        metadata: FungibleTokenMetadata,
+        #[serializer(borsh)] token_id: AccountId
+    ) -> ResultType {
+        ResultType::Metadata {
+            token: token_id,
+            name: metadata.name,
+            symbol: metadata.symbol,
+            decimals: metadata.decimals,
+            block_height: env::block_index(),
         }
     }
 
@@ -122,6 +168,7 @@ impl Contract {
     }
 
     #[private]
+    #[result_serializer(borsh)]
     pub fn finish_deposit(&self,
                           #[serializer(borsh)] token: AccountId,
                           #[serializer(borsh)] amount: Balance,
@@ -194,7 +241,7 @@ impl Contract {
         let proof_key = proof.get_key();
         assert!(
             !self.used_events.contains(&proof_key),
-            "Event cannot be reused for depositing."
+            "Event cannot be reused for withdrawing."
         );
         self.used_events.insert(&proof_key);
         let current_storage = env::storage_usage();
@@ -212,15 +259,15 @@ admin_controlled::impl_admin_controlled!(Contract, paused);
 #[cfg(test)]
 mod tests {
     use std::convert::TryInto;
+    use std::panic;
 
+    use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
     use near_sdk::{MockedBlockchain, testing_env};
     use near_sdk::env::sha256;
-    use near_sdk::test_utils::{VMContextBuilder, accounts};
+    use near_sdk::test_utils::{accounts, VMContextBuilder};
     use uint::rustc_hex::{FromHex, ToHex};
 
     use super::*;
-    use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
-    use std::panic;
 
     const UNPAUSE_ALL: Mask = 0;
 

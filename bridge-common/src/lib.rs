@@ -1,6 +1,6 @@
 use admin_controlled::{Mask};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{Balance, Gas, AccountId};
+use near_sdk::{Balance, Gas, AccountId, BlockHeight};
 use prover::EthAddress;
 
 pub mod prover;
@@ -30,6 +30,13 @@ pub enum ResultType {
         amount: Balance,
         recipient: EthAddress,
     },
+    Metadata {
+        token: String,
+        name: String,
+        symbol: String,
+        decimals: u8,
+        block_height: BlockHeight,
+    }
 }
 
 pub struct Recipient {

@@ -1,17 +1,18 @@
+use std::convert::TryInto;
+
 use admin_controlled::{AdminControlled, Mask};
+use near_sdk::{
+    AccountId, Balance, env, ext_contract, Gas, near_bindgen, PanicOnDefault, Promise, PublicKey,
+};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap, UnorderedSet};
-use near_sdk::json_types::{Base64VecU8, ValidAccountId, U128};
-use near_sdk::{
-    env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault, Promise, PublicKey,
-};
+use near_sdk::json_types::{Base64VecU8, U128, ValidAccountId};
 
+use bridge_common::{FT_TRANSFER_CALL_GAS, NO_DEPOSIT, parse_recipient, Recipient, ResultType, VERIFY_LOG_ENTRY_GAS};
+use bridge_common::prover::*;
+pub use bridge_common::prover::{Proof, validate_eth_address};
 pub use lock_event::EthLockedEvent;
 pub use log_metadata_event::TokenMetadataEvent;
-use bridge_common::{NO_DEPOSIT, FT_TRANSFER_CALL_GAS, VERIFY_LOG_ENTRY_GAS, parse_recipient, ResultType};
-use bridge_common::prover::*;
-pub use bridge_common::prover::{validate_eth_address, Proof};
-use std::convert::TryInto;
 
 mod lock_event;
 mod log_metadata_event;
@@ -137,11 +138,6 @@ pub trait ExtBridgeToken {
 
 pub fn assert_self() {
     assert_eq!(env::predecessor_account_id(), env::current_account_id());
-}
-
-struct Recipient {
-    target: AccountId,
-    message: Option<String>,
 }
 
 #[near_bindgen]
@@ -548,14 +544,15 @@ admin_controlled::impl_admin_controlled!(BridgeTokenFactory, paused);
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
-    use near_sdk::test_utils::VMContextBuilder;
-    use near_sdk::{testing_env, MockedBlockchain};
-
-    use super::*;
-    use near_sdk::env::sha256;
     use std::convert::TryInto;
     use std::panic;
+
+    use near_sdk::{MockedBlockchain, testing_env};
+    use near_sdk::env::sha256;
+    use near_sdk::test_utils::VMContextBuilder;
     use uint::rustc_hex::{FromHex, ToHex};
+
+    use super::*;
 
     const UNPAUSE_ALL: Mask = 0;
 
