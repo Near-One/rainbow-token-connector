@@ -1,7 +1,7 @@
 {
-    "name": "erc20-connector",
+    "name": "erc20-bridge-token",
     "version": "0.1.0",
-    "description": "ERC20 bridge locker",
+    "description": "Generic ERC20 bridge token factory",
     "license": "MIT",
     "dependencies": {
         "@openzeppelin/cli": "^2.8.1",
