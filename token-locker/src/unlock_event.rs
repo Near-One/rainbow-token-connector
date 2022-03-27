@@ -46,6 +46,7 @@ impl EthUnlockedEvent {
         }
     }
 
+    #[warn(dead_code)]
     pub fn to_log_entry_data(&self) -> Vec<u8> {
         EthEvent::to_log_entry_data(
             "Withdraw",
