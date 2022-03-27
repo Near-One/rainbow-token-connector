@@ -1,0 +1,18 @@
+[package]
+name = "bridge-common"
+version = "0.1.0"
+authors = ["Near Inc <hello@near.org>"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "9ffb08e6613788096f26636f695b4c7e5fa5b261" }
+ethabi = "12.0.0"
+near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
+tiny-keccak = "1.4.0"
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
+rlp = "0.4.2"
+hex = "0.4.2"
+admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "9ffb08e6613788096f26636f695b4c7e5fa5b261" }
