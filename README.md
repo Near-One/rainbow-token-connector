@@ -127,7 +127,6 @@ yarn run test
 ### Testing NEAR side
 
 ```
-cd bridge-token-factory
-./build.sh
+make res/bridge_token_factory.wasm
 cargo test --all
 ```
