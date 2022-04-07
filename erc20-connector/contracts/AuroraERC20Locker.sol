@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.6.12;
 
+import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/math/SafeMath.sol";
+import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import "@openzeppelin/contracts/math/SafeMath.sol";
 import "rainbow-bridge/contracts/eth/nearbridge/contracts/AdminControlled.sol";
-import "./AccountId.sol";
+import "./AccountIds.sol";
 
-
-contract EvmErc20Locker is AdminControlled, AccountId {
+contract AuroraERC20Locker is AdminControlled, AccountIds {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -51,8 +51,7 @@ contract EvmErc20Locker is AdminControlled, AccountId {
         nearTokenFactory = _nearTokenFactory;
     }
 
-
-    function lockToken(address ethToken, uint256 amount, bytes memory recipient)
+    function lockToken(address ethToken, uint256 amount, string memory recipient)
         public
         pausable (PAUSED_LOCK)
         returns(string memory)
@@ -64,38 +63,37 @@ contract EvmErc20Locker is AdminControlled, AccountId {
 
         IERC20(ethToken).safeTransferFrom(msg.sender, address(this), amount);
         lastLockEventIndex++;
-        LockEvent locekEvent = LockEvent(lastLockEventIndex, address(ethToken), msg.sender, amount, string(recipient));
+        LockEvent memory locekEvent = LockEvent(lastLockEventIndex, ethToken, msg.sender, amount, recipient);
         lockEvents[lastLockEventIndex] = locekEvent;
-        string memory args = abi.encodePacked("{locker_address:", address(this), 
-        ",token:", string(ethToken), ",amount:", amount, ",recipient:", recipient, "}");
+        string memory args = string(abi.encodePacked("{locker_address:", address(this), ",token:", ethToken, ",amount:", amount, ",recipient:", recipient, "}"));
 
         emit Locked(address(ethToken), msg.sender, amount, recipient);
-        return "promises:" + nearTokenFactory + "#" + "deposit" + "#" + args + "#" + "30000000000000";
+        return string(abi.encodePacked("promises:", nearTokenFactory, "#", "deposit", "#", args, "#", "30000000000000"));
     }
 
     function unlockToken(address token, uint256 amount, address recipient)
         public
         pausable (PAUSED_UNLOCK)
     {
-        require(predecessorAccountId(), nearTokenFactory, "Mismatch factory account");
+        require(compareStrings(predecessorAccountId(), nearTokenFactory), "Mismatch factory account");
         IERC20(token).safeTransfer(recipient, amount);
     }
 
-    function claim(address token, uint256 nonce) returns (uint256 amount, string memory receipient)
+    function claim(address token, uint256 nonce) public returns (uint256 amount, string memory receipient)
     {
-        require(predecessorAccountId(), nearTokenFactory, "Mismatch factory account");
-        LockEvent lockEvent = lockEvents[nonce];
-        require(lockEvent.token, token, "Mismatch token address");
+        require(compareStrings(predecessorAccountId(), nearTokenFactory), "Mismatch factory account");
+        LockEvent memory lockEvent = lockEvents[nonce];
+        require(lockEvent.token == token, "Mismatch token address");
         amount = lockEvent.amount;
         receipient = lockEvent.receipient;
         delete lockEvents[nonce];
     }
 
-    function getTokenMetadata(address token) returns (string memory name, string memory symbol, uint8 decimals)
+    function getTokenMetadata(address token) public view returns (string memory name, string memory symbol, uint8 decimals)
     {
-        name = IERC20(token).name();
-        symbol = IERC20(token).symbol();
-        decimals = IERC20(token).decimals();
+        name = ERC20(token).name();
+        symbol = ERC20(token).symbol();
+        decimals = ERC20(token).decimals();
     }
 
     // tokenFallback implements the ContractReceiver interface from ERC223-token-standard.
@@ -109,5 +107,10 @@ contract EvmErc20Locker is AdminControlled, AccountId {
         onlyAdmin
     {
         token.safeTransfer(destination, amount);
+    }
+
+    function compareStrings(string memory a, string memory b) private pure returns (bool) 
+    {
+        return keccak256(abi.encodePacked(a)) == keccak256(abi.encodePacked(b));
     }
 }
