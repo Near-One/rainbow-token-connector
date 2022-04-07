@@ -32,6 +32,7 @@ hex = "0.4.2"
 getrandom = { version = "0.2.6", features = ["js"] }
 primitive-types = { version = "0.10.0", default-features = false, features = ["rlp"] }
 aurora-engine-parameters = { path = "../aurora-engine-parameters", default-features = false }
+sha3 = { version = "0.9.1", default-features = false }
 
 [dev-dependencies]
 near-sdk-sim = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }

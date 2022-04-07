@@ -22,6 +22,14 @@ res/bridge_token_factory.wasm: res/bridge_token.wasm $(shell find bridge-token-f
 	cp target/wasm32-unknown-unknown/release/bridge_token_factory.wasm ../res/ && \
 	ls -l ../res/bridge_token_factory.wasm
 
+res/bridge_aurora_token_factory.wasm: export BRIDGE_TOKEN = $(realpath res/bridge_token.wasm)
+res/bridge_aurora_token_factory.wasm: res/bridge_token.wasm $(shell find bridge-aurora-token-factory/src -name "*.rs")
+	cd bridge-aurora-token-factory && \
+	export RUSTFLAGS='-C link-arg=-s' && \
+	$(CARGO) build --target wasm32-unknown-unknown --release && \
+	cp target/wasm32-unknown-unknown/release/bridge_aurora_token_factory.wasm ../res/ && \
+	ls -l ../res/bridge_aurora_token_factory.wasm
+
 res/ERC20MetadataLogger.json: metadata-connector/contracts/ERC20MetadataLogger.sol
 	cd metadata-connector && \
 	yarn && \

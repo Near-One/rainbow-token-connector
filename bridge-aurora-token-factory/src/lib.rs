@@ -1,4 +1,3 @@
-// use eth_types::U256;
 use admin_controlled::{AdminControlled, Mask};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedSet;
@@ -61,8 +60,18 @@ const SET_METADATA_GAS: Gas = 5_000_000_000_000;
 /// Controller storage key.
 const CONTROLLER_STORAGE_KEY: &[u8] = b"aCONTROLLER";
 
+/// Selector to call claim function in ERC 20 locker contract
+///
+/// keccak("claim(address,uint256)".as_bytes())[..4];
 pub const LOCKER_CLAIM_SELECTOR: &[u8] = &[170, 211, 236, 150];
-pub const LOCKER_METADATA_SELECTOR: &[u8] = &[7, 218, 16, 70];
+/// Selector to call getTokenMetadata function in ERC 20 locker contract
+///
+/// keccak("getTokenMetadata(address)".as_bytes())[..4];
+pub const LOCKER_METADATA_SELECTOR: &[u8] = &[192, 15, 20, 171];
+/// Selector to call unlockToken function in ERC 20 locker contract
+///
+/// keccak("unlockToken(address,uint256,address)".as_bytes())[..4];
+pub const LOCKER_UNLOCK_SELECTOR: &[u8] = &[90, 156, 120, 171];
 
 #[derive(Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum ResultType {
@@ -194,7 +203,7 @@ impl BridgeTokenFactory {
         );
 
         let tail = ethabi::encode(&[
-            ethabi::Token::Address(validate_eth_address(token).into()),
+            ethabi::Token::Address(validate_eth_address(token.clone()).into()),
         ]);
 
         let get_metadata_args = ViewCallArgs {
@@ -233,12 +242,13 @@ impl BridgeTokenFactory {
         );
 
         let tail = ethabi::encode(&[
-            ethabi::Token::Address(validate_eth_address(token).into()),
+            ethabi::Token::Address(validate_eth_address(token.clone()).into()),
             ethabi::Token::Uint(U256::from(nonce.as_bytes())),
         ]);
 
         let call_args = FunctionCallArgs {
             contract: self.locker_address,
+            value: WeiU256::default(),
             input: [LOCKER_CLAIM_SELECTOR, tail.as_slice()].concat(),
         };
 
@@ -273,7 +283,7 @@ impl BridgeTokenFactory {
             _other => Vec::new(),
         };
 
-        let output_list = ethabi::decode(&[ethabi::ParamType::Uint(128), ethabi::ParamType::String], output.as_slice()).unwrap();
+        let mut output_list = ethabi::decode(&[ethabi::ParamType::Uint(128), ethabi::ParamType::String], output.as_slice()).unwrap();
         let amount: u128 = output_list.pop().unwrap().into_uint().unwrap().try_into().unwrap();
         let recipient: String = output_list.pop().unwrap().into_string().unwrap();
 
@@ -300,7 +310,7 @@ impl BridgeTokenFactory {
             _other => Vec::new(),
         };
 
-        let output_list = ethabi::decode(&[ethabi::ParamType::String, ethabi::ParamType::String, ethabi::ParamType::Uint(8)], output.as_slice()).unwrap();
+        let mut output_list = ethabi::decode(&[ethabi::ParamType::String, ethabi::ParamType::String, ethabi::ParamType::Uint(8)], output.as_slice()).unwrap();
         let name: String = output_list.pop().unwrap().into_string().unwrap();
         let symbol: String = output_list.pop().unwrap().into_string().unwrap();
         let decimals: u8 = output_list.pop().unwrap().into_uint().unwrap().try_into().unwrap();
@@ -349,16 +359,26 @@ impl BridgeTokenFactory {
             self.tokens.contains(&parts[0].to_string()),
             "Such BridgeToken does not exist."
         );
+        
         let token_address = validate_eth_address(parts[0].to_string());
         let recipient_address = validate_eth_address(recipient.clone());
 
-        ext_aurora::unlock_erc20_token(
-            self.locker_address,
-            token.try_into().unwrap(),
-            amount.into(),
-            recipient_address,
+        let tail = ethabi::encode(&[
+            ethabi::Token::Address(token_address.into()),
+            ethabi::Token::Uint(ethabi::Uint::from(amount)),
+            ethabi::Token::String(recipient),
+        ]);
+
+        let call_args = FunctionCallArgs {
+            contract: self.locker_address,
+            value: WeiU256::default(),
+            input: [LOCKER_UNLOCK_SELECTOR, tail.as_slice()].concat(),
+        };
+
+        ext_aurora::call(
+            call_args,
             &self.aurora_account,
-            env::attached_deposit(),
+            NO_DEPOSIT,
             UNLOCK_ERC20_GAS,
         );
 
@@ -465,6 +485,7 @@ admin_controlled::impl_admin_controlled!(BridgeTokenFactory, paused);
 mod tests {
     use near_sdk::test_utils::VMContextBuilder;
     use near_sdk::{testing_env, MockedBlockchain};
+    use sha3::Digest;
 
     use super::*;
     use near_sdk::env::sha256;
@@ -522,10 +543,6 @@ mod tests {
             .to_hex()
     }
 
-    fn create_deposit_data() -> (Balance, AccountId) {
-        (1000, "123".to_string())
-    }
-
     #[test]
     #[should_panic]
     fn test_fail_deploy_bridge_token() {
@@ -547,7 +564,7 @@ mod tests {
             predecessor_account_id: alice(),
             attached_deposit: env::storage_byte_cost() * 1000
         );
-        contract.deposit("".to_string(), "".to_string(), 0, "".to_string());
+        contract.deposit("".to_string(), "1".to_string());
     }
 
     #[test]
@@ -685,12 +702,9 @@ mod tests {
 
         // Check it is possible to use deposit while the contract is NOT paused
         set_env!(predecessor_account_id: aurora());
-        let (amount, recipient) = create_deposit_data();
         contract.deposit(
-            token_locker(),
             erc20_address.clone(),
-            amount,
-            recipient.clone(),
+            "0".to_string(),
         );
 
         // Pause deposit
@@ -709,7 +723,7 @@ mod tests {
 
         // Check it is NOT possible to use deposit while the contract is paused
         panic::catch_unwind(move || {
-            contract.deposit(token_locker(), erc20_address, amount, recipient);
+            contract.deposit(erc20_address, "1".to_string());
         })
         .unwrap_err();
     }
@@ -729,12 +743,9 @@ mod tests {
         contract.deploy_bridge_token(erc20_address.clone());
 
         // Check it is possible to use deposit while the contract is NOT paused
-        let (amount, recipient) = create_deposit_data();
         contract.deposit(
-            token_locker(),
             erc20_address.clone(),
-            amount,
-            recipient.clone(),
+            "0".to_string(),
         );
 
         // Pause everything
@@ -753,7 +764,7 @@ mod tests {
 
         // Check it is NOT possible to use deposit while the contract is paused
         panic::catch_unwind(move || {
-            contract.deposit(token_locker(), erc20_address, amount, recipient);
+            contract.deposit(erc20_address, "0".to_string());
         })
         .unwrap_err();
     }
@@ -774,12 +785,9 @@ mod tests {
 
         // Check it is possible to use deposit while the contract is NOT paused
         set_env!(predecessor_account_id: aurora());
-        let (amount, recipient) = create_deposit_data();
         contract.deposit(
-            token_locker(),
             erc20_address.clone(),
-            amount,
-            recipient.clone(),
+            "0".to_string(),
         );
 
         // Pause everything
@@ -799,6 +807,21 @@ mod tests {
         );
 
         // Check the deposit works after pausing and unpausing everything
-        contract.deposit(token_locker(), erc20_address, amount, recipient);
+        contract.deposit(erc20_address, "0".to_string());
+    }
+
+    #[test]
+    fn check_selector() {
+        let mut hasher = sha3::Keccak256::default();
+        hasher.update(b"claim(address,uint256)");
+        assert_eq!(hasher.finalize()[..4].to_vec(), LOCKER_CLAIM_SELECTOR);
+
+        let mut hasher = sha3::Keccak256::default();
+        hasher.update(b"getTokenMetadata(address)");
+        assert_eq!(hasher.finalize()[..4].to_vec(), LOCKER_METADATA_SELECTOR);
+
+        let mut hasher = sha3::Keccak256::default();
+        hasher.update(b"unlockToken(address,uint256,address)");
+        assert_eq!(hasher.finalize()[..4].to_vec(), LOCKER_UNLOCK_SELECTOR);
     }
 }

@@ -320,6 +320,7 @@ dependencies = [
  "rlp 0.5.1",
  "serde",
  "serde_json",
+ "sha3",
  "test-token",
  "tiny-keccak 1.5.0",
  "uint 0.8.5",
