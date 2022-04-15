@@ -8,7 +8,6 @@ use near_sdk::{
 
 use aurora_engine_parameters::*;
 use std::convert::TryInto;
-use primitive_types::U256;
 
 pub type EthAddress = [u8; 20];
 
@@ -45,7 +44,11 @@ const UNLOCK_ERC20_GAS: Gas = 150_000_000_000_000;
 const GET_METADATA_GAS: Gas = 17_000_000_000_000;
 
 // Gas to call claim method
-const CLAIM_GAS: Gas = 17_000_000_000_000;
+const CLAIM_GAS: Gas = 50_000_000_000_000;
+
+/// Gas to call finish deposit method.
+/// This doesn't cover the gas required for calling mint method.
+const FINISH_DEPOSIT_GAS: Gas = 30_000_000_000_000;
 
 /// Gas to call finish update_metadata method.
 const FINISH_UPDATE_METADATA_GAS: Gas = 6_000_000_000_000;
@@ -92,7 +95,7 @@ const PAUSE_DEPOSIT: Mask = 1 << 1;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
-pub struct BridgeTokenFactory {
+pub struct BridgeAuroraTokenFactory {
     /// The account of the aurora engine
     pub aurora_account: AccountId,
     /// Address of the Ethereum locker contract.
@@ -108,7 +111,7 @@ pub struct BridgeTokenFactory {
 }
 
 #[ext_contract(ext_self)]
-pub trait ExtBridgeTokenFactory {
+pub trait ExtBridgeAuroraTokenFactory {
     #[result_serializer(borsh)]
     fn finish_updating_metadata(
         &mut self,
@@ -158,16 +161,10 @@ pub trait ExtBridgeToken {
 #[ext_contract(ext_aurora)]
 pub trait Aurora {
     #[result_serializer(borsh)]
-    fn call(
-        &mut self,
-        #[serializer(borsh)] input: FunctionCallArgs,
-    ) -> Promise<SubmitResult>;
+    fn call(&mut self, #[serializer(borsh)] input: FunctionCallArgsV2) -> PromiseOrValue<SubmitResult>;
 
     #[result_serializer(borsh)]
-    fn view(
-        &mut self,
-        #[serializer(borsh)] input: ViewCallArgs,
-    ) -> Promise<TransactionStatus>;
+    fn view(&mut self, #[serializer(borsh)] input: ViewCallArgs) -> Promise<TransactionStatus>;
 }
 
 pub fn assert_self() {
@@ -175,7 +172,7 @@ pub fn assert_self() {
 }
 
 #[near_bindgen]
-impl BridgeTokenFactory {
+impl BridgeAuroraTokenFactory {
     /// Initializes the contract.
     /// `aurora_account`: NEAR account of the Aurora engine contract;
     /// `locker_address`: Ethereum address of the locker contract, in hex.
@@ -202,9 +199,9 @@ impl BridgeTokenFactory {
             token
         );
 
-        let tail = ethabi::encode(&[
-            ethabi::Token::Address(validate_eth_address(token.clone()).into()),
-        ]);
+        let tail = ethabi::encode(&[ethabi::Token::Address(
+            validate_eth_address(token.clone()).into(),
+        )]);
 
         let get_metadata_args = ViewCallArgs {
             sender: self.locker_address,
@@ -228,42 +225,40 @@ impl BridgeTokenFactory {
     }
     /// Deposit from Aurora to NEAR
     #[payable]
-    pub fn deposit(
-        &mut self,
-        token: String,
-        nonce: String,
-    ) -> Promise {
+    pub fn deposit(&mut self, token: String, nonce: String) -> Promise {
         self.check_not_paused(PAUSE_DEPOSIT);
+        let token_striped = token.strip_prefix("0x").unwrap_or(&token).to_string();
 
         assert!(
-            self.tokens.contains(&token),
+            self.tokens.contains(&token_striped),
             "Bridge token for {} is not deployed yet",
-            token
+            token_striped
         );
 
         let tail = ethabi::encode(&[
-            ethabi::Token::Address(validate_eth_address(token.clone()).into()),
-            ethabi::Token::Uint(U256::from(nonce.as_bytes())),
+            ethabi::Token::Address(validate_eth_address(token_striped.clone()).into()),
+            ethabi::Token::Uint(ethabi::Uint::from_dec_str(&nonce).unwrap()),
         ]);
 
-        let call_args = FunctionCallArgs {
+        let call_args = CallArgs::V2(FunctionCallArgsV2 {
             contract: self.locker_address,
             value: WeiU256::default(),
             input: [LOCKER_CLAIM_SELECTOR, tail.as_slice()].concat(),
-        };
+        });
 
-        ext_aurora::call(
-            call_args,
-            &self.aurora_account,
+        Promise::new(self.aurora_account.to_string()).function_call(
+            b"call".to_vec(),
+            call_args.try_to_vec().unwrap(),
             NO_DEPOSIT,
             CLAIM_GAS,
+        ).then(
+            ext_self::finish_deposit(
+                token_striped,
+                &env::current_account_id(),
+                env::attached_deposit(),
+                FINISH_DEPOSIT_GAS,
+            ),
         )
-        .then(ext_self::finish_deposit(
-            token,
-            &env::current_account_id(),
-            env::attached_deposit(),
-            FINISH_UPDATE_METADATA_GAS + SET_METADATA_GAS,
-        ))
     }
 
     /// Return all registered tokens
@@ -271,21 +266,32 @@ impl BridgeTokenFactory {
         self.tokens.iter().collect::<Vec<_>>()
     }
 
+    #[payable]
     pub fn finish_deposit(
         &mut self,
         #[callback]
         #[serializer(borsh)]
         result: SubmitResult,
         #[serializer(borsh)] token: String,
-    ) {
+    ) -> Promise {
         let output: Vec<u8> = match result.status {
             TransactionStatus::Succeed(ret) => ret,
             _other => Vec::new(),
         };
 
-        let mut output_list = ethabi::decode(&[ethabi::ParamType::Uint(128), ethabi::ParamType::String], output.as_slice()).unwrap();
-        let amount: u128 = output_list.pop().unwrap().into_uint().unwrap().try_into().unwrap();
-        let recipient: String = output_list.pop().unwrap().into_string().unwrap();
+        let mut output_list = ethabi::decode(
+            &[ethabi::ParamType::Uint(128), ethabi::ParamType::String],
+            output.as_slice(),
+        )
+        .unwrap();
+        let recipient: String = output_list.pop().unwrap().to_string().unwrap();
+        let amount: u128 = output_list
+            .pop()
+            .unwrap()
+            .to_uint()
+            .unwrap()
+            .try_into()
+            .unwrap();
 
         ext_bridge_token::mint(
             recipient,
@@ -293,7 +299,7 @@ impl BridgeTokenFactory {
             &self.get_bridge_token_account_id(token),
             env::attached_deposit(),
             MINT_GAS,
-        );
+        )
     }
 
     /// Finish updating token metadata.
@@ -310,10 +316,24 @@ impl BridgeTokenFactory {
             _other => Vec::new(),
         };
 
-        let mut output_list = ethabi::decode(&[ethabi::ParamType::String, ethabi::ParamType::String, ethabi::ParamType::Uint(8)], output.as_slice()).unwrap();
-        let name: String = output_list.pop().unwrap().into_string().unwrap();
-        let symbol: String = output_list.pop().unwrap().into_string().unwrap();
-        let decimals: u8 = output_list.pop().unwrap().into_uint().unwrap().try_into().unwrap();
+        let mut output_list = ethabi::decode(
+            &[
+                ethabi::ParamType::String,
+                ethabi::ParamType::String,
+                ethabi::ParamType::Uint(8),
+            ],
+            output.as_slice(),
+        )
+        .unwrap();
+        let name: String = output_list.pop().unwrap().to_string().unwrap();
+        let symbol: String = output_list.pop().unwrap().to_string().unwrap();
+        let decimals: u8 = output_list
+            .pop()
+            .unwrap()
+            .to_uint()
+            .unwrap()
+            .try_into()
+            .unwrap();
 
         env::log(
             format!(
@@ -353,13 +373,13 @@ impl BridgeTokenFactory {
         assert_eq!(
             token,
             format!("{}.{}", parts[0], env::current_account_id()),
-            "Only sub accounts of BridgeTokenFactory can call this method."
+            "Only sub accounts of BridgeAuroraTokenFactory can call this method."
         );
         assert!(
             self.tokens.contains(&parts[0].to_string()),
             "Such BridgeToken does not exist."
         );
-        
+
         let token_address = validate_eth_address(parts[0].to_string());
         let recipient_address = validate_eth_address(recipient.clone());
 
@@ -369,7 +389,7 @@ impl BridgeTokenFactory {
             ethabi::Token::String(recipient),
         ]);
 
-        let call_args = FunctionCallArgs {
+        let call_args = FunctionCallArgsV2 {
             contract: self.locker_address,
             value: WeiU256::default(),
             input: [LOCKER_UNLOCK_SELECTOR, tail.as_slice()].concat(),
@@ -478,7 +498,7 @@ impl BridgeTokenFactory {
     }
 }
 
-admin_controlled::impl_admin_controlled!(BridgeTokenFactory, paused);
+admin_controlled::impl_admin_controlled!(BridgeAuroraTokenFactory, paused);
 
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
@@ -547,7 +567,7 @@ mod tests {
     #[should_panic]
     fn test_fail_deploy_bridge_token() {
         set_env!(predecessor_account_id: alice());
-        let mut contract = BridgeTokenFactory::new(aurora(), token_locker());
+        let mut contract = BridgeAuroraTokenFactory::new(aurora(), token_locker());
         set_env!(
             predecessor_account_id: alice(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE,
@@ -559,7 +579,7 @@ mod tests {
     #[should_panic]
     fn test_fail_deposit_no_token() {
         set_env!(predecessor_account_id: alice());
-        let mut contract = BridgeTokenFactory::new(aurora(), token_locker());
+        let mut contract = BridgeAuroraTokenFactory::new(aurora(), token_locker());
         set_env!(
             predecessor_account_id: alice(),
             attached_deposit: env::storage_byte_cost() * 1000
@@ -570,7 +590,7 @@ mod tests {
     #[test]
     fn test_deploy_bridge_token() {
         set_env!(predecessor_account_id: alice());
-        let mut contract = BridgeTokenFactory::new(aurora(), token_locker());
+        let mut contract = BridgeAuroraTokenFactory::new(aurora(), token_locker());
         set_env!(
             current_account_id: bridge_token_factory(),
             predecessor_account_id: alice(),
@@ -598,7 +618,7 @@ mod tests {
     #[test]
     fn test_finish_withdraw() {
         set_env!(predecessor_account_id: alice());
-        let mut contract = BridgeTokenFactory::new(aurora(), token_locker());
+        let mut contract = BridgeAuroraTokenFactory::new(aurora(), token_locker());
 
         set_env!(
             predecessor_account_id: alice(),
@@ -627,7 +647,7 @@ mod tests {
         set_env!(predecessor_account_id: alice());
 
         // User alice can deploy a new bridge token
-        let mut contract = BridgeTokenFactory::new(aurora(), token_locker());
+        let mut contract = BridgeAuroraTokenFactory::new(aurora(), token_locker());
         set_env!(
             current_account_id: bridge_token_factory(),
             predecessor_account_id: alice(),
@@ -666,7 +686,7 @@ mod tests {
     #[test]
     fn only_admin_can_pause() {
         set_env!(predecessor_account_id: alice());
-        let mut contract = BridgeTokenFactory::new(aurora(), token_locker());
+        let mut contract = BridgeAuroraTokenFactory::new(aurora(), token_locker());
 
         // Admin can pause
         set_env!(
@@ -690,7 +710,7 @@ mod tests {
     #[test]
     fn deposit_paused() {
         set_env!(predecessor_account_id: alice());
-        let mut contract = BridgeTokenFactory::new(aurora(), token_locker());
+        let mut contract = BridgeAuroraTokenFactory::new(aurora(), token_locker());
 
         set_env!(
             current_account_id: bridge_token_factory(),
@@ -702,10 +722,7 @@ mod tests {
 
         // Check it is possible to use deposit while the contract is NOT paused
         set_env!(predecessor_account_id: aurora());
-        contract.deposit(
-            erc20_address.clone(),
-            "0".to_string(),
-        );
+        contract.deposit(erc20_address.clone(), "0".to_string());
 
         // Pause deposit
         set_env!(
@@ -732,7 +749,7 @@ mod tests {
     #[test]
     fn all_paused() {
         set_env!(predecessor_account_id: alice());
-        let mut contract = BridgeTokenFactory::new(aurora(), token_locker());
+        let mut contract = BridgeAuroraTokenFactory::new(aurora(), token_locker());
 
         set_env!(
             current_account_id: bridge_token_factory(),
@@ -743,10 +760,7 @@ mod tests {
         contract.deploy_bridge_token(erc20_address.clone());
 
         // Check it is possible to use deposit while the contract is NOT paused
-        contract.deposit(
-            erc20_address.clone(),
-            "0".to_string(),
-        );
+        contract.deposit(erc20_address.clone(), "0".to_string());
 
         // Pause everything
         set_env!(
@@ -773,7 +787,7 @@ mod tests {
     #[test]
     fn no_paused() {
         set_env!(predecessor_account_id: alice());
-        let mut contract = BridgeTokenFactory::new(aurora(), token_locker());
+        let mut contract = BridgeAuroraTokenFactory::new(aurora(), token_locker());
 
         set_env!(
             current_account_id: bridge_token_factory(),
@@ -785,10 +799,7 @@ mod tests {
 
         // Check it is possible to use deposit while the contract is NOT paused
         set_env!(predecessor_account_id: aurora());
-        contract.deposit(
-            erc20_address.clone(),
-            "0".to_string(),
-        );
+        contract.deposit(erc20_address.clone(), "0".to_string());
 
         // Pause everything
         set_env!(
