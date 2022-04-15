@@ -30,7 +30,7 @@
         "truffle-flattener": "^1.4.4"
     },
     "scripts": {
-        "build": "yarn hardhat compile",
+        "build": "yarn hardhat compile && node main.js ./build/contracts/AuroraERC20Locker.sol/AuroraERC20Locker.json",
         "testrpc": "ganache-cli --port 9545 --deterministic --gasLimit 10000000",
         "test": "scripts/test.sh",
         "coverage": "scripts/coverage.sh",
