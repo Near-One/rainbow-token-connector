@@ -1,0 +1,44 @@
+[package]
+name = "aurora-engine-tests"
+version = "1.0.0"
+authors = ["Aurora Labs <hello@aurora.dev>"]
+edition = "2021"
+description = ""
+documentation = ""
+readme = true
+homepage = "https://github.com/aurora-is-near/aurora-engine"
+repository = "https://github.com/aurora-is-near/aurora-engine"
+license = "GPL-3.0"
+publish = false
+autobenches = false
+
+[dependencies]
+aurora-engine-parameters = { path = "../aurora-engine-parameters", default-features = false }
+aurora-engine-types = { git = "https://github.com/aurora-is-near/aurora-engine", default-features = false, features = ["std"] }
+aurora-engine-sdk = { git = "https://github.com/aurora-is-near/aurora-engine", default-features = false, features = ["std"] }
+borsh = { version = "0.8.2", default-features = false }
+sha3 = { version = "0.9.1", default-features = false }
+rlp = { version = "0.5.0", default-features = false }
+# primitive-types = { version = "0.10.0", default-features = false, features = ["rlp"] }
+
+[dev-dependencies]
+base64 = "0.13.0"
+bstr = "0.2"
+byte-slice-cast = { version = "1.0", default-features = false }
+ethabi = { git = "https://github.com/darwinia-network/ethabi", branch = "xavier-no-std" }
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"] }
+hex = { version = "0.4.3", default-features = false }
+near-sdk = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "5e58722bd61d9d24ae6293326146c751f0a814fb" }
+near-sdk-sim = { git = "https://github.com/aurora-is-near/near-sdk-rs.git", rev = "5e58722bd61d9d24ae6293326146c751f0a814fb" }
+near-crypto = { git = "https://github.com/near/nearcore.git", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783" }
+near-vm-runner = { git = "https://github.com/near/nearcore.git", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783", default-features = false, features = [ "wasmer2_vm" ] }
+near-vm-logic = { git = "https://github.com/near/nearcore.git", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783" }
+near-primitives-core = { git = "https://github.com/near/nearcore.git", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783" }
+near-primitives = { git = "https://github.com/near/nearcore.git", rev = "83fc0f7d6b212bacc49f058e7400743de3e59783" }
+libsecp256k1 = "0.3.5"
+rand = "0.7.3"
+criterion = "0.3.4"
+git2 = "0.13"
+tempfile = "3.2.0"
+walrus = "0.19"
