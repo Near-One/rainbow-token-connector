@@ -38,7 +38,7 @@ const BRIDGE_TOKEN_NEW: Gas = 10_000_000_000_000;
 const MINT_GAS: Gas = 10_000_000_000_000;
 
 /// Gas to call unlock_erc20_tokens method
-const UNLOCK_ERC20_GAS: Gas = 150_000_000_000_000;
+const UNLOCK_ERC20_GAS: Gas = 40_000_000_000_000;
 
 // Gas to call get_erc20_metadata method
 const GET_METADATA_GAS: Gas = 17_000_000_000_000;
@@ -161,7 +161,7 @@ pub trait ExtBridgeToken {
 #[ext_contract(ext_aurora)]
 pub trait Aurora {
     #[result_serializer(borsh)]
-    fn call(&mut self, #[serializer(borsh)] input: FunctionCallArgsV2) -> PromiseOrValue<SubmitResult>;
+    fn call(&mut self, #[serializer(borsh)] input: crate::CallArgs) -> PromiseOrValue<SubmitResult>;
 
     #[result_serializer(borsh)]
     fn view(&mut self, #[serializer(borsh)] input: ViewCallArgs) -> Promise<TransactionStatus>;
@@ -244,11 +244,11 @@ impl BridgeAuroraTokenFactory {
             contract: self.locker_address,
             value: WeiU256::default(),
             input: [LOCKER_CLAIM_SELECTOR, tail.as_slice()].concat(),
-        });
+        });    
 
-        Promise::new(self.aurora_account.to_string()).function_call(
-            b"call".to_vec(),
-            call_args.try_to_vec().unwrap(),
+        ext_aurora::call(
+            call_args,
+            &self.aurora_account,
             NO_DEPOSIT,
             CLAIM_GAS,
         ).then(
@@ -386,14 +386,14 @@ impl BridgeAuroraTokenFactory {
         let tail = ethabi::encode(&[
             ethabi::Token::Address(token_address.into()),
             ethabi::Token::Uint(ethabi::Uint::from(amount)),
-            ethabi::Token::String(recipient),
+            ethabi::Token::Address(recipient_address.into()),
         ]);
 
-        let call_args = FunctionCallArgsV2 {
+        let call_args = CallArgs::V2(FunctionCallArgsV2 {
             contract: self.locker_address,
             value: WeiU256::default(),
             input: [LOCKER_UNLOCK_SELECTOR, tail.as_slice()].concat(),
-        };
+        });
 
         ext_aurora::call(
             call_args,
