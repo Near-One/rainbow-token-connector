@@ -40,6 +40,10 @@ res/ERC20MetadataLogger.json: metadata-connector/contracts/ERC20MetadataLogger.s
 test: export BRIDGE_TOKEN = $(realpath res/bridge_token.wasm)
 test:
 	cd bridge-token-factory && \
+	cargo test --all && \
+	cd ../bridge-aurora-token-factory && \
+	cargo test --all && \
+	cd ../sim-tests && \
 	cargo test --all
 
 # <--

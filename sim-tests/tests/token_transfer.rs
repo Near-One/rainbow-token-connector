@@ -3,30 +3,24 @@ use aurora_engine_parameters::{
 };
 use aurora_engine_types::{
     types::{u256_to_arr, Address},
-    H160, U256,
+    U256,
 };
-use bstr::ByteSlice;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::AccountId;
-use near_sdk_sim::{
-    call, deploy, init_simulator, lazy_static_include::syn::token::Use, units::to_yocto, view,
-    ContractAccount, ExecutionResult, UserAccount,
-};
+use near_sdk_sim::{units::to_yocto, UserAccount};
 use serde_json::json;
 
 const AURORA: &str = "aurora";
 const FACTORY: &str = "bridge";
-const LOCKER_ADDRESS: &str = "11111474e89094c44da98b954eedeac495271d0f";
-const DAI_ADDRESS: &str = "6b175474e89094c44da98b954eedeac495271d0f";
-const SENDER_ADDRESS: &str = "00005474e89094c44da98b954eedeac495271d0f";
 const ALICE: &str = "alice";
 
 near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
-    TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
-    TOKEN_WASM_BYTES => "../res/bridge_token.wasm",
     FACTORY_WASM_BYTES => "../res/bridge_aurora_token_factory.wasm",
-    AURORA_WASM_BYTES => "../res/mainnet-release.wasm",
+    AURORA_WASM_BYTES => "../res/mainnet-test.wasm",
 }
+
+pub const DEFAULT_GAS: u64 = 300_000_000_000_000;
+pub const STORAGE_AMOUNT: u128 = 50_000_000_000_000_000_000_000_000;
 
 /// Borsh-encoded parameters for the `new` function.
 #[derive(BorshSerialize, BorshDeserialize)]
@@ -42,9 +36,6 @@ pub struct NewCallArgs {
     /// How many blocks after staging upgrade can deploy it.
     pub upgrade_delay_blocks: u64,
 }
-
-pub const DEFAULT_GAS: u64 = 300_000_000_000_000;
-pub const STORAGE_AMOUNT: u128 = 50_000_000_000_000_000_000_000_000;
 
 pub(crate) fn str_to_account_id(account_id: &str) -> AccountId {
     use aurora_engine_types::str::FromStr;
@@ -282,13 +273,6 @@ fn test_transfer_native_erc20_common() -> TestContext {
     }
 }
 
-fn get_selector(method: &str) -> Vec<u8> {
-    use sha3::Digest;
-    let mut hasher = sha3::Keccak256::default();
-    hasher.update(method);
-    hasher.finalize()[..4].to_vec()
-}
-
 fn build_input(str_selector: &str, inputs: &[ethabi::Token]) -> Vec<u8> {
     use sha3::Digest;
     let sel = sha3::Keccak256::digest(str_selector.as_bytes()).to_vec()[..4].to_vec();
@@ -347,12 +331,7 @@ fn approve_erc20_token(context: &TestContext, spender: Address, amount: u128) {
     unwrap_success(result.unwrap_borsh());
 }
 
-fn lock_erc20_token(
-    context: &TestContext,
-    sender: Address,
-    recipient: String,
-    amount: u128,
-) -> Vec<u8> {
+fn lock_erc20_token(context: &TestContext, recipient: String, amount: u128) -> Vec<u8> {
     let input = build_input(
         "lockToken(address,uint256,string)",
         &[
@@ -369,32 +348,6 @@ fn lock_erc20_token(
     });
 
     let result = context.root.call(
-        context.aurora.account_id(),
-        "call",
-        &call_args.try_to_vec().unwrap(),
-        near_sdk_sim::DEFAULT_GAS,
-        0,
-    );
-
-    unwrap_success(result.unwrap_borsh())
-}
-
-fn claim_erc20_token(context: &TestContext, nonce: String) -> Vec<u8> {
-    let input = build_input(
-        "claim(address,uint256)",
-        &[
-            ethabi::Token::Address(context.erc20.raw()),
-            ethabi::Token::Uint(ethabi::Uint::from_dec_str(&nonce).unwrap()),
-        ],
-    );
-
-    let call_args = CallArgs::V2(FunctionCallArgsV2 {
-        contract: context.locker.raw().into(),
-        value: WeiU256::default(),
-        input,
-    });
-
-    let result = context.factory.call(
         context.aurora.account_id(),
         "call",
         &call_args.try_to_vec().unwrap(),
@@ -429,10 +382,7 @@ fn erc20_balance(context: &TestContext, account: Address) -> U256 {
     U256::from_big_endian(&unwrap_success(submit_result))
 }
 
-fn nep_141_balance_of(
-    context: &TestContext,
-    account_id: &str,
-) -> u128 {
+fn nep_141_balance_of(context: &TestContext, account_id: &str) -> u128 {
     context
         .root
         .call(
@@ -450,7 +400,7 @@ fn nep_141_balance_of(
 }
 
 #[test]
-fn test_native_erc20_token_lock() {
+fn test_native_erc20_token_transfer() {
     let context = test_transfer_native_erc20_common();
     let alice = context
         .root
@@ -461,8 +411,12 @@ fn test_native_erc20_token_lock() {
     assert_eq!(U256::from(1000), erc20_balance(&context, root_address));
 
     approve_erc20_token(&context, context.locker, 100);
-    let lock_result = lock_erc20_token(&context, root_address, ALICE.to_string(), 100);
+    let lock_result = lock_erc20_token(&context, ALICE.to_string(), 100);
     assert_eq!(U256::from(900), erc20_balance(&context, root_address));
+    assert_eq!(
+        U256::from(100),
+        erc20_balance(&context, context.locker.clone())
+    );
 
     let promise_args = json!({
         "token": "0x".to_string() + &context.erc20.encode(),
@@ -496,14 +450,35 @@ fn test_native_erc20_token_lock() {
         )
         .assert_success();
 
-
-    context.root.call(
-        context.factory.account_id(),
-        "deposit",
-        promise_args.as_bytes(),
-        near_sdk_sim::DEFAULT_GAS,
-        near_sdk_sim::STORAGE_AMOUNT,
-    ).assert_success();
+    context
+        .root
+        .call(
+            context.factory.account_id(),
+            "deposit",
+            promise_args.as_bytes(),
+            near_sdk_sim::DEFAULT_GAS,
+            near_sdk_sim::STORAGE_AMOUNT,
+        )
+        .assert_success();
 
     assert_eq!(nep_141_balance_of(&context, ALICE), 100);
+
+    alice
+        .call(
+            context.nep141.clone(),
+            "withdraw",
+            json!({ "amount": "50", "recipient": root_address.encode()})
+                .to_string()
+                .as_bytes(),
+            near_sdk_sim::DEFAULT_GAS,
+            1,
+        )
+        .assert_success();
+
+    assert_eq!(nep_141_balance_of(&context, ALICE), 50);
+    assert_eq!(
+        U256::from(50),
+        erc20_balance(&context, context.locker.clone())
+    );
+    assert_eq!(U256::from(950), erc20_balance(&context, root_address));
 }
