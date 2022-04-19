@@ -1,11 +1,18 @@
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8;
 
-import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
-
-contract BridgeToken is ERC20 {
-
-    address private _controller; // has CONTROL role
+contract BridgeToken is
+    Initializable,
+    ERC20Upgradeable,
+    AccessControlUpgradeable,
+    PausableUpgradeable
+{
+    address private _controller; // proxy address
 
     string private _name;
     string private _symbol;
@@ -13,40 +20,59 @@ contract BridgeToken is ERC20 {
 
     uint64 _metadataLastUpdated;
 
-    constructor(
-        string memory name_, 
-        string memory symbol_,
-        uint8 decimals_
-    ) ERC20(name_, symbol_ ) {
-        _controller = msg.sender;
+    bytes32 public constant PAUSE_ROLE = keccak256("PAUSE_ROLE");
 
+    function initialize(
+        string memory name_,
+        string memory symbol_,
+        uint8 decimals_,
+        address controller_
+    ) external initializer {
+        _controller = controller_;
+
+        __ERC20_init(_name, _symbol);
+        __AccessControl_init();
+
+        _setupRole(DEFAULT_ADMIN_ROLE, controller_); //should be sender or controller?
+        _setupRole(PAUSE_ROLE, controller_);
         _name = name_;
         _symbol = symbol_;
         _decimals = decimals_;
     }
 
+    function pause() external onlyRole(PAUSE_ROLE) {
+        _pause();
+    }
+
+    function unpause() external onlyRole(PAUSE_ROLE) {
+        _unpause();
+    }
+
     function set_metadata(
-        string memory name_, 
+        string memory name_,
         string memory symbol_,
         uint8 decimals_,
         uint64 blockHeight_
-    ) public {
-        require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
-        require(blockHeight_ >= _metadataLastUpdated, "ERR_OLD_METADATA");
-
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
         _metadataLastUpdated = blockHeight_;
         _name = name_;
         _symbol = symbol_;
         _decimals = decimals_;
     }
 
-    function mint(address beneficiary, uint256 amount) public {
-        require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
+    function mint(address beneficiary, uint256 amount)
+        public
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        whenNotPaused
+    {
         _mint(beneficiary, amount);
     }
 
-    function burn(address act, uint256 amount) public {
-        require(msg.sender == _controller, "ERR_NOT_CONTROLLER");
+    function burn(address act, uint256 amount)
+        public
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        whenNotPaused
+    {
         _burn(act, amount);
     }
 
