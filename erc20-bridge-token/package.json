@@ -5,12 +5,13 @@
     "license": "MIT",
     "dependencies": {
         "@openzeppelin/cli": "^2.8.1",
-        "@openzeppelin/contracts": "^4.4",
-        "rainbow-bridge-sol": "https://github.com/near/rainbow-bridge-sol",
-        "rainbow-bridge-lib": "https://github.com/near/rainbow-bridge-lib",
+        "@openzeppelin/contracts": "^4.5",
+        "@openzeppelin/contracts-upgradeable": "^4.5.2",
+        "rainbow-bridge": "https://github.com/aurora-is-near/rainbow-bridge",
         "truffle-assertions": "^0.9.2"
     },
     "devDependencies": {
+        "@openzeppelin/hardhat-upgrades": "^1.17.0",
         "@openzeppelin/test-helpers": "^0.5.5",
         "chai": "^4.2.0",
         "coveralls": "^3.1.0",
