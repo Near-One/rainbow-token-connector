@@ -57,5 +57,6 @@ contract ERC20Locker is Locker {
         result.token = address(uint160(token));
         bytes20 recipient = borshData.decodeBytes20();
         result.recipient = address(uint160(recipient));
+        borshData.done();
     }
 }

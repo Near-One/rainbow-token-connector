@@ -1,4 +1,3 @@
-// SPDX-License-Identifier: MIT
 pragma solidity ^0.8;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
@@ -25,16 +24,15 @@ contract BridgeToken is
     function initialize(
         string memory name_,
         string memory symbol_,
-        uint8 decimals_,
-        address controller_
+        uint8 decimals_
     ) external initializer {
-        _controller = controller_;
+        _controller = _msgSender();
 
         __ERC20_init(_name, _symbol);
         __AccessControl_init();
 
-        _setupRole(DEFAULT_ADMIN_ROLE, controller_); //should be sender or controller?
-        _setupRole(PAUSE_ROLE, controller_);
+        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender()); //should be sender or controller?
+        _setupRole(PAUSE_ROLE, _msgSender());
         _name = name_;
         _symbol = symbol_;
         _decimals = decimals_;

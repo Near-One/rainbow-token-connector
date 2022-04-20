@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8;
 
-import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
-import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
-import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
-
+import "rainbow-bridge/contracts/eth/nearprover/contracts/INearProver.sol";
+import "rainbow-bridge/contracts/eth/nearprover/contracts/ProofDecoder.sol";
+import "rainbow-bridge/contracts/eth/nearbridge/contracts/Borsh.sol";
 contract Locker {
     using Borsh for Borsh.Data;
     using ProofDecoder for Borsh.Data;
