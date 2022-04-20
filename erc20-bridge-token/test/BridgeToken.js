@@ -18,10 +18,10 @@ contract('BridgeToken', function ([_, addr1]) {
     });
 
     it('can update metadata', async function() {
-        const token = await BridgeToken.new("", "", 0);        
+        const token = await BridgeToken.new();        
         let block = await web3.eth.getBlock("latest");
+        await token.initialize("", "", 0)
         await token.set_metadata("NEAR ERC20", "NEAR", "18", String(block.number));
-
         expect(await token.name()).to.equal("NEAR ERC20");
         expect(await token.symbol()).to.equal("NEAR");
         expect((await token.decimals()).toString()).to.equal("18");
