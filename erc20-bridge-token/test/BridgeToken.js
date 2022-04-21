@@ -1,5 +1,4 @@
 const { expect } = require('chai');
-const truffleAssert = require('truffle-assertions');
 const BridgeToken = artifacts.require('BridgeToken.sol');
 
 const { toWei, fromWei, hexToBytes } = web3.utils;
@@ -31,7 +30,12 @@ contract('BridgeToken', function ([_, addr1]) {
     it('cannot update metadata with old block height', async function() {
         const token = await BridgeToken.new("", "", 0);        
         let block = await web3.eth.getBlock("latest");
-        truffleAssert.reverts(token.set_metadata("NEAR ERC20", "NEAR", "18", String(block.number - 1)));
+        await expect(
+            token.set_metadata('NEAR_ERC20', 'NEAR', '18', String(block.number - 1))
+        )
+            .to
+            .be
+            .revertedWith('ERR_OLD_METADATA');
     });
 
 });

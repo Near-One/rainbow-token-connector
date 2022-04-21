@@ -7,8 +7,7 @@
         "@openzeppelin/cli": "^2.8.1",
         "@openzeppelin/contracts": "^4.5",
         "@openzeppelin/contracts-upgradeable": "^4.5.2",
-        "rainbow-bridge-sol": "https://gitpkg.now.sh/aurora-is-near/rainbow-bridge/contracts/eth",
-        "truffle-assertions": "^0.9.2"
+        "rainbow-bridge-sol": "https://gitpkg.now.sh/aurora-is-near/rainbow-bridge/contracts/eth"
     },
     "devDependencies": {
         "@openzeppelin/hardhat-upgrades": "^1.17.0",
