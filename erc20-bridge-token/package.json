@@ -25,7 +25,7 @@
         "ganache-cli": "^6.9.1",
         "hardhat": "^2.8",
         "solc": "^0.6",
-        "solidity-coverage": "^0.7.5",
+        "solidity-coverage": "^0.7.20",
         "solium": "^1.2.5",
         "truffle": "^5.1.24",
         "truffle-flattener": "^1.4.4"
