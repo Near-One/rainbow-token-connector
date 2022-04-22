@@ -63,13 +63,14 @@ contract BridgeTokenFactory is Locker, AccessControlUpgradeable, PausableUpgrade
 
     // BridgeTokenFactory is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
-    function initialize(bytes memory nearTokenFactory, INearProver prover) public initializer{
-        // __UUPSUpgradeable_init();
+    function initialize(bytes memory _nearTokenFactory, INearProver _prover,  uint64 _minBlockAcceptanceHeight)
+     public initializer{
         __AccessControl_init();
+        __Pausable_init_unchained();
+        __Locker_init(_nearTokenFactory, _prover, _minBlockAcceptanceHeight);
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender()); 
         _setupRole(PAUSE_ROLE, _msgSender()); 
-        nearTokenFactory_ = nearTokenFactory;
-        prover_ = prover;
+    
     }
 
     function isBridgeToken(address token) external view returns (bool) {
@@ -99,7 +100,7 @@ contract BridgeTokenFactory is Locker, AccessControlUpgradeable, PausableUpgrade
     }
 
     function set_metadata(bytes memory proofData, uint64 proofBlockHeight) public whenNotPaused {
-        ProofDecoder.ExecutionStatus memory status = _parseProof(proofData, proofBlockHeight);
+        ProofDecoder.ExecutionStatus memory status = _parseAndConsumeProof(proofData, proofBlockHeight);
         MetadataResult memory result = _decodeMetadataResult(status.successValue);
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
         
@@ -109,7 +110,7 @@ contract BridgeTokenFactory is Locker, AccessControlUpgradeable, PausableUpgrade
     }
 
     function deposit(bytes memory proofData, uint64 proofBlockHeight) public whenNotPaused {
-        ProofDecoder.ExecutionStatus memory status = _parseProof(proofData, proofBlockHeight);
+        ProofDecoder.ExecutionStatus memory status = _parseAndConsumeProof(proofData, proofBlockHeight);
         LockResult memory result = _decodeLockResult(status.successValue);
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
         BridgeToken(_nearToEthToken[result.token]).mint(result.recipient, result.amount);
