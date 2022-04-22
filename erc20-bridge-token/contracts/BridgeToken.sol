@@ -46,7 +46,7 @@ contract BridgeToken is
         _unpause();
     }
 
-    function set_metadata(
+    function setMetadata(
         string memory name_,
         string memory symbol_,
         uint8 decimals_,

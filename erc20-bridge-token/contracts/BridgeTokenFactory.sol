@@ -99,13 +99,13 @@ contract BridgeTokenFactory is Locker, AccessControlUpgradeable, PausableUpgrade
         return bridgeTokenProxy;
     }
 
-    function set_metadata(bytes memory proofData, uint64 proofBlockHeight) public whenNotPaused {
+    function setMetadata(bytes memory proofData, uint64 proofBlockHeight) public whenNotPaused {
         ProofDecoder.ExecutionStatus memory status = _parseAndConsumeProof(proofData, proofBlockHeight);
         MetadataResult memory result = _decodeMetadataResult(status.successValue);
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
         
         require(result.blockHeight >= BridgeToken(_nearToEthToken[result.token]).metadataLastUpdated(), "ERR_OLD_METADATA");
-        BridgeToken(_nearToEthToken[result.token]).set_metadata(result.name, result.symbol, result.decimals, result.blockHeight);
+        BridgeToken(_nearToEthToken[result.token]).setMetadata(result.name, result.symbol, result.decimals, result.blockHeight);
         emit SetMetadata(_nearToEthToken[result.token], result.name, result.symbol, result.decimals);
     }
 
