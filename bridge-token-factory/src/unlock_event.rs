@@ -2,6 +2,7 @@ use crate::prover::{EthAddress, EthEvent, EthEventParams};
 use ethabi::{ParamType, Token};
 use hex::ToHex;
 use near_sdk::{AccountId, Balance};
+use std::convert::TryInto;
 
 /// Data that was emitted by the Ethereum Unlocked event.
 #[derive(Debug, Eq, PartialEq)]
@@ -42,7 +43,7 @@ impl EthUnlockedEvent {
             token,
             sender,
             amount,
-            recipient,
+            recipient: recipient.try_into().unwrap(),
         }
     }
 
@@ -55,7 +56,7 @@ impl EthUnlockedEvent {
             vec![
                 Token::String(self.token.clone()),
                 Token::Uint(self.amount.into()),
-                Token::String(self.recipient.clone()),
+                Token::String(self.recipient.to_string()),
             ],
         )
     }

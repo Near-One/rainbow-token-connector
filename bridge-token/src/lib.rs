@@ -1,25 +1,31 @@
-use admin_controlled::Mask;
 use near_contract_standards::fungible_token::metadata::{
     FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC,
 };
 use near_contract_standards::fungible_token::FungibleToken;
+use near_plugins::{only, pause, FullAccessKeyFallback, Ownable, Pausable, Upgradable};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::json_types::{Base64VecU8, ValidAccountId, U128};
+use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::{
     assert_one_yocto, env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault,
     Promise, PromiseOrValue, StorageUsage,
 };
 use std::convert::TryInto;
 
-near_sdk::setup_alloc!();
-
 const NO_DEPOSIT: Balance = 0;
 
 /// Gas to call finish withdraw method on factory.
-const FINISH_WITHDRAW_GAS: Gas = 50_000_000_000_000;
+const FINISH_WITHDRAW_GAS: Gas = Gas(50 * Gas::ONE_TERA.0);
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+#[derive(
+    BorshDeserialize,
+    BorshSerialize,
+    PanicOnDefault,
+    Pausable,
+    Ownable,
+    Upgradable,
+    FullAccessKeyFallback,
+)]
 pub struct BridgeToken {
     controller: AccountId,
     token: FungibleToken,
@@ -28,12 +34,11 @@ pub struct BridgeToken {
     reference: String,
     reference_hash: Base64VecU8,
     decimals: u8,
-    paused: Mask,
+    // Deprecated field. Requires migration to be removed.
+    __paused: u128,
     #[cfg(feature = "migrate_icon")]
     icon: Option<String>,
 }
-
-const PAUSE_WITHDRAW: Mask = 1 << 0;
 
 #[ext_contract(ext_bridge_token_factory)]
 pub trait ExtBridgeTokenFactory {
@@ -49,7 +54,6 @@ pub trait ExtBridgeTokenFactory {
 impl BridgeToken {
     #[init]
     pub fn new() -> Self {
-        assert!(!env::state_exists(), "Already initialized");
         Self {
             controller: env::predecessor_account_id(),
             token: FungibleToken::new(b"t".to_vec()),
@@ -58,12 +62,13 @@ impl BridgeToken {
             reference: String::default(),
             reference_hash: Base64VecU8(vec![]),
             decimals: 0,
-            paused: Mask::default(),
+            __paused: Default::default(),
             #[cfg(feature = "migrate_icon")]
             icon: None,
         }
     }
 
+    #[only(owner)]
     pub fn set_metadata(
         &mut self,
         name: Option<String>,
@@ -73,9 +78,6 @@ impl BridgeToken {
         decimals: Option<u8>,
         icon: Option<String>,
     ) {
-        // Only owner can change the metadata
-        assert!(self.controller_or_self());
-
         name.map(|name| self.name = name);
         symbol.map(|symbol| self.symbol = symbol);
         reference.map(|reference| self.reference = reference);
@@ -97,24 +99,22 @@ impl BridgeToken {
             "Only controller can call mint"
         );
 
-        self.storage_deposit(Some(account_id.as_str().try_into().unwrap()), None);
+        self.storage_deposit(Some(account_id.clone()), None);
         self.token.internal_deposit(&account_id, amount.into());
     }
 
+    #[pause]
     #[payable]
     pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
-        self.check_not_paused(PAUSE_WITHDRAW);
-
         assert_one_yocto();
-        Promise::new(env::predecessor_account_id()).transfer(1);
 
         self.token
             .internal_withdraw(&env::predecessor_account_id(), amount.into());
 
         ext_bridge_token_factory::finish_withdraw(
             amount.into(),
-            recipient,
-            &self.controller,
+            recipient.try_into().unwrap(),
+            self.controller.clone(),
             NO_DEPOSIT,
             FINISH_WITHDRAW_GAS,
         )
@@ -152,8 +152,6 @@ impl FungibleTokenMetadataProvider for BridgeToken {
     }
 }
 
-admin_controlled::impl_admin_controlled!(BridgeToken, paused);
-
 // Migration
 
 #[cfg(feature = "migrate_icon")]
@@ -166,7 +164,7 @@ pub struct BridgeTokenV0 {
     reference: String,
     reference_hash: Base64VecU8,
     decimals: u8,
-    paused: Mask,
+    __paused: u128,
 }
 
 #[cfg(feature = "migrate_icon")]
@@ -180,7 +178,7 @@ impl From<BridgeTokenV0> for BridgeToken {
             reference: obj.reference,
             reference_hash: obj.reference_hash,
             decimals: obj.decimals,
-            paused: obj.paused,
+            __paused: obj.__paused,
             icon: None,
         }
     }

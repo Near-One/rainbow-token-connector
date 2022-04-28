@@ -22,5 +22,5 @@ serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 uint = { version = "0.8.3", default-features = false }
 wee_alloc = { version = "0.4.5", default-features = false, features = [] }
-near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "af0e826f916f3aa3ea51e8b675ecebdd37176671" }
-near-contract-standards = { git = "https://github.com/near/near-sdk-rs", rev = "af0e826f916f3aa3ea51e8b675ecebdd37176671" }
+near-sdk = "4.0.0-pre.7"
+near-contract-standards = "4.0.0-pre.7"
