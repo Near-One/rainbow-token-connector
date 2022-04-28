@@ -130,3 +130,42 @@ yarn run test
 make res/bridge_token_factory.wasm
 cargo test --all
 ```
+
+# Native Aurora ERC-20/NEP-141 connector
+
+## Usage flow Aurora -> NEAR
+
+1. User sends `<erc20>.approve(<erc20locker>, <amount>)` Aurora transaction.
+2. User sends `<AuroraERC20locker>.lock(<erc20>, <amount>, <destination>)` or `<AuroraERC20locker>.lockTokenAsyncOnly(<erc20>, <amount>, <destination>)` Aurora transaction. This transaction will create event which stored in the storage.
+3. `AuroraBridgeTokenFactory.deposit(<token>, <lock_event_index>)` will be called by `AsyncAurora` by using the promise that returned by `<AuroraERC20locker>.lockTokenAsyncOnly()`, also, the `deposit` can be called manually from any account.
+4. `AuroraBridgeTokenFactory.deposit(<token>, <lock_event_index>)` will call `<AuroraERC20locker>.claim(<erc20>, <lockEventIndex>)` and then `<<hex(erc20)>.<AuroraBridgeTokenFactory>>.mint(<near_account_id>, <amount>)` 
+5. `<AuroraERC20locker>.claim(<erc20>, <lockEventIndex>)` will remove and return the lock event.
+6. User can use `<<hex(erc20)>.<AuroraBridgeTokenFactory>>` token in other applications now on NEAR.
+
+## Usage flow NEAR - > Aurora
+
+1. User call `<<hex(erc20)>.<AuroraBridgeTokenFactory>.<withdraw>>` which will call `<AuroraBridgeTokenFactory>.<finish_withdraw>>`.
+2. `<AuroraBridgeTokenFactory>.<finish_withdraw>>` will call `<AuroraERC20locker>.unlockToken(<erc20>, <amount>, <recipient>)`
+
+For more details please check this discussion https://github.com/aurora-is-near/rainbow-bridge/discussions/726
+
+## Building
+
+### Building locker contract
+```
+cd native-erc20-connector
+yarn
+./build.sh
+```
+
+### Building factory contract
+```
+cd bridge-aurora-token-factory
+./build.sh
+```
+
+## Testing
+```
+cd sim-tests
+cargo test
+```
