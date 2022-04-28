@@ -191,7 +191,7 @@ dependencies = [
 
 [[package]]
 name = "bridge-aurora-token-factory"
-version = "0.1.5"
+version = "0.1.0"
 dependencies = [
  "admin-controlled",
  "aurora-engine-parameters",

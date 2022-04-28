@@ -1273,6 +1273,13 @@ contract AuroraERC20Locker is AdminControlled, AccountIds {
         string accountId
     );
 
+    event Claimed(
+        uint256 index,
+        address indexed token,
+        uint256 amount,
+        string accountId
+    );
+
     event Unlocked(uint128 amount, address recipient);
 
     struct LockEvent {
@@ -1280,8 +1287,10 @@ contract AuroraERC20Locker is AdminControlled, AccountIds {
         address token;
         address sender;
         uint256 amount;
-        string receipient;
+        string recipient;
     }
+
+    string constant LOCK_GAS = "75000000000000";
 
     uint256 constant UNPAUSED_ALL = 0;
     uint256 constant PAUSED_LOCK = 1 << 0;
@@ -1290,22 +1299,58 @@ contract AuroraERC20Locker is AdminControlled, AccountIds {
     mapping(uint256 => LockEvent) public lockEvents;
     uint256 lastLockEventIndex;
     string public nearTokenFactory;
+    string public auroraAsyncAccount;
 
     // ERC20Locker is linked to the bridge token factory on NEAR side.
     constructor(
         string memory _nearTokenFactory,
+        string memory _auroraAsyncAccount,
         address _admin,
         uint256 _pausedFlags
     ) AdminControlled(_admin, _pausedFlags) {
         lastLockEventIndex = 0;
         nearTokenFactory = _nearTokenFactory;
+        auroraAsyncAccount = _auroraAsyncAccount;
+    }
+
+    function lockTokenAsyncOnly(
+        address ethToken,
+        uint256 amount,
+        string memory recipient
+    ) public pausable(PAUSED_LOCK) returns (string memory) {
+        require(
+            compareStrings(predecessorAccountId(), auroraAsyncAccount),
+            "Mismatch aurora async account"
+        );
+
+        uint256 lockEventIndex = lockToken(ethToken, amount, recipient);
+        string memory args = string(
+            abi.encodePacked(
+                '{"token":"',
+                Strings.toHexString(uint160(ethToken), 20),
+                '","lock_event_index":"',
+                Strings.toString(lockEventIndex),
+                '"}'
+            )
+        );
+
+        return
+            string(
+                abi.encodePacked(
+                    "promises:",
+                    nearTokenFactory, "#",
+                    "deposit", "#",
+                    args, "#",
+                    LOCK_GAS
+                )
+            );
     }
 
     function lockToken(
         address ethToken,
         uint256 amount,
         string memory recipient
-    ) public pausable(PAUSED_LOCK) returns (string memory) {
+    ) public pausable(PAUSED_LOCK) returns (uint256) {
         require(
             IERC20(ethToken).balanceOf(address(this)).add(amount) <=
                 ((uint256(1) << 128) - 1),
@@ -1314,38 +1359,16 @@ contract AuroraERC20Locker is AdminControlled, AccountIds {
 
         IERC20(ethToken).safeTransferFrom(msg.sender, address(this), amount);
         lastLockEventIndex++;
-        LockEvent memory locekEvent = LockEvent(
+        LockEvent memory lockEvent = LockEvent(
             lastLockEventIndex,
             ethToken,
             msg.sender,
             amount,
             recipient
         );
-        lockEvents[lastLockEventIndex] = locekEvent;
-        string memory args = string(
-            abi.encodePacked(
-                '{"token":"',
-                Strings.toHexString(uint160(ethToken), 20),
-                '","nonce":"',
-                Strings.toString(lastLockEventIndex),
-                '"}'
-            )
-        );
-
+        lockEvents[lastLockEventIndex] = lockEvent;
         emit Locked(address(ethToken), msg.sender, amount, recipient);
-        return
-            string(
-                abi.encodePacked(
-                    "promises:",
-                    nearTokenFactory,
-                    "#",
-                    "deposit",
-                    "#",
-                    args,
-                    "#",
-                    "20000000000000"
-                )
-            );
+        return lastLockEventIndex;
     }
 
     function unlockToken(
@@ -1360,19 +1383,20 @@ contract AuroraERC20Locker is AdminControlled, AccountIds {
         IERC20(token).safeTransfer(recipient, amount);
     }
 
-    function claim(address token, uint256 nonce)
+    function claim(address token, uint256 lockEventIndex)
         public
-        returns (uint256 amount, string memory receipient)
+        returns (uint256 amount, string memory recipient)
     {
         require(
             compareStrings(predecessorAccountId(), nearTokenFactory),
             "Mismatch factory account"
         );
-        LockEvent memory lockEvent = lockEvents[nonce];
+        LockEvent memory lockEvent = lockEvents[lockEventIndex];
         require(lockEvent.token == token, "Mismatch token address");
         amount = lockEvent.amount;
-        receipient = lockEvent.receipient;
-        delete lockEvents[nonce];
+        recipient = lockEvent.recipient;
+        delete lockEvents[lockEventIndex];
+        emit Claimed(lockEventIndex, address(token), amount, recipient);
     }
 
     function getTokenMetadata(address token)

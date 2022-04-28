@@ -225,7 +225,7 @@ impl BridgeAuroraTokenFactory {
     }
     /// Deposit from Aurora to NEAR
     #[payable]
-    pub fn deposit(&mut self, token: String, nonce: String) -> Promise {
+    pub fn deposit(&mut self, token: String, lock_event_index: String) -> Promise {
         self.check_not_paused(PAUSE_DEPOSIT);
         let token_striped = token.strip_prefix("0x").unwrap_or(&token).to_string();
 
@@ -237,7 +237,7 @@ impl BridgeAuroraTokenFactory {
 
         let tail = ethabi::encode(&[
             ethabi::Token::Address(validate_eth_address(token_striped.clone()).into()),
-            ethabi::Token::Uint(ethabi::Uint::from_dec_str(&nonce).unwrap()),
+            ethabi::Token::Uint(ethabi::Uint::from_dec_str(&lock_event_index).unwrap()),
         ]);
 
         let call_args = CallArgs::V2(FunctionCallArgsV2 {

@@ -1,6 +1,6 @@
 [package]
-name = "aurora-engine-tests"
-version = "1.0.0"
+name = "connector-sim-tests"
+version = "0.1.0"
 authors = ["Aurora Labs <hello@aurora.dev>"]
 edition = "2021"
 description = ""

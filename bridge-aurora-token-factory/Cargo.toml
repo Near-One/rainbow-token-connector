@@ -1,8 +1,9 @@
 [package]
 name = "bridge-aurora-token-factory"
-version = "0.1.5"
-authors = ["Near Inc <hello@near.org>"]
-edition = "2018"
+version = "0.1.0"
+authors = ["Aurora Labs <hello@aurora.dev>"]
+edition = "2021"
+description = "Factory contract for bridge 'Aurora(erc20) -> Near(nep1410)'"
 publish = false
 
 [lib]

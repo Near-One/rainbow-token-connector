@@ -191,12 +191,14 @@ fn deploy_locker(
     main_account: &UserAccount,
     aurora_account: &UserAccount,
     factory: String,
+    async_aurora: String,
 ) -> Address {
     let erc20_locker_contract = include_bytes!("../../res/AuroraERC20Locker.bin");
     let admin =
         aurora_engine_sdk::types::near_account_to_evm_address(aurora_account.account_id.as_bytes());
     let deploy_args = ethabi::encode(&[
         ethabi::Token::String(factory),
+        ethabi::Token::String(async_aurora),
         ethabi::Token::Address(admin.raw()),
         ethabi::Token::Uint(ethabi::Uint::from(0)),
     ]);
@@ -247,7 +249,7 @@ fn deploy_erc20_token(
 fn test_transfer_native_erc20_common() -> TestContext {
     let root = near_sdk_sim::init_simulator(None);
     let aurora = deploy_evm(&root);
-    let locker = deploy_locker(&root, &aurora, FACTORY.to_string());
+    let locker = deploy_locker(&root, &aurora, FACTORY.to_string(), root.account_id().to_string());
     let factory = deploy_factory(
         &root,
         aurora.account_id.to_string(),
@@ -333,7 +335,7 @@ fn approve_erc20_token(context: &TestContext, spender: Address, amount: u128) {
 
 fn lock_erc20_token(context: &TestContext, recipient: String, amount: u128) -> Vec<u8> {
     let input = build_input(
-        "lockToken(address,uint256,string)",
+        "lockTokenAsyncOnly(address,uint256,string)",
         &[
             ethabi::Token::Address(context.erc20.raw()),
             ethabi::Token::Uint(U256::from(amount).into()),
@@ -420,7 +422,7 @@ fn test_native_erc20_token_transfer() {
 
     let promise_args = json!({
         "token": "0x".to_string() + &context.erc20.encode(),
-        "nonce": "1",
+        "lock_event_index": "1",
     })
     .to_string();
 
@@ -429,7 +431,7 @@ fn test_native_erc20_token_transfer() {
         FACTORY.to_string(),
         "deposit",
         promise_args,
-        "20000000000000"
+        "75000000000000"
     );
     let mut output_list =
         ethabi::decode(&[ethabi::ParamType::String], lock_result.as_slice()).unwrap();

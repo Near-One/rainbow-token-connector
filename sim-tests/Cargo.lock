@@ -132,38 +132,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "aurora-engine-tests"
-version = "1.0.0"
-dependencies = [
- "aurora-engine-parameters",
- "aurora-engine-sdk",
- "aurora-engine-types",
- "base64 0.13.0",
- "borsh 0.8.2",
- "bstr",
- "byte-slice-cast",
- "criterion",
- "ethabi",
- "git2",
- "hex",
- "libsecp256k1",
- "near-crypto 0.0.0",
- "near-primitives 0.0.0",
- "near-primitives-core 0.0.0",
- "near-sdk",
- "near-sdk-sim",
- "near-vm-logic 0.0.0",
- "near-vm-runner 0.0.0",
- "rand 0.7.3",
- "rlp",
- "serde",
- "serde_json",
- "sha3",
- "tempfile",
- "walrus",
-]
-
-[[package]]
 name = "aurora-engine-types"
 version = "1.0.0"
 source = "git+https://github.com/aurora-is-near/aurora-engine#5c8691ea6ea5f1b309ef227f7f5c719ffea45d28"
@@ -616,6 +584,38 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddfc5b9aa5d4507acaf872de71051dfd0e309860e88966e1051e462a077aac4f"
 dependencies = [
  "bitflags",
+]
+
+[[package]]
+name = "connector-sim-tests"
+version = "0.1.0"
+dependencies = [
+ "aurora-engine-parameters",
+ "aurora-engine-sdk",
+ "aurora-engine-types",
+ "base64 0.13.0",
+ "borsh 0.8.2",
+ "bstr",
+ "byte-slice-cast",
+ "criterion",
+ "ethabi",
+ "git2",
+ "hex",
+ "libsecp256k1",
+ "near-crypto 0.0.0",
+ "near-primitives 0.0.0",
+ "near-primitives-core 0.0.0",
+ "near-sdk",
+ "near-sdk-sim",
+ "near-vm-logic 0.0.0",
+ "near-vm-runner 0.0.0",
+ "rand 0.7.3",
+ "rlp",
+ "serde",
+ "serde_json",
+ "sha3",
+ "tempfile",
+ "walrus",
 ]
 
 [[package]]
