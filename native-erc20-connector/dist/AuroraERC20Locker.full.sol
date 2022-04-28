@@ -1391,7 +1391,9 @@ contract AuroraERC20Locker is AdminControlled, AccountIds {
             compareStrings(predecessorAccountId(), nearTokenFactory),
             "Mismatch factory account"
         );
-        LockEvent memory lockEvent = lockEvents[lockEventIndex];
+
+        LockEvent storage lockEvent = lockEvents[lockEventIndex];
+        require(lockEvent.index > 0, "The lockEventIndex is not exist");
         require(lockEvent.token == token, "Mismatch token address");
         amount = lockEvent.amount;
         recipient = lockEvent.recipient;

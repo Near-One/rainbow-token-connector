@@ -249,7 +249,12 @@ fn deploy_erc20_token(
 fn test_transfer_native_erc20_common() -> TestContext {
     let root = near_sdk_sim::init_simulator(None);
     let aurora = deploy_evm(&root);
-    let locker = deploy_locker(&root, &aurora, FACTORY.to_string(), root.account_id().to_string());
+    let locker = deploy_locker(
+        &root,
+        &aurora,
+        FACTORY.to_string(),
+        root.account_id().to_string(),
+    );
     let factory = deploy_factory(
         &root,
         aurora.account_id.to_string(),
@@ -462,6 +467,21 @@ fn test_native_erc20_token_transfer() {
             near_sdk_sim::STORAGE_AMOUNT,
         )
         .assert_success();
+
+    // Test for double deposit
+    assert_eq!(
+        context
+            .root
+            .call(
+                context.factory.account_id(),
+                "deposit",
+                promise_args.as_bytes(),
+                near_sdk_sim::DEFAULT_GAS,
+                near_sdk_sim::STORAGE_AMOUNT,
+            )
+            .is_ok(),
+        false
+    );
 
     assert_eq!(nep_141_balance_of(&context, ALICE), 100);
 
