@@ -7,8 +7,7 @@
         "@openzeppelin/cli": "^2.8.1",
         "@openzeppelin/contracts": "^4.4",
         "rainbow-bridge-sol": "https://gitpkg.now.sh/aurora-is-near/rainbow-bridge/contracts/eth?c80ff19c74a00ee2d08907668f95f4f99aee8356",
-        "rainbow-bridge-lib": "https://github.com/near/rainbow-bridge-lib",
-        "truffle-assertions": "^0.9.2"
+        "rainbow-bridge-lib": "https://github.com/near/rainbow-bridge-lib"
     },
     "devDependencies": {
         "@openzeppelin/test-helpers": "^0.5.5",
@@ -25,12 +24,10 @@
         "hardhat": "^2.8",
         "solc": "^0.6",
         "solidity-coverage": "^0.7.5",
-        "solium": "^1.2.5",
-        "truffle": "^5.1.24",
-        "truffle-flattener": "^1.4.4"
+        "solium": "^1.2.5"
     },
     "scripts": {
-        "build": "yarn hardhat compile",
+        "build": "yarn hardhat compile && node main.js ./build/contracts/AuroraERC20Locker.sol/AuroraERC20Locker.json",
         "testrpc": "ganache-cli --port 9545 --deterministic --gasLimit 10000000",
         "test": "scripts/test.sh",
         "coverage": "scripts/coverage.sh",

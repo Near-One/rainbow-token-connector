@@ -43,7 +43,7 @@ contract AuroraERC20Locker is AdminControlled, AccountIds {
         string memory _nearTokenFactory,
         address _admin,
         uint256 _pausedFlags
-    ) public AdminControlled(_admin, _pausedFlags) {
+    ) AdminControlled(_admin, _pausedFlags) {
         lastLockEventIndex = 0;
         nearTokenFactory = _nearTokenFactory;
     }

@@ -1,6 +1,8 @@
-// File: contracts/AccountIds.sol
+// Sources flattened with hardhat v2.8.3 https://hardhat.org
 
-pragma solidity ^0.6.12;
+// File contracts/AccountIds.sol
+
+pragma solidity ^0.8;
 
 contract AccountIds {
     function currentAccountId() public returns (string memory) {
