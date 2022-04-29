@@ -400,9 +400,9 @@ impl BridgeAuroraTokenFactory {
         #[serializer(borsh)] token: String,
     ) {
         assert_self();
-        let output: Vec<u8> = match result {
+        let output = match result {
             TransactionStatus::Succeed(ret) => ret,
-            _other => Vec::new(),
+            other => panic!("Unexpected status: {:?}", other),
         };
 
         let mut output_list = ethabi::decode(
