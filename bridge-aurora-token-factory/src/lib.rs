@@ -35,7 +35,7 @@ const BRIDGE_TOKEN_INIT_BALANCE: Balance = 3_000_000_000_000_000_000_000_000; //
 const BRIDGE_TOKEN_NEW: Gas = 10_000_000_000_000;
 
 /// Gas to call mint method on bridge token.
-const MINT_GAS: Gas = 10_000_000_000_000;
+const MINT_GAS: Gas = 5_000_000_000_000;
 
 /// Gas to call unlock_erc20_tokens method
 const UNLOCK_ERC20_GAS: Gas = 40_000_000_000_000;
@@ -43,12 +43,22 @@ const UNLOCK_ERC20_GAS: Gas = 40_000_000_000_000;
 // Gas to call get_erc20_metadata method
 const GET_METADATA_GAS: Gas = 17_000_000_000_000;
 
+// Gas to call getLockEvent method
+const GET_LOCK_EVENT_GAS: Gas = 20_000_000_000_000;
+
+/// Gas to call storage deposit method.
+const STORAGE_DEPOSIT_GAS: Gas = 5_000_000_000_000;
+
 // Gas to call claim method
-const CLAIM_GAS: Gas = 50_000_000_000_000;
+const CLAIM_GAS: Gas = 25_000_000_000_000;
+
+/// Gas to call finish claim method.
+const FINISH_CLAIM_GAS: Gas = 15_000_000_000_000;
 
 /// Gas to call finish deposit method.
 /// This doesn't cover the gas required for calling mint method.
-const FINISH_DEPOSIT_GAS: Gas = 30_000_000_000_000;
+const FINISH_DEPOSIT_GAS: Gas =
+    STORAGE_DEPOSIT_GAS + CLAIM_GAS + FINISH_CLAIM_GAS + 35_000_000_000_000;
 
 /// Gas to call finish update_metadata method.
 const FINISH_UPDATE_METADATA_GAS: Gas = 6_000_000_000_000;
@@ -75,6 +85,10 @@ pub const LOCKER_METADATA_SELECTOR: &[u8] = &[192, 15, 20, 171];
 ///
 /// keccak("unlockToken(address,uint256,address)".as_bytes())[..4];
 pub const LOCKER_UNLOCK_SELECTOR: &[u8] = &[90, 156, 120, 171];
+/// Selector to call getLockEvent function in ERC 20 locker contract
+///
+/// keccak("getLockEvent(uint256)".as_bytes())[..4];
+pub const GET_LOCK_EVENT_SELECTOR: &[u8] = &[105, 33, 49, 42];
 
 #[derive(Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum ResultType {
@@ -120,13 +134,26 @@ pub trait ExtBridgeAuroraTokenFactory {
         result: TransactionStatus,
         #[serializer(borsh)] token: String,
     ) -> Promise;
+
     #[result_serializer(borsh)]
     fn finish_deposit(
         &mut self,
         #[callback]
         #[serializer(borsh)]
-        result: SubmitResult,
+        result: TransactionStatus,
         #[serializer(borsh)] token: String,
+        #[serializer(borsh)] lock_event_index: String,
+    ) -> Promise;
+
+    #[result_serializer(borsh)]
+    fn finish_claim(
+        &mut self,
+        #[callback]
+        #[serializer(borsh)]
+        result: SubmitResult,
+        #[serializer(borsh)] recipient: AccountId,
+        #[serializer(borsh)] amount: u128,
+        #[serializer(borsh)] token_account_id: AccountId,
     ) -> Promise;
 }
 
@@ -138,6 +165,12 @@ pub trait FungibleToken {
 #[ext_contract(ext_bridge_token)]
 pub trait ExtBridgeToken {
     fn mint(&self, account_id: AccountId, amount: U128);
+
+    fn storage_deposit(
+        &mut self,
+        account_id: Option<ValidAccountId>,
+        registration_only: Option<bool>,
+    ) -> PromiseOrValue<StorageBalance>;
 
     fn ft_transfer_call(
         &mut self,
@@ -161,7 +194,8 @@ pub trait ExtBridgeToken {
 #[ext_contract(ext_aurora)]
 pub trait Aurora {
     #[result_serializer(borsh)]
-    fn call(&mut self, #[serializer(borsh)] input: crate::CallArgs) -> PromiseOrValue<SubmitResult>;
+    fn call(&mut self, #[serializer(borsh)] input: crate::CallArgs)
+        -> PromiseOrValue<SubmitResult>;
 
     #[result_serializer(borsh)]
     fn view(&mut self, #[serializer(borsh)] input: ViewCallArgs) -> Promise<TransactionStatus>;
@@ -235,25 +269,21 @@ impl BridgeAuroraTokenFactory {
             token_striped
         );
 
-        let tail = ethabi::encode(&[
-            ethabi::Token::Address(validate_eth_address(token_striped.clone()).into()),
-            ethabi::Token::Uint(ethabi::Uint::from_dec_str(&lock_event_index).unwrap()),
-        ]);
+        let tail = ethabi::encode(&[ethabi::Token::Uint(
+            ethabi::Uint::from_dec_str(&lock_event_index).unwrap(),
+        )]);
 
-        let call_args = CallArgs::V2(FunctionCallArgsV2 {
-            contract: self.locker_address,
-            value: WeiU256::default(),
-            input: [LOCKER_CLAIM_SELECTOR, tail.as_slice()].concat(),
-        });    
+        let args = ViewCallArgs {
+            sender: self.locker_address,
+            address: self.locker_address,
+            amount: [0; 32],
+            input: [GET_LOCK_EVENT_SELECTOR, tail.as_slice()].concat(),
+        };
 
-        ext_aurora::call(
-            call_args,
-            &self.aurora_account,
-            NO_DEPOSIT,
-            CLAIM_GAS,
-        ).then(
+        ext_aurora::view(args, &self.aurora_account, NO_DEPOSIT, GET_LOCK_EVENT_GAS).then(
             ext_self::finish_deposit(
                 token_striped,
+                lock_event_index,
                 &env::current_account_id(),
                 env::attached_deposit(),
                 FINISH_DEPOSIT_GAS,
@@ -271,16 +301,23 @@ impl BridgeAuroraTokenFactory {
         &mut self,
         #[callback]
         #[serializer(borsh)]
-        result: SubmitResult,
+        result: TransactionStatus,
         #[serializer(borsh)] token: String,
+        #[serializer(borsh)] lock_event_index: String,
     ) -> Promise {
-        let output: Vec<u8> = match result.status {
+        assert_self();
+        let output = match result {
             TransactionStatus::Succeed(ret) => ret,
-            _other => Vec::new(),
+            other => panic!("Unexpected status: {:?}", other),
         };
 
         let mut output_list = ethabi::decode(
-            &[ethabi::ParamType::Uint(128), ethabi::ParamType::String],
+            &[
+                ethabi::ParamType::Address,
+                ethabi::ParamType::Address,
+                ethabi::ParamType::Uint(128),
+                ethabi::ParamType::String,
+            ],
             output.as_slice(),
         )
         .unwrap();
@@ -293,10 +330,61 @@ impl BridgeAuroraTokenFactory {
             .try_into()
             .unwrap();
 
+        let tail = ethabi::encode(&[
+            ethabi::Token::Address(validate_eth_address(token.clone()).into()),
+            ethabi::Token::Uint(ethabi::Uint::from_dec_str(&lock_event_index).unwrap()),
+        ]);
+
+        let call_args = CallArgs::V2(FunctionCallArgsV2 {
+            contract: self.locker_address,
+            value: WeiU256::default(),
+            input: [LOCKER_CLAIM_SELECTOR, tail.as_slice()].concat(),
+        });
+
+        let token_account_id = self.get_bridge_token_account_id(token);
+        ext_bridge_token::storage_deposit(
+            Some(recipient.clone().try_into().unwrap()),
+            None,
+            &token_account_id,
+            env::attached_deposit(),
+            STORAGE_DEPOSIT_GAS,
+        )
+        .then(ext_aurora::call(
+            call_args,
+            &self.aurora_account,
+            NO_DEPOSIT,
+            CLAIM_GAS,
+        ))
+        .then(ext_self::finish_claim(
+            recipient,
+            amount,
+            token_account_id,
+            &env::current_account_id(),
+            env::attached_deposit(),
+            FINISH_CLAIM_GAS,
+        ))
+    }
+
+    #[payable]
+    pub fn finish_claim(
+        &mut self,
+        #[callback]
+        #[serializer(borsh)]
+        result: SubmitResult,
+        #[serializer(borsh)] recipient: String,
+        #[serializer(borsh)] amount: u128,
+        #[serializer(borsh)] token_account_id: String,
+    ) -> Promise {
+        assert_self();
+        match result.status {
+            TransactionStatus::Succeed(ret) => ret,
+            other => panic!("Unexpected status: {:?}", other),
+        };
+
         ext_bridge_token::mint(
             recipient,
             amount.into(),
-            &self.get_bridge_token_account_id(token),
+            &token_account_id,
             env::attached_deposit(),
             MINT_GAS,
         )
@@ -311,6 +399,7 @@ impl BridgeAuroraTokenFactory {
         result: TransactionStatus,
         #[serializer(borsh)] token: String,
     ) {
+        assert_self();
         let output: Vec<u8> = match result {
             TransactionStatus::Succeed(ret) => ret,
             _other => Vec::new(),
@@ -834,5 +923,9 @@ mod tests {
         let mut hasher = sha3::Keccak256::default();
         hasher.update(b"unlockToken(address,uint256,address)");
         assert_eq!(hasher.finalize()[..4].to_vec(), LOCKER_UNLOCK_SELECTOR);
+
+        let mut hasher = sha3::Keccak256::default();
+        hasher.update(b"getLockEvent(uint256)");
+        assert_eq!(hasher.finalize()[..4].to_vec(), GET_LOCK_EVENT_SELECTOR);
     }
 }

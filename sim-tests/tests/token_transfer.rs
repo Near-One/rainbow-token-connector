@@ -431,12 +431,13 @@ fn test_native_erc20_token_transfer() {
     })
     .to_string();
 
+    let deposit_gas: near_sdk_sim::types::Gas = 150_000_000_000_000;
     let promise_desc_str = format!(
         "promises:{}#{}#{}#{}",
         FACTORY.to_string(),
         "deposit",
         promise_args,
-        "75000000000000"
+        deposit_gas.to_string()
     );
     let mut output_list =
         ethabi::decode(&[ethabi::ParamType::String], lock_result.as_slice()).unwrap();
@@ -463,7 +464,7 @@ fn test_native_erc20_token_transfer() {
             context.factory.account_id(),
             "deposit",
             promise_args.as_bytes(),
-            near_sdk_sim::DEFAULT_GAS,
+            deposit_gas,
             near_sdk_sim::STORAGE_AMOUNT,
         )
         .assert_success();

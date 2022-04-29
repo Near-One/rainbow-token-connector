@@ -1290,7 +1290,7 @@ contract AuroraERC20Locker is AdminControlled, AccountIds {
         string recipient;
     }
 
-    string constant LOCK_GAS = "75000000000000";
+    string constant LOCK_GAS = "150000000000000";
 
     uint256 constant UNPAUSED_ALL = 0;
     uint256 constant PAUSED_LOCK = 1 << 0;
@@ -1383,9 +1383,25 @@ contract AuroraERC20Locker is AdminControlled, AccountIds {
         IERC20(token).safeTransfer(recipient, amount);
     }
 
-    function claim(address token, uint256 lockEventIndex)
+    function getLockEvent(uint256 lockEventIndex)
         public
-        returns (uint256 amount, string memory recipient)
+        view
+        returns (
+            address token,
+            address sender,
+            uint256 amount,
+            string memory recipient
+        )
+    {
+        LockEvent storage lockEvent = lockEvents[lockEventIndex];
+        require(lockEvent.index > 0, "The lockEventIndex is not exist");
+        token = lockEvent.token;
+        sender = lockEvent.sender;
+        amount = lockEvent.amount;
+        recipient = lockEvent.recipient;
+    }
+
+    function claim(address token, uint256 lockEventIndex) public
     {
         require(
             compareStrings(predecessorAccountId(), nearTokenFactory),
@@ -1395,10 +1411,8 @@ contract AuroraERC20Locker is AdminControlled, AccountIds {
         LockEvent storage lockEvent = lockEvents[lockEventIndex];
         require(lockEvent.index > 0, "The lockEventIndex is not exist");
         require(lockEvent.token == token, "Mismatch token address");
-        amount = lockEvent.amount;
-        recipient = lockEvent.recipient;
         delete lockEvents[lockEventIndex];
-        emit Claimed(lockEventIndex, address(token), amount, recipient);
+        emit Claimed(lockEventIndex, address(token), lockEvent.amount, lockEvent.recipient);
     }
 
     function getTokenMetadata(address token)
