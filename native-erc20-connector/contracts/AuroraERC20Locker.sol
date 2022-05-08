@@ -157,7 +157,7 @@ contract AuroraERC20Locker is AdminControlled, AccountIds {
 
         LockEvent storage lockEvent = lockEvents[lockEventIndex];
         require(lockEvent.index > 0, "The lockEventIndex is not exist");
-        require(lockEvent.token == token, "Mismatch token address");
+        require(lockEvent.token == token, "Token address doesn't match in the locked event");
         delete lockEvents[lockEventIndex];
         emit Claimed(lockEventIndex, address(token), lockEvent.amount, lockEvent.recipient);
     }
