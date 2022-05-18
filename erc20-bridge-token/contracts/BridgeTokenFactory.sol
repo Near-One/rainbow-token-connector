@@ -105,6 +105,7 @@ contract BridgeTokenFactory is Locker, AccessControlUpgradeable, PausableUpgrade
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
         
         require(result.blockHeight >= BridgeToken(_nearToEthToken[result.token]).metadataLastUpdated(), "ERR_OLD_METADATA");
+
         BridgeToken(_nearToEthToken[result.token]).setMetadata(result.name, result.symbol, result.decimals, result.blockHeight);
         emit SetMetadata(_nearToEthToken[result.token], result.name, result.symbol, result.decimals);
     }
@@ -117,10 +118,10 @@ contract BridgeTokenFactory is Locker, AccessControlUpgradeable, PausableUpgrade
         emit Deposit(result.amount, result.recipient);
     }
 
-    function withdraw(address token, uint256 amount, string memory recipient) public whenNotPaused {
-        require(_isBridgeToken[token], "ERR_NOT_BRIDGE_TOKEN");
-        BridgeToken(token).burn(msg.sender, amount);
-        emit Withdraw(_ethToNearToken[token], msg.sender, amount, recipient);
+    function withdraw(string memory token, address bridgeTokenProxy, uint256 amount, string memory recipient) public whenNotPaused {
+        require(_isBridgeToken[_nearToEthToken[token]], "ERR_NOT_BRIDGE_TOKEN");
+        BridgeToken(_nearToEthToken[token]).burn(msg.sender, amount);
+        emit Withdraw(_ethToNearToken[bridgeTokenProxy], msg.sender, amount, recipient);
     }
 
     function _decodeMetadataResult(bytes memory data) internal pure returns(MetadataResult memory result) {
