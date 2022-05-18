@@ -1,19 +1,19 @@
 /**
  * @type import('hardhat/config').HardhatUserConfig
  */
- require('@nomiclabs/hardhat-ethers');
- require('@openzeppelin/hardhat-upgrades');
- require("solidity-coverage");
+require("@nomiclabs/hardhat-waffle");
+require('@openzeppelin/hardhat-upgrades')
+require('solidity-coverage')
 
 module.exports = {
   paths: {
-    sources: "./contracts",
-    artifacts: "./build",
+    sources: './contracts',
+    artifacts: './build'
   },
   solidity: {
     compilers: [
       {
-        version: "0.8.11",
+        version: '0.8.11',
         settings: {
           optimizer: {
             enabled: true,
@@ -23,4 +23,4 @@ module.exports = {
       }
     ]
   }
-};
+}
