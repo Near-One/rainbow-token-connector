@@ -108,7 +108,7 @@ This will create `<<hex(erc20)>.<bridge_token_factory>>` NEP141-compatible contr
 
 ## Usage flow NEAR -> Ethereum
 
-1. `token-factory` locks NEP141 tokens on NEAR side.
+1. `token-locker` locks NEP141 tokens on NEAR side.
 
 To deposit funds into the locker, call `ft_transfer_call` where `msg` contains Ethereum address the funds should arrive to.
 This will emit `<token: String, amount: u128, recipient address: EthAddress>` (which arrives to `deposit` on Ethereum side).
