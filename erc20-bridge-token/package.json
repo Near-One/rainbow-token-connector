@@ -7,6 +7,7 @@
         "@openzeppelin/cli": "^2.8.1",
         "@openzeppelin/contracts": "^4.5",
         "@openzeppelin/contracts-upgradeable": "^4.5.2",
+        "dotenv": "^16.0.1",
         "rainbow-bridge-lib": "https://github.com/near/rainbow-bridge-lib",
         "rainbow-bridge-sol": "https://gitpkg.now.sh/aurora-is-near/rainbow-bridge/contracts/eth",
         "rainbow-bridge-utils": "https://gitpkg.now.sh/aurora-is-near/rainbow-bridge/utils"
