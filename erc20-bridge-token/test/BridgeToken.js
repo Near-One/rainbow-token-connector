@@ -30,15 +30,11 @@ describe('BridgeToken', () => {
   const nearTokenId = 'test-token'
   const minBlockAcceptanceHeight = 0
 
-  let BridgeToken
   let BridgeTokenInstance
 
   let BridgeTokenFactory
-  let BridgeTokenProxy
 
   let adminAccount
-  let userAccount1
-  let userAccount2
 
   beforeEach(async function () {
     const [deployerAccount, userAccount1, userAccount2] = await ethers.getSigners()
@@ -185,4 +181,7 @@ describe('BridgeToken', () => {
     expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal('0')
   })
 
+  it('upgrade token contract', async function () {
+
+  })
 })
