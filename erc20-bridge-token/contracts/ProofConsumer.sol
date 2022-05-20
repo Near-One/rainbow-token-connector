@@ -7,7 +7,7 @@ import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
 import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
 import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 
-contract Locker is Initializable {
+contract ProofConsumer is Initializable {
     using Borsh for Borsh.Data;
     using ProofDecoder for Borsh.Data;
 
@@ -21,7 +21,7 @@ contract Locker is Initializable {
     // OutcomeReciptId -> Used
     mapping(bytes32 => bool) public usedProofs;
 
-    function __Locker_init(
+    function __ProofConsumer_init(
         bytes memory _nearTokenFactory,
         INearProver _prover,
         uint64 _minBlockAcceptanceHeight
@@ -85,11 +85,11 @@ contract Locker is Initializable {
         result = fullOutcomeProof.outcome_proof.outcome_with_id.outcome.status;
         require(
             !result.failed,
-            "Cannot use failed execution outcome for unlocking the tokens"
+            "Cannot use failed execution outcome for unlocking the tokens or setting metadata"
         );
         require(
             !result.unknown,
-            "Cannot use unknown execution outcome for unlocking the tokens"
+            "Cannot use unknown execution outcome for unlocking the tokens or setting metadata"
         );
     }
 }

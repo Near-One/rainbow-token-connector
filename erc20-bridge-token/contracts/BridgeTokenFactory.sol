@@ -10,11 +10,11 @@ import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
 import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
 import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 
-import "./Locker.sol";
+import "./ProofConsumer.sol";
 import "./BridgeToken.sol";
 import "./BridgeTokenProxy.sol";
 
-contract BridgeTokenFactory is Locker, AccessControlUpgradeable, PausableUpgradeable{
+contract BridgeTokenFactory is ProofConsumer, AccessControlUpgradeable, PausableUpgradeable{
 
     using Borsh for Borsh.Data;
     using SafeMathUpgradeable for uint256;
@@ -66,7 +66,7 @@ contract BridgeTokenFactory is Locker, AccessControlUpgradeable, PausableUpgrade
      public initializer{
         __AccessControl_init();
         __Pausable_init_unchained();
-        __Locker_init(_nearTokenFactory, _prover, _minBlockAcceptanceHeight);
+        __ProofConsumer_init(_nearTokenFactory, _prover, _minBlockAcceptanceHeight);
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender()); 
         _setupRole(PAUSE_ROLE, _msgSender()); 
     
