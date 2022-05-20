@@ -31,9 +31,7 @@ describe('BridgeToken', () => {
   const minBlockAcceptanceHeight = 0
 
   let BridgeTokenInstance
-
   let BridgeTokenFactory
-
   let adminAccount
 
   beforeEach(async function () {
@@ -182,6 +180,39 @@ describe('BridgeToken', () => {
   })
 
   it('upgrade token contract', async function () {
+    await BridgeTokenFactory.newBridgeToken(nearTokenId)
+    const tokenProxyAddress = await BridgeTokenFactory.nearToEthToken(nearTokenId)
+    const token = BridgeTokenInstance.attach(tokenProxyAddress)
+    const metadataProof = require('./proof_template.json');
+    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', {
+      token: nearTokenId,
+      name: 'NEAR ERC20',
+      symbol: 'NEAR',
+      decimals: 18,
+      blockHeight: 1089
+    }).toString('base64');
+    await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089);
 
+    const lockResultProof = metadataProof;
+    lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
+      token: nearTokenId,
+      amount: 100,
+      recipient: ethers.utils.arrayify(adminAccount.address),
+    }).toString('base64');
+    lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'B'.repeat(44);
+    await BridgeTokenFactory.deposit(borshifyOutcomeProof(metadataProof), 1090);
+    expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal('100')
+
+  const BridgeTokenV2Instance = await ethers.getContractFactory("TestBridgeToken");
+  const BridgeTokenV2 = await (await BridgeTokenV2Instance.deploy()).deployed();
+  
+  const upgradeToken = await BridgeTokenFactory.upgradeToken(nearTokenId, BridgeTokenV2.address)
+
+  const BridgeTokenV2Proxied = BridgeTokenV2Instance.attach(tokenProxyAddress)
+  expect(await BridgeTokenV2Proxied.returnTestString()).to.equal('test')
+  expect(await BridgeTokenV2Proxied.name()).to.equal('NEAR ERC20')
+  expect(await BridgeTokenV2Proxied.symbol()).to.equal('NEAR')
+  expect((await BridgeTokenV2Proxied.decimals()).toString()).to.equal('18')
+  expect((await BridgeTokenV2Proxied.metadataLastUpdated()).toString()).to.equal('1089')
   })
 })

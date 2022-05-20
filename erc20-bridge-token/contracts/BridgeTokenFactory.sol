@@ -8,7 +8,6 @@ import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
 import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
 import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
-import "rainbow-bridge-sol/nearbridge/contracts/NearDecoder.sol";
 import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 
 import "./Locker.sol";
@@ -20,7 +19,7 @@ contract BridgeTokenFactory is Locker, AccessControlUpgradeable, PausableUpgrade
     using Borsh for Borsh.Data;
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
-    
+
     mapping(address => string) private _ethToNearToken;
     mapping(string => address) private _nearToEthToken;
     mapping(address => bool) private _isBridgeToken;
@@ -89,10 +88,8 @@ contract BridgeTokenFactory is Locker, AccessControlUpgradeable, PausableUpgrade
 
     function newBridgeToken(string calldata nearTokenId) external returns (BridgeTokenProxy) {
         require(!_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_BRIDGE_TOKEN_EXISTS");
-
         BridgeToken bridgeToken = new BridgeToken();
         BridgeTokenProxy bridgeTokenProxy = new BridgeTokenProxy(address(bridgeToken), abi.encodeWithSelector(BridgeToken(address(0)).initialize.selector, "", "", 0));
-
         _isBridgeToken[address(bridgeTokenProxy)] = true;
         _ethToNearToken[address(bridgeTokenProxy)] = nearTokenId;
         _nearToEthToken[nearTokenId] = address(bridgeTokenProxy);
@@ -103,9 +100,7 @@ contract BridgeTokenFactory is Locker, AccessControlUpgradeable, PausableUpgrade
         ProofDecoder.ExecutionStatus memory status = _parseAndConsumeProof(proofData, proofBlockHeight);
         MetadataResult memory result = _decodeMetadataResult(status.successValue);
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
-        
         require(result.blockHeight >= BridgeToken(_nearToEthToken[result.token]).metadataLastUpdated(), "ERR_OLD_METADATA");
-
         BridgeToken(_nearToEthToken[result.token]).setMetadata(result.name, result.symbol, result.decimals, result.blockHeight);
         emit SetMetadata(_nearToEthToken[result.token], result.name, result.symbol, result.decimals);
     }
@@ -148,6 +143,12 @@ contract BridgeTokenFactory is Locker, AccessControlUpgradeable, PausableUpgrade
 
     function unpause() external onlyRole(PAUSE_ROLE) {
         _unpause();
+    }
+
+    function upgradeToken(string calldata nearTokenId, address implementation) external  onlyRole(DEFAULT_ADMIN_ROLE) {
+       require(_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_NOT_BRIDGE_TOKEN");
+       BridgeTokenProxy proxy = BridgeTokenProxy(payable(_nearToEthToken[nearTokenId]));
+       proxy.upgradeTo(implementation);
     }
 
 }
