@@ -2,6 +2,7 @@
  * @type import('hardhat/config').HardhatUserConfig
  */
 require("@nomiclabs/hardhat-waffle");
+require('hardhat-contract-sizer');
 require('@openzeppelin/hardhat-upgrades')
 require('solidity-coverage')
 
@@ -17,7 +18,7 @@ module.exports = {
         settings: {
           optimizer: {
             enabled: true,
-            runs: 200
+            runs: 1
           }
         }
       }
