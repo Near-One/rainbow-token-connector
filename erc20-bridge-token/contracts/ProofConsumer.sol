@@ -79,7 +79,7 @@ contract ProofConsumer is Initializable {
                     .outcome
                     .executor_id
             ) == keccak256(nearTokenFactory),
-            "Can only unlock tokens from the linked proof producer on Near blockchain"
+            "Can only unlock tokens or set metadata from the linked proof producer on Near blockchain"
         );
 
         result = fullOutcomeProof.outcome_proof.outcome_with_id.outcome.status;
