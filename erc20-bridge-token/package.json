@@ -38,7 +38,7 @@
     },
     "scripts": {
         "build": "yarn hardhat compile",
-        "testrpc": "ganache-cli --port 9545 --deterministic --gasLimit 10000000",
+        "testrpc": "",
         "test": "scripts/test.sh",
         "coverage": "scripts/coverage.sh",
         "lint:js": "eslint .",
