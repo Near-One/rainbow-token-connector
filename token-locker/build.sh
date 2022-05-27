@@ -15,4 +15,4 @@ docker run \
      /bin/bash -c "rustup target add wasm32-unknown-unknown; cargo build --target wasm32-unknown-unknown --release"
 
 mkdir -p res
-cp $DIR/target/wasm32-unknown-unknown/release/bridge_locker.wasm $DIR/../res/
+cp $DIR/target/wasm32-unknown-unknown/release/token-locker.wasm $DIR/../res/
