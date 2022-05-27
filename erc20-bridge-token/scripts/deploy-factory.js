@@ -13,4 +13,9 @@ async function main() {
     console.log(`BridgeTokenFactory deployed at ${BridgeTokenFactory.address}`);
 }
 
-main();
+main()
+  .then(() => process.exit(0))
+  .catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
