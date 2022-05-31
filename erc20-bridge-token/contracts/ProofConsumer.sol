@@ -57,7 +57,7 @@ contract ProofConsumer is Initializable {
         require(
             fullOutcomeProof.block_header_lite.inner_lite.height >=
                 minBlockAcceptanceHeight,
-            "Proof is from the ancient block"
+            "Ancient block proof"
         );
 
         bytes32 receiptId = fullOutcomeProof
@@ -67,7 +67,7 @@ contract ProofConsumer is Initializable {
             .receipt_ids[0];
         require(
             !usedProofs[receiptId],
-            "The burn event proof cannot be reused"
+            "Burn proof can't be reused"
         );
         usedProofs[receiptId] = true;
 
@@ -79,17 +79,17 @@ contract ProofConsumer is Initializable {
                     .outcome
                     .executor_id
             ) == keccak256(nearTokenFactory),
-            "Can only unlock tokens/set metadata from the linked proof produced on Near blockchain"
+            "Proof is not produced on Near blockchain"
         );
 
         result = fullOutcomeProof.outcome_proof.outcome_with_id.outcome.status;
         require(
             !result.failed,
-            "Can't use failed execution outcome for unlocking the tokens or set metadata"
+            "Can't use failed execution outcome"
         );
         require(
             !result.unknown,
-            "Can't use unknown execution outcome for unlocking the tokens or set metadata"
+            "Can't use unknown execution outcome"
         );
     }
 }
