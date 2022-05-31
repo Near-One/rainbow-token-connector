@@ -79,17 +79,17 @@ contract ProofConsumer is Initializable {
                     .outcome
                     .executor_id
             ) == keccak256(nearTokenFactory),
-            "Can only unlock tokens or set metadata from the linked proof producer on Near blockchain"
+            "Can only unlock tokens/set metadata from the linked proof produced on Near blockchain"
         );
 
         result = fullOutcomeProof.outcome_proof.outcome_with_id.outcome.status;
         require(
             !result.failed,
-            "Cannot use failed execution outcome for unlocking the tokens or setting metadata"
+            "Can't use failed execution outcome for unlocking the tokens or set metadata"
         );
         require(
             !result.unknown,
-            "Cannot use unknown execution outcome for unlocking the tokens or setting metadata"
+            "Can't use unknown execution outcome for unlocking the tokens or set metadata"
         );
     }
 }
