@@ -87,7 +87,7 @@ contract BridgeTokenFactory is ProofConsumer, AccessControlUpgradeable, Pausable
     }
 
     function newBridgeToken(string calldata nearTokenId) external returns (BridgeTokenProxy) {
-        require(!_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_BRIDGE_TOKEN_EXISTS");
+        require(!_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_TKN_EXST");
         BridgeToken bridgeToken = new BridgeToken();
         BridgeTokenProxy bridgeTokenProxy = new BridgeTokenProxy(address(bridgeToken), abi.encodeWithSelector(BridgeToken(address(0)).initialize.selector, "", "", 0));
         _isBridgeToken[address(bridgeTokenProxy)] = true;
@@ -96,7 +96,7 @@ contract BridgeTokenFactory is ProofConsumer, AccessControlUpgradeable, Pausable
         return bridgeTokenProxy;
     }
 
-    function setMetadata(bytes memory proofData, uint64 proofBlockHeight) public whenNotPaused {
+    function setMetadata(bytes memory proofData, uint64 proofBlockHeight) public whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
         ProofDecoder.ExecutionStatus memory status = _parseAndConsumeProof(proofData, proofBlockHeight);
         MetadataResult memory result = _decodeMetadataResult(status.successValue);
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
