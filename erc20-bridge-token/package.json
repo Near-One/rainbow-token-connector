@@ -39,8 +39,8 @@
     "scripts": {
         "build": "yarn hardhat compile",
         "testrpc": "",
-        "test": "scripts/test.sh",
-        "coverage": "scripts/coverage.sh",
+        "test": "yarn hardhat test",
+        "coverage": "yarn hardhat coverage",
         "lint:js": "eslint .",
         "lint:js:fix": "eslint . --fix",
         "lint:sol": "solium -d .",
