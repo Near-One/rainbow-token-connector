@@ -1,7 +1,7 @@
 const { expect } = require('chai')
 const { ethers, upgrades } = require('hardhat')
-const { serialize } = require('rainbow-bridge-lib/rainbow/borsh.js');
-const { borshifyOutcomeProof } = require('rainbow-bridge-lib/rainbow/borshify-proof.js');
+const { serialize } = require('rainbow-bridge-lib/borsh.js');
+const { borshifyOutcomeProof } = require('rainbow-bridge-lib/borshify-proof.js');
 
 
 
