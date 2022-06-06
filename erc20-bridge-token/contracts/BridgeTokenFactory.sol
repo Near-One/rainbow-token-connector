@@ -10,11 +10,12 @@ import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
 import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
 import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 
-import "./ProofConsumer.sol";
+
+import "./IProofConsumer.sol";
 import "./BridgeToken.sol";
 import "./BridgeTokenProxy.sol";
 
-contract BridgeTokenFactory is ProofConsumer, AccessControlUpgradeable, PausableUpgradeable{
+contract BridgeTokenFactory is  AccessControlUpgradeable, PausableUpgradeable{
 
     using Borsh for Borsh.Data;
     using SafeMathUpgradeable for uint256;
@@ -24,6 +25,7 @@ contract BridgeTokenFactory is ProofConsumer, AccessControlUpgradeable, Pausable
     mapping(string => address) private _nearToEthToken;
     mapping(address => bool) private _isBridgeToken;
 
+    address public ProofConsumerAddress;
     bytes32 public constant PAUSE_ROLE = keccak256("PAUSE_ROLE");
     // Event when funds are withdrawn from Ethereum back to NEAR.
     event Withdraw (
@@ -62,11 +64,12 @@ contract BridgeTokenFactory is ProofConsumer, AccessControlUpgradeable, Pausable
 
     // BridgeTokenFactory is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
-    function initialize(bytes memory _nearTokenFactory, INearProver _prover,  uint64 _minBlockAcceptanceHeight)
+    function initialize(address _ProofConsumerAddress)
      public initializer{
+         ProofConsumerAddress = _ProofConsumerAddress;
         __AccessControl_init();
         __Pausable_init_unchained();
-        __ProofConsumer_init(_nearTokenFactory, _prover, _minBlockAcceptanceHeight);
+        // __ProofConsumer_init(_nearTokenFactory, _prover, _minBlockAcceptanceHeight);
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender()); 
         _setupRole(PAUSE_ROLE, _msgSender()); 
     
@@ -87,7 +90,7 @@ contract BridgeTokenFactory is ProofConsumer, AccessControlUpgradeable, Pausable
     }
 
     function newBridgeToken(string calldata nearTokenId) external returns (BridgeTokenProxy) {
-        require(!_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_TKN_EXST");
+        require(!_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_TOKEN_EXIST");
         BridgeToken bridgeToken = new BridgeToken();
         BridgeTokenProxy bridgeTokenProxy = new BridgeTokenProxy(address(bridgeToken), abi.encodeWithSelector(BridgeToken(address(0)).initialize.selector, "", "", 0));
         _isBridgeToken[address(bridgeTokenProxy)] = true;
@@ -97,7 +100,7 @@ contract BridgeTokenFactory is ProofConsumer, AccessControlUpgradeable, Pausable
     }
 
     function setMetadata(bytes memory proofData, uint64 proofBlockHeight) public whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
-        ProofDecoder.ExecutionStatus memory status = _parseAndConsumeProof(proofData, proofBlockHeight);
+        ProofDecoder.ExecutionStatus memory status = IProofConsumer(ProofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
         MetadataResult memory result = _decodeMetadataResult(status.successValue);
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
         require(result.blockHeight >= BridgeToken(_nearToEthToken[result.token]).metadataLastUpdated(), "ERR_OLD_METADATA");
@@ -106,7 +109,7 @@ contract BridgeTokenFactory is ProofConsumer, AccessControlUpgradeable, Pausable
     }
 
     function deposit(bytes memory proofData, uint64 proofBlockHeight) public whenNotPaused {
-        ProofDecoder.ExecutionStatus memory status = _parseAndConsumeProof(proofData, proofBlockHeight);
+        ProofDecoder.ExecutionStatus memory status = IProofConsumer(ProofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
         LockResult memory result = _decodeLockResult(status.successValue);
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
         BridgeToken(_nearToEthToken[result.token]).mint(result.recipient, result.amount);

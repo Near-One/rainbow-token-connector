@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8;
 
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 
 import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
 import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
 import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 
-contract ProofConsumer is Initializable {
+contract ProofConsumer {
     using Borsh for Borsh.Data;
     using ProofDecoder for Borsh.Data;
 
@@ -21,11 +20,11 @@ contract ProofConsumer is Initializable {
     // OutcomeReciptId -> Used
     mapping(bytes32 => bool) public usedProofs;
 
-    function __ProofConsumer_init(
+    constructor (
         bytes memory _nearTokenFactory,
         INearProver _prover,
         uint64 _minBlockAcceptanceHeight
-    ) internal onlyInitializing {
+    )  {
         require(
             _nearTokenFactory.length > 0,
             "Invalid Near Token Factory address"
@@ -39,10 +38,10 @@ contract ProofConsumer is Initializable {
 
     /// Parses the provided proof and consumes it if it's not already used.
     /// The consumed event cannot be reused for future calls.
-    function _parseAndConsumeProof(
+    function parseAndConsumeProof(
         bytes memory proofData,
         uint64 proofBlockHeight
-    ) internal returns (ProofDecoder.ExecutionStatus memory result) {
+    ) external returns (ProofDecoder.ExecutionStatus memory result) {
         require(
             prover.proveOutcome(proofData, proofBlockHeight),
             "Proof should be valid"
