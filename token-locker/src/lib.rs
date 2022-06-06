@@ -94,7 +94,7 @@ pub trait ExtToken {
 impl Contract {
     #[init]
     /// `prover_account`: NEAR account of the Near Prover contract;
-    /// `locker_address`: Ethereum address of the token bridge contract, in hex.
+    /// `bridge_address`: Ethereum address of the token bridge contract, in hex.
     pub fn new(prover_account: AccountId, bridge_address: String) -> Self {
         Self {
             prover_account,
