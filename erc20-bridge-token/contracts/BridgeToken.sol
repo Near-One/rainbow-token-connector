@@ -11,7 +11,6 @@ contract BridgeToken is
     AccessControlUpgradeable,
     PausableUpgradeable
 {
-    address private _controller; // proxy address
 
     string private _name;
     string private _symbol;
@@ -26,7 +25,6 @@ contract BridgeToken is
         string memory symbol_,
         uint8 decimals_
     ) external initializer {
-        _controller = _msgSender();
 
         __ERC20_init(_name, _symbol);
         __AccessControl_init();
