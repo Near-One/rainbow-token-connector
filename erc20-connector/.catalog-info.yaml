@@ -1,0 +1,23 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: erc20-locker
+  title: ERC20 Locker
+  description: |-
+    Controls all token in Ethereum that are being sent to NEAR.
+  tags:
+    - contract
+    - ethereum
+  links: []
+  annotations:
+    aurora.dev/security-tier: "1"
+spec:
+  owner: bridge-team
+  type: contract
+  lifecycle: production
+  system: bridge-connectors
+  deployedAt:
+    - contract:ethereum/mainnet/0x23ddd3e3692d1861ed57ede224608875809e127f
+  interactsWith: []
+  subcomponentOf: rainbow-token-connector

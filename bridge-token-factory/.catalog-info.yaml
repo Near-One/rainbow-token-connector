@@ -1,0 +1,22 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: bridge-factory-near
+  title: Factory on Near
+  description: Factory on NEAR
+  tags:
+    - contract
+    - near
+  links: []
+  annotations:
+    aurora.dev/security-tier: "1"
+spec:
+  owner: bridge-team
+  type: contract
+  lifecycle: production
+  system: bridge-connectors
+  deployedAt:
+    - contract:near/mainnet/factory.bridge.near
+  interactsWith: []
+  subcomponentOf: rainbow-token-connector

@@ -1,0 +1,11 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: rainbow-token-connector-public
+  description: Public Rainbow Token Connector repository
+spec:
+  targets:
+    - ./bridge-token/.catalog-info.yaml
+    - ./bridge-token-factory/.catalog-info.yaml
+    - ./erc20-connector/.catalog-info.yaml
