@@ -1,22 +1,10 @@
-use admin_controlled::{Mask};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{Balance, Gas, AccountId, BlockHeight};
+use near_sdk::{Balance, AccountId, BlockHeight};
 use prover::EthAddress;
 
 pub mod prover;
 
-pub const NO_DEPOSIT: Balance = 0;
 
-pub const PAUSE_DEPOSIT: Mask = 1 << 1;
-
-/// Gas to call verify_log_entry on prover.
-pub const VERIFY_LOG_ENTRY_GAS: Gas = 50_000_000_000_000;
-
-/// Gas to call ft_transfer_call when the target of deposit is a contract
-pub const FT_TRANSFER_CALL_GAS: Gas = 80_000_000_000_000;
-
-/// Gas to call ft_transfer
-pub const FT_TRANSFER_GAS: Gas = 20_000_000_000_000;
 
 #[derive(Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum ResultType {
