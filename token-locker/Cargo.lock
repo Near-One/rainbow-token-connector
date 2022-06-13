@@ -11,9 +11,9 @@ checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
 [[package]]
 name = "admin-controlled"
 version = "0.1.0"
-source = "git+https://github.com/near/rainbow-bridge?rev=9ffb08e6613788096f26636f695b4c7e5fa5b261#9ffb08e6613788096f26636f695b4c7e5fa5b261"
+source = "git+https://github.com/near/rainbow-bridge?rev=4abc8d9b28d4a9a62b90d35147218a9d08f6721b#4abc8d9b28d4a9a62b90d35147218a9d08f6721b"
 dependencies = [
- "near-sdk",
+ "near-sdk 3.0.0-pre.3",
 ]
 
 [[package]]
@@ -190,7 +190,7 @@ dependencies = [
  "eth-types",
  "ethabi",
  "hex",
- "near-sdk",
+ "near-sdk 3.1.0",
  "rlp",
  "serde",
  "serde_json",
@@ -279,12 +279,12 @@ checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
 [[package]]
 name = "eth-types"
 version = "0.1.0"
-source = "git+https://github.com/near/rainbow-bridge?rev=9ffb08e6613788096f26636f695b4c7e5fa5b261#9ffb08e6613788096f26636f695b4c7e5fa5b261"
+source = "git+https://github.com/near/rainbow-bridge?rev=4abc8d9b28d4a9a62b90d35147218a9d08f6721b#4abc8d9b28d4a9a62b90d35147218a9d08f6721b"
 dependencies = [
  "borsh 0.8.2",
  "derive_more",
  "ethereum-types",
- "near-sdk",
+ "near-sdk 3.0.0-pre.3",
  "rlp",
  "rlp-derive",
  "serde",
@@ -484,10 +484,10 @@ dependencies = [
 
 [[package]]
 name = "near-contract-standards"
-version = "3.0.0-pre.3"
-source = "git+https://github.com/near/near-sdk-rs?rev=613adcab6322e4f830efb4d5bde2a810ae642158#613adcab6322e4f830efb4d5bde2a810ae642158"
+version = "3.1.0"
+source = "git+https://github.com/near/near-sdk-rs?tag=3.1.0#bac0ec71395c93620b215573bbaf5a4e4a9b8e85"
 dependencies = [
- "near-sdk",
+ "near-sdk 3.1.0",
 ]
 
 [[package]]
@@ -509,6 +509,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "near-primitives-core"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c2b3fb5acf3a494aed4e848446ef2d6ebb47dbe91c681105d4d1786c2ee63e52"
+dependencies = [
+ "base64 0.13.0",
+ "borsh 0.8.2",
+ "bs58",
+ "derive_more",
+ "hex",
+ "lazy_static",
+ "num-rational",
+ "serde",
+ "serde_json",
+ "sha2",
+]
+
+[[package]]
+name = "near-rpc-error-core"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ffa8dbf8437a28ac40fcb85859ab0d0b8385013935b000c7a51ae79631dd74d9"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn",
+]
+
+[[package]]
 name = "near-rpc-error-core"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -522,11 +553,25 @@ dependencies = [
 
 [[package]]
 name = "near-rpc-error-macro"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0c6111d713e90c7c551dee937f4a06cb9ea2672243455a4454cc7566387ba2d9"
+dependencies = [
+ "near-rpc-error-core 0.1.0",
+ "proc-macro2",
+ "quote",
+ "serde",
+ "serde_json",
+ "syn",
+]
+
+[[package]]
+name = "near-rpc-error-macro"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46bde9eb491ab7ccccd48ee6d438dc07aa74318faa0ff007717c3d5b538d3951"
 dependencies = [
- "near-rpc-error-core",
+ "near-rpc-error-core 0.5.0",
  "proc-macro2",
  "quote",
  "serde",
@@ -545,6 +590,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "near-runtime-utils"
+version = "4.0.0-pre.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a48d80c4ca1d4cf99bc16490e1e3d49826c150dfc4410ac498918e45c7d98e07"
+dependencies = [
+ "lazy_static",
+ "regex",
+]
+
+[[package]]
 name = "near-sdk"
 version = "3.0.0-pre.3"
 source = "git+https://github.com/near/near-sdk-rs?rev=613adcab6322e4f830efb4d5bde2a810ae642158#613adcab6322e4f830efb4d5bde2a810ae642158"
@@ -552,9 +607,25 @@ dependencies = [
  "base64 0.13.0",
  "borsh 0.8.2",
  "bs58",
- "near-primitives-core",
- "near-sdk-macros",
- "near-vm-logic",
+ "near-primitives-core 0.1.0",
+ "near-sdk-macros 3.0.0-pre.3",
+ "near-vm-logic 3.0.0",
+ "serde",
+ "serde_json",
+ "wee_alloc",
+]
+
+[[package]]
+name = "near-sdk"
+version = "3.1.0"
+source = "git+https://github.com/near/near-sdk-rs?tag=3.1.0#bac0ec71395c93620b215573bbaf5a4e4a9b8e85"
+dependencies = [
+ "base64 0.13.0",
+ "borsh 0.8.2",
+ "bs58",
+ "near-primitives-core 0.4.0",
+ "near-sdk-macros 3.1.0",
+ "near-vm-logic 4.0.0-pre.1",
  "serde",
  "serde_json",
  "wee_alloc",
@@ -572,11 +643,33 @@ dependencies = [
 ]
 
 [[package]]
+name = "near-sdk-core"
+version = "3.1.0"
+source = "git+https://github.com/near/near-sdk-rs?tag=3.1.0#bac0ec71395c93620b215573bbaf5a4e4a9b8e85"
+dependencies = [
+ "Inflector",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "near-sdk-macros"
 version = "3.0.0-pre.3"
 source = "git+https://github.com/near/near-sdk-rs?rev=613adcab6322e4f830efb4d5bde2a810ae642158#613adcab6322e4f830efb4d5bde2a810ae642158"
 dependencies = [
- "near-sdk-core",
+ "near-sdk-core 3.0.0-pre.3",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "near-sdk-macros"
+version = "3.1.0"
+source = "git+https://github.com/near/near-sdk-rs?tag=3.1.0#bac0ec71395c93620b215573bbaf5a4e4a9b8e85"
+dependencies = [
+ "near-sdk-core 3.1.0",
  "proc-macro2",
  "quote",
  "syn",
@@ -591,7 +684,19 @@ dependencies = [
  "borsh 0.9.3",
  "hex",
  "near-account-id",
- "near-rpc-error-macro",
+ "near-rpc-error-macro 0.5.0",
+ "serde",
+]
+
+[[package]]
+name = "near-vm-errors"
+version = "4.0.0-pre.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e281d8730ed8cb0e3e69fb689acee6b93cdb43824cd69a8ffd7e1bfcbd1177d7"
+dependencies = [
+ "borsh 0.8.2",
+ "hex",
+ "near-rpc-error-macro 0.1.0",
  "serde",
 ]
 
@@ -605,9 +710,27 @@ dependencies = [
  "borsh 0.8.2",
  "bs58",
  "byteorder",
- "near-primitives-core",
- "near-runtime-utils",
- "near-vm-errors",
+ "near-primitives-core 0.1.0",
+ "near-runtime-utils 3.0.0",
+ "near-vm-errors 3.1.0",
+ "serde",
+ "sha2",
+ "sha3",
+]
+
+[[package]]
+name = "near-vm-logic"
+version = "4.0.0-pre.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e11cb28a2d07f37680efdaf860f4c9802828c44fc50c08009e7884de75d982c5"
+dependencies = [
+ "base64 0.13.0",
+ "borsh 0.8.2",
+ "bs58",
+ "byteorder",
+ "near-primitives-core 0.4.0",
+ "near-runtime-utils 4.0.0-pre.1",
+ "near-vm-errors 4.0.0-pre.1",
  "serde",
  "sha2",
  "sha3",
@@ -731,6 +854,24 @@ name = "radium"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "def50a86306165861203e7f84ecffbbdfdea79f0e51039b33de1e952358c47ac"
+
+[[package]]
+name = "rainbow-bridge-near-token-locker"
+version = "0.1.0"
+dependencies = [
+ "admin-controlled",
+ "bridge-common",
+ "eth-types",
+ "ethabi",
+ "hex",
+ "near-contract-standards",
+ "near-sdk 3.1.0",
+ "rlp",
+ "serde",
+ "serde_json",
+ "tiny-keccak 1.5.0",
+ "uint",
+]
 
 [[package]]
 name = "rand"
@@ -927,24 +1068,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2c9d3793400a45f954c52e73d068316d76b6f4e36977e3fcebb13a2721e80237"
 dependencies = [
  "crunchy",
-]
-
-[[package]]
-name = "token-locker"
-version = "0.1.0"
-dependencies = [
- "admin-controlled",
- "bridge-common",
- "eth-types",
- "ethabi",
- "hex",
- "near-contract-standards",
- "near-sdk",
- "rlp",
- "serde",
- "serde_json",
- "tiny-keccak 1.5.0",
- "uint",
 ]
 
 [[package]]
