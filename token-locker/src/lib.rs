@@ -119,10 +119,9 @@ impl Contract {
         #[callback]
         #[serializer(borsh)]
         metadata: FungibleTokenMetadata,
-        #[serializer(borsh)] token_id: AccountId
     ) -> ResultType {
         ResultType::Metadata {
-            token: token_id,
+            token: env::predecessor_account_id(),
             name: metadata.name,
             symbol: metadata.symbol,
             decimals: metadata.decimals,
@@ -182,6 +181,7 @@ impl Contract {
     }
 
     #[private]
+    #[payable]
     pub fn finish_withdraw(
         &mut self,
         #[callback]
