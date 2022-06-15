@@ -1,7 +1,6 @@
 use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
 
 use crate::*;
-use near_sdk::json_types::ValidAccountId;
 
 #[near_bindgen]
 impl FungibleTokenReceiver for Contract {
@@ -9,7 +8,7 @@ impl FungibleTokenReceiver for Contract {
     /// msg: `Ethereum` address to receive the tokens on.
     fn ft_on_transfer(
         &mut self,
-        _sender_id: ValidAccountId,
+        _sender_id: AccountId,
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128> {
@@ -18,13 +17,12 @@ impl FungibleTokenReceiver for Contract {
         let eth_address = validate_eth_address(msg);
         // Emit the information for transfer via a separate callback to itself.
         // This is done because there is no event prover and this function must return integer value per FT standard.
-        ext_self::finish_deposit(
+        ext_self::ext(env::current_account_id())
+        .with_static_gas(FT_FINISH_DEPOSIT_GAS)
+        .finish_deposit(
             env::predecessor_account_id(),
             amount.0,
             eth_address,
-            &env::current_account_id(),
-            0,
-            FT_FINISH_DEPOSIT_GAS,
         );
         PromiseOrValue::Value(U128(0))
     }

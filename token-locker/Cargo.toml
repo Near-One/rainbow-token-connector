@@ -18,8 +18,8 @@ panic = "abort"
 overflow-checks = true
 
 [dependencies]
-near-sdk = { git = "https://github.com/near/near-sdk-rs", tag = "3.1.0" }
-near-contract-standards = { git = "https://github.com/near/near-sdk-rs", tag = "3.1.0" }
+near-sdk = { git = "https://github.com/near/near-sdk-rs", tag = "4.0.0" }
+near-contract-standards = { git = "https://github.com/near/near-sdk-rs", tag = "4.0.0" }
 eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "4abc8d9b28d4a9a62b90d35147218a9d08f6721b" }
 admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "4abc8d9b28d4a9a62b90d35147218a9d08f6721b" }
 tiny-keccak = "1.4.0"

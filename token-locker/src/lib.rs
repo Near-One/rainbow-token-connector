@@ -5,30 +5,30 @@ use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 use near_sdk::{AccountId, Balance, env, ext_contract, Gas, near_bindgen, PanicOnDefault, Promise, PromiseOrValue};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedSet;
-use near_sdk::json_types::{U128, ValidAccountId};
+use near_sdk::json_types::{U128};
 
-use bridge_common::{FT_TRANSFER_CALL_GAS, FT_TRANSFER_GAS, NO_DEPOSIT, parse_recipient, PAUSE_DEPOSIT, Recipient, ResultType, VERIFY_LOG_ENTRY_GAS};
-use bridge_common::prover::{EthAddress, ext_prover, Proof, validate_eth_address};
+use bridge_common::{parse_recipient, Recipient, ResultType};
+use bridge_common::prover::{EthAddress, ext_prover, Proof, validate_eth_address, FT_TRANSFER_CALL_GAS, FT_TRANSFER_GAS, NO_DEPOSIT, PAUSE_DEPOSIT, VERIFY_LOG_ENTRY_GAS};
 
 use crate::unlock_event::EthUnlockedEvent;
 
 mod token_receiver;
 mod unlock_event;
 
-near_sdk::setup_alloc!();
+// near_sdk::setup_alloc!();
 
 /// Gas to call finish withdraw method.
 /// This doesn't cover the gas required for calling transfer method.
-const FINISH_WITHDRAW_GAS: Gas = 30_000_000_000_000;
+const FINISH_WITHDRAW_GAS: Gas = Gas(30_000_000_000_000);
 
 /// Gas to call finish deposit method.
-const FT_FINISH_DEPOSIT_GAS: Gas = 10_000_000_000_000;
+const FT_FINISH_DEPOSIT_GAS: Gas = Gas(10_000_000_000_000);
 
 /// Gas for fetching metadata of token.
-const FT_GET_METADATA_GAS: Gas = 10_000_000_000_000;
+const FT_GET_METADATA_GAS: Gas = Gas(10_000_000_000_000);
 
 /// Gas for emitting metadata info.
-const FT_FINISH_LOG_METADATA_GAS: Gas = 30_000_000_000_000;
+const FT_FINISH_LOG_METADATA_GAS: Gas = Gas(30_000_000_000_000);
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -71,7 +71,6 @@ pub trait ExtContract {
         #[callback]
         #[serializer(borsh)]
         metadata: FungibleTokenMetadata,
-        #[serializer(borsh)] token_id: AccountId
     ) -> ResultType;
 }
 
@@ -105,10 +104,12 @@ impl Contract {
     }
 
     /// Logs into the result of this transaction a Metadata for given token.
-    pub fn log_metadata(&self, token_id: ValidAccountId) -> Promise {
-        let token_id = AccountId::from(token_id);
-        ext_token::ft_metadata(&token_id, 0, FT_GET_METADATA_GAS)
-            .then(ext_self::finish_log_metadata(token_id, &env::current_account_id(), 0, FT_FINISH_LOG_METADATA_GAS))
+    pub fn log_metadata(&self, token_id: AccountId) -> Promise {
+        ext_token::ext(token_id.clone())
+        .with_static_gas(FT_GET_METADATA_GAS)
+        .ft_metadata()
+            .then(ext_self::ext(token_id)
+            .with_static_gas(FT_FINISH_LOG_METADATA_GAS).finish_log_metadata())
     }
 
     /// Emits `ResultType` with Metadata of the given token.
@@ -121,11 +122,11 @@ impl Contract {
         metadata: FungibleTokenMetadata,
     ) -> ResultType {
         ResultType::Metadata {
-            token: env::predecessor_account_id(),
+            token: env::predecessor_account_id().into(),
             name: metadata.name,
             symbol: metadata.symbol,
             decimals: metadata.decimals,
-            block_height: env::block_index(),
+            block_height: env::block_height(),
         }
     }
 
@@ -143,7 +144,10 @@ impl Contract {
             hex::encode(&self.bridge_address),
         );
         let proof_1 = proof.clone();
-        ext_prover::verify_log_entry(
+        ext_prover::ext(self.prover_account.clone())
+        .with_static_gas(VERIFY_LOG_ENTRY_GAS)
+        .with_attached_deposit(NO_DEPOSIT)
+        .verify_log_entry(
             proof.log_index,
             proof.log_entry_data,
             proof.receipt_index,
@@ -151,18 +155,15 @@ impl Contract {
             proof.header_data,
             proof.proof,
             false, // Do not skip bridge call. This is only used for development and diagnostics.
-            &self.prover_account,
-            NO_DEPOSIT,
-            VERIFY_LOG_ENTRY_GAS,
         )
-            .then(ext_self::finish_withdraw(
+            .then(ext_self::ext(env::current_account_id())
+            .with_attached_deposit(env::attached_deposit())
+            .with_static_gas( FINISH_WITHDRAW_GAS + FT_TRANSFER_CALL_GAS)
+                .finish_withdraw(
                 event.token,
                 event.recipient,
                 event.amount,
                 proof_1,
-                &env::current_account_id(),
-                env::attached_deposit(),
-                FINISH_WITHDRAW_GAS + FT_TRANSFER_CALL_GAS,
             ))
     }
 
@@ -174,7 +175,7 @@ impl Contract {
                           #[serializer(borsh)] recipient: EthAddress,
     ) -> ResultType {
         ResultType::Lock {
-            token,
+            token: token.into(),
             amount,
             recipient,
         }
@@ -200,27 +201,27 @@ impl Contract {
                 >= required_deposit
         );
 
-        let Recipient { target, message } = parse_recipient(new_owner_id);
+        let Recipient { target, message } = parse_recipient(new_owner_id.into());
 
-        env::log(format!("Finish deposit. Token:{} Target:{} Message:{:?}", token, target, message).as_bytes());
+        env::log_str(format!("Finish deposit. Token:{} Target:{} Message:{:?}", token, target, message).as_str());
 
         match message {
-            Some(message) => ext_token::ft_transfer_call(
+            Some(message) => ext_token::ext(token.try_into().unwrap())
+            .with_attached_deposit(1)
+            .with_static_gas(FT_TRANSFER_CALL_GAS)
+            .ft_transfer_call(
                     target.try_into().unwrap(),
                     amount.into(),
                     None,
                     message,
-                    &token,
-                    1,
-                    FT_TRANSFER_CALL_GAS,
                 ),
-            None => ext_token::ft_transfer(
-                target,
+            None => ext_token::ext(token.try_into().unwrap())
+            .with_attached_deposit(1)
+            .with_static_gas(FT_TRANSFER_GAS)
+            .ft_transfer(
+                target.into(),
                 amount.into(),
                 None,
-                &token,
-                1,
-                FT_TRANSFER_GAS,
             ),
         }
     }
@@ -294,11 +295,11 @@ mod tests {
     }
 
     fn prover() -> AccountId {
-        "prover".to_string()
+        "prover".parse().unwrap()
     }
 
     fn bridge_token_factory() -> AccountId {
-        "bridge".to_string()
+        "bridge".parse().unwrap()
     }
 
     fn token_locker() -> String {
@@ -327,7 +328,7 @@ mod tests {
             token,
             sender: "00005474e89094c44da98b954eedeac495271d0f".to_string(),
             amount: 1000,
-            recipient: "123".to_string(),
+            recipient: "123".parse().unwrap(),
         };
 
         Proof {

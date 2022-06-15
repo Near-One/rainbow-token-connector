@@ -42,7 +42,7 @@ impl EthUnlockedEvent {
             token,
             sender,
             amount,
-            recipient,
+            recipient: recipient.parse().unwrap(),
         }
     }
 
@@ -56,7 +56,7 @@ impl EthUnlockedEvent {
             vec![
                 Token::String(self.token.clone()),
                 Token::Uint(self.amount.into()),
-                Token::String(self.recipient.clone()),
+                Token::String(self.recipient.clone().into()),
             ],
         )
     }

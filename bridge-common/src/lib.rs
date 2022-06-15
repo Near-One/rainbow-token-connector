@@ -50,7 +50,7 @@ pub struct Recipient {
 pub fn parse_recipient(recipient: String) -> Recipient {
     if recipient.contains(':') {
         let mut iter = recipient.split(':');
-        let target = iter.next().unwrap().into();
+        let target = iter.next().unwrap().parse().unwrap();
         let message = iter.collect::<Vec<&str>>().join(":");
 
         Recipient {
@@ -59,7 +59,7 @@ pub fn parse_recipient(recipient: String) -> Recipient {
         }
     } else {
         Recipient {
-            target: recipient,
+            target:  recipient.parse().unwrap(),
             message: None,
         }
     }
