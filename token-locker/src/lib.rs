@@ -15,7 +15,6 @@ use crate::unlock_event::EthUnlockedEvent;
 mod token_receiver;
 mod unlock_event;
 
-// near_sdk::setup_alloc!();
 
 /// Gas to call finish withdraw method.
 /// This doesn't cover the gas required for calling transfer method.
