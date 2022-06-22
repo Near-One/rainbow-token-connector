@@ -1,0 +1,22 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: bridge-token-factory-on-near
+  title: Bridge Token Factory on Near
+  description: Bridge Token Factory on NEAR that manages bridged ERC-20 tokens from Ethereum on NEAR as NEP-141 tokens
+  tags:
+    - contract
+    - near
+  links: []
+  annotations:
+    aurora.dev/security-tier: "1"
+spec:
+  owner: bridge-team
+  type: contract
+  lifecycle: production
+  system: bridge-connectors
+  deployedAt:
+    - contract:near/mainnet/factory.bridge.near
+  interactsWith: []
+  subcomponentOf: rainbow-token-connector
