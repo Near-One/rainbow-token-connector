@@ -2,10 +2,10 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: bridge-token
-  title: Bridge Token
+  name: bridge-token-on-near
+  title: Bridge NEP-141 Token
   description: |-
-    Bridge Token
+    Bridged token represented as NEP-141 token contract
   tags:
     - contract
     - near

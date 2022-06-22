@@ -5,7 +5,7 @@ metadata:
   name: erc20-locker
   title: ERC20 Locker
   description: |-
-    Controls all token in Ethereum that are being sent to NEAR.
+    Contains all ERC-20 locked tokens on Ethereum that are being sent to NEAR/Aurora via Rainbow Bridge.
   tags:
     - contract
     - ethereum

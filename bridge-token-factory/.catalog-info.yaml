@@ -2,9 +2,9 @@
 apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
-  name: bridge-factory-near
-  title: Factory on Near
-  description: Factory on NEAR
+  name: bridge-token-factory-on-near
+  title: Bridge Token Factory on Near
+  description: Bridge Token Factory on NEAR that manages bridged ERC-20 tokens from Ethereum on NEAR as NEP-141 tokens
   tags:
     - contract
     - near
