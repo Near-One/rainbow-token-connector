@@ -104,8 +104,8 @@ TODO
 1. User sends `<erc20>.approve(<erc20locker>, <amount>)` Ethereum transaction.
 2. User sends `<erc20locker>.lock(<erc20>, <amount>, <destination>)` Ethereum transaction. This transaction will create `Locked` event.
 3. Relayers will be sending Ethereum blocks to the `EthClient` on NEAR side.
-4. After sufficient number of confirmations on top of the mined Ethereum block that contain the `lock` transaction, user or relayer can call `BridgeTokenFactory.mint(proof)`. Proof is the extracted information from the event on Ethereum side.
-5. `BridgeTokenFactory.mint` function will call `EthProver` and verify that proof is correct and relies on a block with sufficient number of confirmations.
+4. After sufficient number of confirmations on top of the mined Ethereum block that contain the `lock` transaction, user or relayer can call `BridgeTokenFactory.deposit(proof)`. Proof is the extracted information from the event on Ethereum side.
+5. `BridgeTokenFactory.deposit` function will call `EthProver` and verify that proof is correct and relies on a block with sufficient number of confirmations.
 6. `EthProver` will return callback to `BridgeTokenFactory` confirming that proof is correct.
 7. `BridgeTokenFactory` will call `<<hex(erc20)>.<bridge_token_factory>>.mint(<near_account_id>, <amount>)`.
 8. User can use `<<hex(erc20)>.<bridge_token_factory>>` token in other applications now on NEAR.
