@@ -2,7 +2,7 @@ CARGO = cargo
 
 .PHONY = res/bridge_token.wasm res/bridge_token_factory.wasm res/bridge_token_no_icon.wasm res/bridge_token_factory_no_icon.wasm res/ERC20MetadataLogger.json
 
-all: res/bridge_token.wasm res/bridge_token_factory.wasm res/ERC20MetadataLogger.json
+all: res/bridge_token.wasm res/bridge_token_factory.wasm res/rainbow_bridge_near_token_locker.wasm res/ERC20MetadataLogger.json
 
 prepare:
 	rustup target add wasm32-unknown-unknown
@@ -21,6 +21,13 @@ res/bridge_token_factory.wasm: res/bridge_token.wasm $(shell find bridge-token-f
 	$(CARGO) build --target wasm32-unknown-unknown --release && \
 	cp target/wasm32-unknown-unknown/release/bridge_token_factory.wasm ../res/ && \
 	ls -l ../res/bridge_token_factory.wasm
+
+res/rainbow_bridge_near_token_locker.wasm: $(shell find token-locker/src -name "*.rs")
+	cd token-locker && \
+	export RUSTFLAGS='-C link-arg=-s' && \
+	$(CARGO) build --target wasm32-unknown-unknown --release && \
+	cp target/wasm32-unknown-unknown/release/rainbow_bridge_near_token_locker.wasm ../res/ && \
+	ls -l ../res/rainbow_bridge_near_token_locker.wasm
 
 res/ERC20MetadataLogger.json: metadata-connector/contracts/ERC20MetadataLogger.sol
 	cd metadata-connector && \

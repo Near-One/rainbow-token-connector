@@ -4,19 +4,14 @@ use near_contract_standards::fungible_token::metadata::{
 };
 use near_contract_standards::fungible_token::FungibleToken;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::json_types::{Base64VecU8, ValidAccountId, U128};
+use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::{
     assert_one_yocto, env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault,
     Promise, PromiseOrValue, StorageUsage,
 };
-use std::convert::TryInto;
-
-near_sdk::setup_alloc!();
-
-const NO_DEPOSIT: Balance = 0;
 
 /// Gas to call finish withdraw method on factory.
-const FINISH_WITHDRAW_GAS: Gas = 50_000_000_000_000;
+const FINISH_WITHDRAW_GAS: Gas = Gas(50_000_000_000_000);
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -97,7 +92,7 @@ impl BridgeToken {
             "Only controller can call mint"
         );
 
-        self.storage_deposit(Some(account_id.as_str().try_into().unwrap()), None);
+        self.storage_deposit(Some(account_id.clone()), None);
         self.token.internal_deposit(&account_id, amount.into());
     }
 
@@ -111,13 +106,9 @@ impl BridgeToken {
         self.token
             .internal_withdraw(&env::predecessor_account_id(), amount.into());
 
-        ext_bridge_token_factory::finish_withdraw(
-            amount.into(),
-            recipient,
-            &self.controller,
-            NO_DEPOSIT,
-            FINISH_WITHDRAW_GAS,
-        )
+        ext_bridge_token_factory::ext(self.controller.clone())
+            .with_static_gas(FINISH_WITHDRAW_GAS)
+            .finish_withdraw(amount.into(), recipient.parse().unwrap())
     }
 
     pub fn account_storage_usage(&self) -> StorageUsage {

@@ -248,7 +248,7 @@ impl Contract {
         let required_deposit =
             Balance::from(current_storage - initial_storage) * env::storage_byte_cost();
 
-        env::log(format!("RecordProof:{}", hex::encode(proof_key)).as_bytes());
+        env::log_str(&format!("RecordProof:{}", hex::encode(proof_key)));
         required_deposit
     }
 }
