@@ -13,6 +13,7 @@ impl FungibleTokenReceiver for Contract {
         msg: String,
     ) -> PromiseOrValue<U128> {
         self.check_not_paused(PAUSE_DEPOSIT);
+        self.check_whitelist_token(env::predecessor_account_id(), env::signer_account_id());
         // Fails if msg is not a valid Ethereum address.
         let eth_address = validate_eth_address(msg);
         // Emit the information for transfer via a separate callback to itself.

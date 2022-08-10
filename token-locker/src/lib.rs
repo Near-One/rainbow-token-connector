@@ -9,11 +9,15 @@ use near_sdk::json_types::{U128};
 
 use bridge_common::{parse_recipient, Recipient, ResultType};
 use bridge_common::prover::{EthAddress, ext_prover, Proof, validate_eth_address, FT_TRANSFER_CALL_GAS, FT_TRANSFER_GAS, NO_DEPOSIT, PAUSE_DEPOSIT, VERIFY_LOG_ENTRY_GAS};
+use near_sdk_inner::BorshStorageKey;
+use near_sdk_inner::collections::UnorderedMap;
+use whitelist::WhitelistMode;
 
 use crate::unlock_event::EthUnlockedEvent;
 
 mod token_receiver;
 mod unlock_event;
+mod whitelist;
 
 
 /// Gas to call finish withdraw method.
@@ -29,6 +33,13 @@ const FT_GET_METADATA_GAS: Gas = Gas(10_000_000_000_000);
 /// Gas for emitting metadata info.
 const FT_FINISH_LOG_METADATA_GAS: Gas = Gas(30_000_000_000_000);
 
+#[derive(BorshSerialize, BorshStorageKey)]
+enum StorageKey {
+    UsedEvents,
+    WhitelistTokens,
+    WhitelistAccounts,
+}
+
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Contract {
@@ -40,6 +51,12 @@ pub struct Contract {
     pub used_events: UnorderedSet<Vec<u8>>,
     /// Mask determining all paused functions
     paused: Mask,
+    /// Mapping whitelisted tokens to their mode
+    pub whitelist_tokens: UnorderedMap<AccountId, WhitelistMode>,
+    /// Mapping whitelisted accounts to their whitelisted tokens by using combined key {token}:{account}
+    pub whitelist_accounts: UnorderedSet<String>,
+    /// The mode of the whitelist check
+    pub is_whitelist_mode_enabled: bool,
 }
 
 #[ext_contract(ext_self)]
@@ -96,9 +113,12 @@ impl Contract {
     pub fn new(prover_account: AccountId, bridge_address: String) -> Self {
         Self {
             prover_account,
-            used_events: UnorderedSet::new(b"u".to_vec()),
+            used_events: UnorderedSet::new(StorageKey::UsedEvents),
             bridge_address: validate_eth_address(bridge_address),
             paused: Mask::default(),
+            whitelist_tokens: UnorderedMap::new(StorageKey::WhitelistTokens),
+            whitelist_accounts: UnorderedSet::new(StorageKey::WhitelistAccounts),
+            is_whitelist_mode_enabled: true,
         }
     }
 
