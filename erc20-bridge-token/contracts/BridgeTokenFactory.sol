@@ -174,7 +174,7 @@ contract BridgeTokenFactory is  AccessControlUpgradeable, PausableUpgradeable{
     }
 
     function addAccountToWhitelist(string calldata token, address account) external onlyRole(WHITELIST_ADMIN_ROLE) {
-        require(_whitelist_tokens[token] == WhitelistMode.NotInited, "ERR_NOT_INITED_WHITELIST_TOKEN");
+        require(_whitelist_tokens[token] != WhitelistMode.NotInited, "ERR_NOT_INITED_WHITELIST_TOKEN");
        _whitelist_accounts[abi.encodePacked(token, account)] = true;
     }
     
@@ -184,7 +184,7 @@ contract BridgeTokenFactory is  AccessControlUpgradeable, PausableUpgradeable{
         }
         
         WhitelistMode token_mode = _whitelist_tokens[token];
-        require(token_mode == WhitelistMode.NotInited, "ERR_NOT_INITED_WHITELIST_TOKEN");
+        require(token_mode != WhitelistMode.NotInited, "ERR_NOT_INITED_WHITELIST_TOKEN");
 
         if (token_mode == WhitelistMode.CheckAccountAndToken) {
             require(_whitelist_accounts[abi.encodePacked(token, account)], "ERR_ACCOUNT_NOT_IN_WHAITELIST");
