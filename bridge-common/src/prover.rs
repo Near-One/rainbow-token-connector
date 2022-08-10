@@ -1,14 +1,29 @@
 use std::convert::From;
 
+use admin_controlled::{Mask};
 use eth_types::*;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog, Token};
 use ethabi::param_type::Writer;
+
+use near_sdk::{env, ext_contract, Gas, Balance};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{env, ext_contract};
-use near_sdk::serde::{Serialize, Deserialize};
+use near_sdk::serde::{Deserialize, Serialize};
 use tiny_keccak::Keccak;
 
 pub type EthAddress = [u8; 20];
+
+pub const NO_DEPOSIT: Balance = 0;
+
+pub const PAUSE_DEPOSIT: Mask = 1 << 1;
+
+/// Gas to call verify_log_entry on prover.
+pub const VERIFY_LOG_ENTRY_GAS: Gas = Gas(50_000_000_000_000);
+
+/// Gas to call ft_transfer_call when the target of deposit is a contract
+pub const FT_TRANSFER_CALL_GAS: Gas = Gas(80_000_000_000_000);
+
+/// Gas to call ft_transfer
+pub const FT_TRANSFER_GAS: Gas = Gas(20_000_000_000_000);
 
 pub fn validate_eth_address(address: String) -> EthAddress {
     let data = hex::decode(address).expect("address should be a valid hex string.");

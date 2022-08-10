@@ -1,23 +1,21 @@
+use std::convert::TryInto;
+
 use admin_controlled::{AdminControlled, Mask};
+use near_sdk::{
+    AccountId, Balance, env, ext_contract, Gas, near_bindgen, PanicOnDefault, Promise, PublicKey,
+};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap, UnorderedSet};
-use near_sdk::json_types::{Base64VecU8, ValidAccountId, U128};
-use near_sdk::{
-    env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault, Promise, PublicKey,
-};
+use near_sdk::json_types::{Base64VecU8, U128, ValidAccountId};
 
-type EthereumAddress = [u8; 20];
+use bridge_common::{FT_TRANSFER_CALL_GAS, NO_DEPOSIT, parse_recipient, Recipient, ResultType, VERIFY_LOG_ENTRY_GAS};
+use bridge_common::prover::*;
+pub use bridge_common::prover::{Proof, validate_eth_address};
 pub use lock_event::EthLockedEvent;
 pub use log_metadata_event::TokenMetadataEvent;
-use prover::*;
-pub use prover::{validate_eth_address, Proof};
-use std::convert::TryInto;
-pub use unlock_event::EthUnlockedEvent;
 
 mod lock_event;
 mod log_metadata_event;
-pub mod prover;
-mod unlock_event;
 
 near_sdk::setup_alloc!();
 
@@ -25,8 +23,6 @@ const BRIDGE_TOKEN_BINARY: &'static [u8] = include_bytes!(std::env!(
     "BRIDGE_TOKEN",
     "Set BRIDGE_TOKEN to be the path of the bridge token binary"
 ));
-
-const NO_DEPOSIT: Balance = 0;
 
 /// Initial balance for the BridgeToken contract to cover storage and related.
 const BRIDGE_TOKEN_INIT_BALANCE: Balance = 3_000_000_000_000_000_000_000_000; // 3e24yN, 3N
@@ -37,18 +33,12 @@ const BRIDGE_TOKEN_NEW: Gas = 10_000_000_000_000;
 /// Gas to call mint method on bridge token.
 const MINT_GAS: Gas = 10_000_000_000_000;
 
-/// Gas to call ft_transfer_call when the target of deposit is a contract
-const FT_TRANSFER_CALL_GAS: Gas = 80_000_000_000_000;
-
 /// Gas to call finish deposit method.
 /// This doesn't cover the gas required for calling mint method.
 const FINISH_DEPOSIT_GAS: Gas = 30_000_000_000_000;
 
 /// Gas to call finish update_metadata method.
 const FINISH_UPDATE_METADATA_GAS: Gas = 5_000_000_000_000;
-
-/// Gas to call verify_log_entry on prover.
-const VERIFY_LOG_ENTRY_GAS: Gas = 50_000_000_000_000;
 
 /// Amount of gas used by set_metadata in the factory, without taking into account
 /// the gas consumed by the promise.
@@ -67,20 +57,6 @@ const METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY: &[u8] = b"aM_CONNECTOR";
 /// block on Ethereum where the metadata for given token was emitted.
 /// The prefix is made specially short since it becomes more expensive with larger prefixes.
 const TOKEN_TIMESTAMP_MAP_PREFIX: &[u8] = b"aTT";
-
-#[derive(Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
-pub enum ResultType {
-    Withdraw {
-        amount: Balance,
-        token: EthereumAddress,
-        recipient: EthereumAddress,
-    },
-    Lock {
-        token: String,
-        amount: Balance,
-        recipient: EthereumAddress,
-    },
-}
 
 const PAUSE_DEPLOY_TOKEN: Mask = 1 << 0;
 const PAUSE_DEPOSIT: Mask = 1 << 1;
@@ -162,44 +138,6 @@ pub trait ExtBridgeToken {
 
 pub fn assert_self() {
     assert_eq!(env::predecessor_account_id(), env::current_account_id());
-}
-
-struct Recipient {
-    target: AccountId,
-    message: Option<String>,
-}
-
-/// `recipient` is the target account id receiving current ERC-20 tokens.
-///
-/// If `recipient` doesn't contain a semicolon (:) then it is interpreted as a NEAR account id
-/// and token are minted as NEP-141 directly on `recipient` account id.
-///
-/// Otherwise, the format expected is: <target_address>:<message>
-///
-/// @target_address: Account id of the contract to transfer current funds
-/// @message: Free form message to be send to the target using ft_transfer_call
-///
-/// The final message sent to the `target_address` has the format:
-///
-/// <message>
-///
-/// Where `message` is the free form string that was passed.
-fn parse_recipient(recipient: String) -> Recipient {
-    if recipient.contains(':') {
-        let mut iter = recipient.split(':');
-        let target = iter.next().unwrap().into();
-        let message = iter.collect::<Vec<&str>>().join(":");
-
-        Recipient {
-            target,
-            message: Some(message),
-        }
-    } else {
-        Recipient {
-            target: recipient,
-            message: None,
-        }
-    }
 }
 
 #[near_bindgen]
@@ -606,14 +544,15 @@ admin_controlled::impl_admin_controlled!(BridgeTokenFactory, paused);
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
-    use near_sdk::test_utils::VMContextBuilder;
-    use near_sdk::{testing_env, MockedBlockchain};
-
-    use super::*;
-    use near_sdk::env::sha256;
     use std::convert::TryInto;
     use std::panic;
+
+    use near_sdk::{MockedBlockchain, testing_env};
+    use near_sdk::env::sha256;
+    use near_sdk::test_utils::VMContextBuilder;
     use uint::rustc_hex::{FromHex, ToHex};
+
+    use super::*;
 
     const UNPAUSE_ALL: Mask = 0;
 

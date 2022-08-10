@@ -30,10 +30,13 @@ uint = { version = "0.8.3", default-features = false }
 rlp = "0.4.2"
 hex = "0.4.2"
 
+bridge-common = { path = "../bridge-common" }
+
 [dev-dependencies]
 near-sdk-sim = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
 test-token = { git = "https://github.com/mfornet/contracts", rev = "9e115e54bec56842d1380c6ebdd884eab3170583" }
-bridge-token = { path = "../bridge-token" }
-mock-prover = { path = "../mock-prover" }
 lazy_static = "1.4.0"
 rand = "0.7.3"
+
+bridge-token = { path = "../bridge-token" }
+mock-prover = { path = "../mock-prover" }

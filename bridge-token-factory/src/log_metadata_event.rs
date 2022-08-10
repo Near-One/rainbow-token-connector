@@ -1,6 +1,7 @@
-use crate::prover::{EthAddress, EthEvent, EthEventParams};
 use ethabi::{ParamType, Token};
 use hex::ToHex;
+
+use bridge_common::prover::{EthAddress, EthEvent, EthEventParams};
 
 /// Data that was emitted by the Ethereum Locked event.
 #[derive(Debug, Eq, PartialEq)]
