@@ -434,7 +434,7 @@ dependencies = [
 [[package]]
 name = "eth2_hashing"
 version = "0.3.0"
-source = "git+https://github.com/aurora-is-near/lighthouse.git?rev=b7dd45e622c35674916bf71a200891d7fc0279ec#b7dd45e622c35674916bf71a200891d7fc0279ec"
+source = "git+https://github.com/near/rainbow-bridge?rev=67966a151122815039f07b02065ab3a2bba09804#67966a151122815039f07b02065ab3a2bba09804"
 dependencies = [
  "lazy_static",
  "near-sdk",
@@ -443,7 +443,7 @@ dependencies = [
 [[package]]
 name = "eth2_serde_utils"
 version = "0.1.1"
-source = "git+https://github.com/aurora-is-near/lighthouse.git?rev=b7dd45e622c35674916bf71a200891d7fc0279ec#b7dd45e622c35674916bf71a200891d7fc0279ec"
+source = "git+https://github.com/aurora-is-near/lighthouse.git?rev=b624c3f0d3c5bc9ea46faa14c9cb2d90ee1e1dec#b624c3f0d3c5bc9ea46faa14c9cb2d90ee1e1dec"
 dependencies = [
  "ethereum-types",
  "hex",
@@ -455,7 +455,7 @@ dependencies = [
 [[package]]
 name = "eth2_ssz"
 version = "0.4.1"
-source = "git+https://github.com/aurora-is-near/lighthouse.git?rev=b7dd45e622c35674916bf71a200891d7fc0279ec#b7dd45e622c35674916bf71a200891d7fc0279ec"
+source = "git+https://github.com/aurora-is-near/lighthouse.git?rev=b624c3f0d3c5bc9ea46faa14c9cb2d90ee1e1dec#b624c3f0d3c5bc9ea46faa14c9cb2d90ee1e1dec"
 dependencies = [
  "ethereum-types",
  "smallvec",
@@ -464,7 +464,7 @@ dependencies = [
 [[package]]
 name = "eth2_ssz_derive"
 version = "0.3.0"
-source = "git+https://github.com/aurora-is-near/lighthouse.git?rev=b7dd45e622c35674916bf71a200891d7fc0279ec#b7dd45e622c35674916bf71a200891d7fc0279ec"
+source = "git+https://github.com/aurora-is-near/lighthouse.git?rev=b624c3f0d3c5bc9ea46faa14c9cb2d90ee1e1dec#b624c3f0d3c5bc9ea46faa14c9cb2d90ee1e1dec"
 dependencies = [
  "darling",
  "proc-macro2",
@@ -1413,7 +1413,7 @@ dependencies = [
 [[package]]
 name = "tree_hash"
 version = "0.4.1"
-source = "git+https://github.com/aurora-is-near/lighthouse.git?rev=b7dd45e622c35674916bf71a200891d7fc0279ec#b7dd45e622c35674916bf71a200891d7fc0279ec"
+source = "git+https://github.com/aurora-is-near/lighthouse.git?rev=b624c3f0d3c5bc9ea46faa14c9cb2d90ee1e1dec#b624c3f0d3c5bc9ea46faa14c9cb2d90ee1e1dec"
 dependencies = [
  "eth2_hashing",
  "ethereum-types",
@@ -1423,7 +1423,7 @@ dependencies = [
 [[package]]
 name = "tree_hash_derive"
 version = "0.4.0"
-source = "git+https://github.com/aurora-is-near/lighthouse.git?rev=b7dd45e622c35674916bf71a200891d7fc0279ec#b7dd45e622c35674916bf71a200891d7fc0279ec"
+source = "git+https://github.com/aurora-is-near/lighthouse.git?rev=b624c3f0d3c5bc9ea46faa14c9cb2d90ee1e1dec#b624c3f0d3c5bc9ea46faa14c9cb2d90ee1e1dec"
 dependencies = [
  "darling",
  "quote",

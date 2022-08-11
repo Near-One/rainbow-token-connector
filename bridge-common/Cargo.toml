@@ -19,3 +19,7 @@ hex = "0.4.2"
 [features]
 default = ["result_with_prefix"]
 result_with_prefix = []
+
+[patch]
+[patch.crates-io]
+eth2_hashing = { git = "https://github.com/near/rainbow-bridge", rev = "67966a151122815039f07b02065ab3a2bba09804" }
