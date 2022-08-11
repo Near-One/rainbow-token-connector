@@ -27,7 +27,7 @@ contract BridgeTokenFactory is  AccessControlUpgradeable, PausableUpgradeable{
 
     mapping(string => WhitelistMode) private _whitelist_tokens;
     mapping(bytes => bool) private _whitelist_accounts;
-    bool private _is_whitelist_mode_enabled;
+    bool private _is_whitelist_mode_enabled = true;
 
     address public ProofConsumerAddress;
     bytes32 public constant PAUSE_ROLE = keccak256("PAUSE_ROLE");
