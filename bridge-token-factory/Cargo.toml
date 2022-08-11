@@ -18,25 +18,21 @@ panic = "abort"
 overflow-checks = true
 
 [dependencies]
-near-sdk = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
-near-contract-standards = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
-eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "9ffb08e6613788096f26636f695b4c7e5fa5b261" }
-admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "9ffb08e6613788096f26636f695b4c7e5fa5b261" }
-tiny-keccak = "1.4.0"
+near-sdk = "4.0.0"
+near-contract-standards = "4.0.0"
+eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "67966a151122815039f07b02065ab3a2bba09804" }
+admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "67966a151122815039f07b02065ab3a2bba09804" }
 ethabi = "12.0.0"
-serde = { version = "*", features = ["derive"] }
-serde_json = "*"
-uint = { version = "0.8.3", default-features = false }
-rlp = "0.4.2"
+bridge-common = { path = "../bridge-common" }
+bridge-token = { path = "../bridge-token" }
 hex = "0.4.2"
 
-bridge-common = { path = "../bridge-common" }
-
 [dev-dependencies]
-near-sdk-sim = { git = "https://github.com/near/near-sdk-rs", rev = "613adcab6322e4f830efb4d5bde2a810ae642158" }
-test-token = { git = "https://github.com/mfornet/contracts", rev = "9e115e54bec56842d1380c6ebdd884eab3170583" }
-lazy_static = "1.4.0"
+uint = { version = "0.8.3", default-features = false }
 rand = "0.7.3"
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
 
-bridge-token = { path = "../bridge-token" }
-mock-prover = { path = "../mock-prover" }
+[patch]
+[patch.crates-io]
+eth2_hashing = { git = "https://github.com/near/rainbow-bridge", rev = "67966a151122815039f07b02065ab3a2bba09804" }

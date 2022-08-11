@@ -7,12 +7,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "4abc8d9b28d4a9a62b90d35147218a9d08f6721b" }
+eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "67966a151122815039f07b02065ab3a2bba09804" }
+admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "67966a151122815039f07b02065ab3a2bba09804" }
 ethabi = "12.0.0"
-near-sdk = { git = "https://github.com/near/near-sdk-rs", tag = "4.0.0" }
+near-sdk = "4.0.0"
 tiny-keccak = "1.4.0"
-serde = { version = "*", features = ["derive"] }
-serde_json = "*"
 rlp = "0.4.2"
+serde = { version = "1.0", features = ["derive"] }
 hex = "0.4.2"
-admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "4abc8d9b28d4a9a62b90d35147218a9d08f6721b" }

@@ -18,16 +18,16 @@ mod unlock_event;
 
 /// Gas to call finish withdraw method.
 /// This doesn't cover the gas required for calling transfer method.
-const FINISH_WITHDRAW_GAS: Gas = Gas(30_000_000_000_000);
+const FINISH_WITHDRAW_GAS: Gas = Gas(Gas::ONE_TERA.0 * 30);
 
 /// Gas to call finish deposit method.
-const FT_FINISH_DEPOSIT_GAS: Gas = Gas(10_000_000_000_000);
+const FT_FINISH_DEPOSIT_GAS: Gas = Gas(Gas::ONE_TERA.0 * 10);
 
 /// Gas for fetching metadata of token.
-const FT_GET_METADATA_GAS: Gas = Gas(10_000_000_000_000);
+const FT_GET_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 10);
 
 /// Gas for emitting metadata info.
-const FT_FINISH_LOG_METADATA_GAS: Gas = Gas(30_000_000_000_000);
+const FT_FINISH_LOG_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 30);
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -248,7 +248,7 @@ impl Contract {
         let required_deposit =
             Balance::from(current_storage - initial_storage) * env::storage_byte_cost();
 
-        env::log(format!("RecordProof:{}", hex::encode(proof_key)).as_bytes());
+        env::log_str(&format!("RecordProof:{}", hex::encode(proof_key)));
         required_deposit
     }
 }

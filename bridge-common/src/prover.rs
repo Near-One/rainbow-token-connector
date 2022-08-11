@@ -17,13 +17,13 @@ pub const NO_DEPOSIT: Balance = 0;
 pub const PAUSE_DEPOSIT: Mask = 1 << 1;
 
 /// Gas to call verify_log_entry on prover.
-pub const VERIFY_LOG_ENTRY_GAS: Gas = Gas(50_000_000_000_000);
+pub const VERIFY_LOG_ENTRY_GAS: Gas = Gas(Gas::ONE_TERA.0 * 50);
 
 /// Gas to call ft_transfer_call when the target of deposit is a contract
-pub const FT_TRANSFER_CALL_GAS: Gas = Gas(80_000_000_000_000);
+pub const FT_TRANSFER_CALL_GAS: Gas = Gas(Gas::ONE_TERA.0 * 80);
 
 /// Gas to call ft_transfer
-pub const FT_TRANSFER_GAS: Gas = Gas(20_000_000_000_000);
+pub const FT_TRANSFER_GAS: Gas = Gas(Gas::ONE_TERA.0 * 20);
 
 pub fn validate_eth_address(address: String) -> EthAddress {
     let data = hex::decode(address).expect("address should be a valid hex string.");

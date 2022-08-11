@@ -26,7 +26,7 @@ fn real_data_locked_event_serialization() {
         let locked_event = EthLockedEvent::from_log_entry_data(serialized.as_ref());
 
         assert_eq!(locked_event.amount, event.amount);
-        assert_eq!(locked_event.recipient, event.recipient);
+        assert_eq!(locked_event.recipient.to_string(), event.recipient);
 
         let re_serialize = locked_event.to_log_entry_data();
         assert_eq!(re_serialize, serialized);
@@ -45,7 +45,7 @@ fn generate_random_eth_locked_event(rng: &mut ThreadRng) -> EthLockedEvent {
         token: hex::encode(rng.gen::<[u8; 20]>()),
         sender: hex::encode(rng.gen::<[u8; 20]>()),
         amount: rng.gen::<u128>(),
-        recipient: rand_string(rng),
+        recipient: rand_string(rng).parse().unwrap(),
     }
 }
 
