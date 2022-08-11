@@ -15,3 +15,7 @@ tiny-keccak = "1.4.0"
 rlp = "0.4.2"
 serde = { version = "1.0", features = ["derive"] }
 hex = "0.4.2"
+
+[features]
+default = ["result_with_prefix"]
+result_with_prefix = []

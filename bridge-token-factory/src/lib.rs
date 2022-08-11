@@ -6,9 +6,8 @@ use near_sdk::{
     env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault, Promise, PublicKey,
 };
 
-use bridge_common::prover::*;
 pub use bridge_common::prover::{validate_eth_address, Proof};
-use bridge_common::{parse_recipient, Recipient, ResultType};
+use bridge_common::{parse_recipient, prover::*, result_types, Recipient};
 pub use lock_event::EthLockedEvent;
 pub use log_metadata_event::TokenMetadataEvent;
 use near_sdk_inner::{PromiseOrValue, ONE_NEAR};
@@ -366,7 +365,7 @@ impl BridgeTokenFactory {
         &mut self,
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] recipient: String,
-    ) -> ResultType {
+    ) -> result_types::Withdraw {
         let token = env::predecessor_account_id();
         let parts: Vec<&str> = token.as_str().split('.').collect();
         assert_eq!(
@@ -380,11 +379,7 @@ impl BridgeTokenFactory {
         );
         let token_address = validate_eth_address(parts[0].to_string());
         let recipient_address = validate_eth_address(recipient);
-        ResultType::Withdraw {
-            amount: amount.into(),
-            token: token_address,
-            recipient: recipient_address,
-        }
+        result_types::Withdraw::new(amount, token_address, recipient_address)
     }
 
     #[payable]
@@ -699,11 +694,7 @@ mod tests {
         let address = validate_eth_address(token_locker());
         assert_eq!(
             contract.finish_withdraw(1_000, token_locker()),
-            ResultType::Withdraw {
-                amount: 1_000,
-                token: address,
-                recipient: address
-            }
+            result_types::Withdraw::new(1_000, address, address)
         );
     }
 
