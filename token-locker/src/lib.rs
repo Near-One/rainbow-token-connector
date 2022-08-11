@@ -2,15 +2,21 @@ use std::convert::TryInto;
 
 use admin_controlled::{AdminControlled, Mask};
 use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
-use near_sdk::{AccountId, Balance, env, ext_contract, Gas, near_bindgen, PanicOnDefault, Promise, PromiseOrValue};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedSet;
-use near_sdk::json_types::{U128};
+use near_sdk::json_types::U128;
+use near_sdk::{
+    env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault, Promise,
+    PromiseOrValue,
+};
 
-use bridge_common::{parse_recipient, Recipient, ResultType};
-use bridge_common::prover::{EthAddress, ext_prover, Proof, validate_eth_address, FT_TRANSFER_CALL_GAS, FT_TRANSFER_GAS, NO_DEPOSIT, PAUSE_DEPOSIT, VERIFY_LOG_ENTRY_GAS};
-use near_sdk_inner::BorshStorageKey;
+use bridge_common::prover::{
+    ext_prover, validate_eth_address, EthAddress, Proof, FT_TRANSFER_CALL_GAS, FT_TRANSFER_GAS,
+    NO_DEPOSIT, PAUSE_DEPOSIT, VERIFY_LOG_ENTRY_GAS,
+};
+use bridge_common::{parse_recipient, result_types, Recipient};
 use near_sdk_inner::collections::UnorderedMap;
+use near_sdk_inner::BorshStorageKey;
 use whitelist::WhitelistMode;
 
 use crate::unlock_event::EthUnlockedEvent;
@@ -18,7 +24,6 @@ use crate::unlock_event::EthUnlockedEvent;
 mod token_receiver;
 mod unlock_event;
 mod whitelist;
-
 
 /// Gas to call finish withdraw method.
 /// This doesn't cover the gas required for calling transfer method.
@@ -66,8 +71,8 @@ pub trait ExtContract {
         &self,
         #[serializer(borsh)] token: AccountId,
         #[serializer(borsh)] amount: Balance,
-        #[serializer(borsh)] recipient: EthAddress
-    ) -> ResultType;
+        #[serializer(borsh)] recipient: EthAddress,
+    ) -> result_types::Lock;
 
     #[result_serializer(borsh)]
     fn finish_withdraw(
@@ -87,12 +92,17 @@ pub trait ExtContract {
         #[callback]
         #[serializer(borsh)]
         metadata: FungibleTokenMetadata,
-    ) -> ResultType;
+    ) -> result_types::Metadata;
 }
 
 #[ext_contract(ext_token)]
 pub trait ExtToken {
-    fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>) -> PromiseOrValue<U128>;
+    fn ft_transfer(
+        &mut self,
+        receiver_id: AccountId,
+        amount: U128,
+        memo: Option<String>,
+    ) -> PromiseOrValue<U128>;
 
     fn ft_transfer_call(
         &mut self,
@@ -125,13 +135,16 @@ impl Contract {
     /// Logs into the result of this transaction a Metadata for given token.
     pub fn log_metadata(&self, token_id: AccountId) -> Promise {
         ext_token::ext(token_id.clone())
-        .with_static_gas(FT_GET_METADATA_GAS)
-        .ft_metadata()
-            .then(ext_self::ext(token_id)
-            .with_static_gas(FT_FINISH_LOG_METADATA_GAS).finish_log_metadata())
+            .with_static_gas(FT_GET_METADATA_GAS)
+            .ft_metadata()
+            .then(
+                ext_self::ext(token_id)
+                    .with_static_gas(FT_FINISH_LOG_METADATA_GAS)
+                    .finish_log_metadata(),
+            )
     }
 
-    /// Emits `ResultType` with Metadata of the given token.
+    /// Emits `result_types::Metadata` with Metadata of the given token.
     #[private]
     #[result_serializer(borsh)]
     pub fn finish_log_metadata(
@@ -139,14 +152,14 @@ impl Contract {
         #[callback]
         #[serializer(borsh)]
         metadata: FungibleTokenMetadata,
-    ) -> ResultType {
-        ResultType::Metadata {
-            token: env::predecessor_account_id().into(),
-            name: metadata.name,
-            symbol: metadata.symbol,
-            decimals: metadata.decimals,
-            block_height: env::block_height(),
-        }
+    ) -> result_types::Metadata {
+        result_types::Metadata::new(
+            env::predecessor_account_id().into(),
+            metadata.name,
+            metadata.symbol,
+            metadata.decimals,
+            env::block_height()
+        )
     }
 
     /// Withdraw funds from NEAR Token Locker.
@@ -164,40 +177,34 @@ impl Contract {
         );
         let proof_1 = proof.clone();
         ext_prover::ext(self.prover_account.clone())
-        .with_static_gas(VERIFY_LOG_ENTRY_GAS)
-        .with_attached_deposit(NO_DEPOSIT)
-        .verify_log_entry(
-            proof.log_index,
-            proof.log_entry_data,
-            proof.receipt_index,
-            proof.receipt_data,
-            proof.header_data,
-            proof.proof,
-            false, // Do not skip bridge call. This is only used for development and diagnostics.
-        )
-            .then(ext_self::ext(env::current_account_id())
-            .with_attached_deposit(env::attached_deposit())
-            .with_static_gas( FINISH_WITHDRAW_GAS + FT_TRANSFER_CALL_GAS)
-                .finish_withdraw(
-                event.token,
-                event.recipient,
-                event.amount,
-                proof_1,
-            ))
+            .with_static_gas(VERIFY_LOG_ENTRY_GAS)
+            .with_attached_deposit(NO_DEPOSIT)
+            .verify_log_entry(
+                proof.log_index,
+                proof.log_entry_data,
+                proof.receipt_index,
+                proof.receipt_data,
+                proof.header_data,
+                proof.proof,
+                false, // Do not skip bridge call. This is only used for development and diagnostics.
+            )
+            .then(
+                ext_self::ext(env::current_account_id())
+                    .with_attached_deposit(env::attached_deposit())
+                    .with_static_gas(FINISH_WITHDRAW_GAS + FT_TRANSFER_CALL_GAS)
+                    .finish_withdraw(event.token, event.recipient, event.amount, proof_1),
+            )
     }
 
     #[private]
     #[result_serializer(borsh)]
-    pub fn finish_deposit(&self,
-                          #[serializer(borsh)] token: AccountId,
-                          #[serializer(borsh)] amount: Balance,
-                          #[serializer(borsh)] recipient: EthAddress,
-    ) -> ResultType {
-        ResultType::Lock {
-            token: token.into(),
-            amount,
-            recipient,
-        }
+    pub fn finish_deposit(
+        &self,
+        #[serializer(borsh)] token: AccountId,
+        #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)] recipient: EthAddress,
+    ) -> result_types::Lock {
+        result_types::Lock::new(token.into(), amount, recipient)
     }
 
     #[private]
@@ -215,36 +222,29 @@ impl Contract {
         assert!(verification_success, "Failed to verify the proof");
         let required_deposit = self.record_proof(&proof);
 
-        assert!(
-            env::attached_deposit()
-                >= required_deposit
-        );
+        assert!(env::attached_deposit() >= required_deposit);
 
         let Recipient { target, message } = parse_recipient(new_owner_id.into());
 
-        env::log_str(format!("Finish deposit. Token:{} Target:{} Message:{:?}", token, target, message).as_str());
+        env::log_str(
+            format!(
+                "Finish deposit. Token:{} Target:{} Message:{:?}",
+                token, target, message
+            )
+            .as_str(),
+        );
 
         match message {
             Some(message) => ext_token::ext(token.try_into().unwrap())
-            .with_attached_deposit(1)
-            .with_static_gas(FT_TRANSFER_CALL_GAS)
-            .ft_transfer_call(
-                    target.try_into().unwrap(),
-                    amount.into(),
-                    None,
-                    message,
-                ),
+                .with_attached_deposit(1)
+                .with_static_gas(FT_TRANSFER_CALL_GAS)
+                .ft_transfer_call(target.try_into().unwrap(), amount.into(), None, message),
             None => ext_token::ext(token.try_into().unwrap())
-            .with_attached_deposit(1)
-            .with_static_gas(FT_TRANSFER_GAS)
-            .ft_transfer(
-                target.into(),
-                amount.into(),
-                None,
-            ),
+                .with_attached_deposit(1)
+                .with_static_gas(FT_TRANSFER_GAS)
+                .ft_transfer(target.into(), amount.into(), None),
         }
     }
-
 
     /// Checks whether the provided proof is already used.
     pub fn is_used_proof(&self, #[serializer(borsh)] proof: Proof) -> bool {
@@ -282,9 +282,9 @@ mod tests {
     use std::panic;
 
     use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
-    use near_sdk::{MockedBlockchain, testing_env};
     use near_sdk::env::sha256;
     use near_sdk::test_utils::{accounts, VMContextBuilder};
+    use near_sdk::{testing_env, MockedBlockchain};
     use uint::rustc_hex::{FromHex, ToHex};
 
     use super::*;
@@ -366,12 +366,22 @@ mod tests {
         let mut contract = Contract::new(prover(), token_locker());
         set_env!(predecessor_account_id: accounts(1));
         contract.ft_on_transfer(accounts(2), U128(1_000_000), ethereum_address_from_id(0));
-        contract.finish_deposit(accounts(1).into(), 1_000_000, validate_eth_address(ethereum_address_from_id(0)));
+        contract.finish_deposit(
+            accounts(1).into(),
+            1_000_000,
+            validate_eth_address(ethereum_address_from_id(0)),
+        );
 
         let proof = create_proof(token_locker(), accounts(1).into());
         set_env!(attached_deposit: env::storage_byte_cost() * 1000);
         contract.withdraw(proof.clone());
-        contract.finish_withdraw(true, accounts(1).into(), accounts(2).into(), 1_000_000, proof);
+        contract.finish_withdraw(
+            true,
+            accounts(1).into(),
+            accounts(2).into(),
+            1_000_000,
+            proof,
+        );
     }
 
     #[test]
@@ -402,6 +412,6 @@ mod tests {
         panic::catch_unwind(move || {
             contract.set_paused(0);
         })
-            .unwrap_err();
+        .unwrap_err();
     }
 }

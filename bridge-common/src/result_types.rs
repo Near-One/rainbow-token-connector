@@ -31,14 +31,14 @@ pub struct Withdraw {
     pub recipient: EthAddress,
 }
 
-impl Default for Withdraw {
-    fn default() -> Self {
+impl Withdraw {
+    pub fn new(amount: Balance, token: EthAddress, recipient: EthAddress) -> Self {
         Self {
             #[cfg(feature = "result_with_prefix")]
             prefix: RESULT_PREFIX_WITHDRAW,
-            amount: Default::default(),
-            token: Default::default(),
-            recipient: Default::default(),
+            amount,
+            token,
+            recipient,
         }
     }
 }
@@ -52,14 +52,14 @@ pub struct Lock {
     pub recipient: EthAddress,
 }
 
-impl Default for Lock {
-    fn default() -> Self {
+impl Lock {
+    pub fn new(token: String, amount: Balance, recipient: EthAddress) -> Self {
         Self {
             #[cfg(feature = "result_with_prefix")]
             prefix: RESULT_PREFIX_LOCK,
-            token: Default::default(),
-            amount: Default::default(),
-            recipient: Default::default(),
+            token,
+            amount,
+            recipient,
         }
     }
 }
@@ -75,16 +75,22 @@ pub struct Metadata {
     pub block_height: BlockHeight,
 }
 
-impl Default for Metadata {
-    fn default() -> Self {
+impl Metadata {
+    pub fn new(
+        token: String,
+        name: String,
+        symbol: String,
+        decimals: u8,
+        block_height: BlockHeight,
+    ) -> Self {
         Self {
             #[cfg(feature = "result_with_prefix")]
             prefix: RESULT_PREFIX_METADATA,
-            token: Default::default(),
-            name: Default::default(),
-            symbol: Default::default(),
-            decimals: Default::default(),
-            block_height: Default::default(),
+            token,
+            name,
+            symbol,
+            decimals,
+            block_height,
         }
     }
 }
@@ -104,13 +110,16 @@ fn generate_result_prefixs() {
         near_sdk::env::keccak256(b"ResultType.Metadata").as_slice()
     );
 
-    println!(
-        "RESULT_PREFIX_WITHDRAW: {}",
+    assert_eq!(
+        "f6b55201cc8e0d878dda6fb9622954ba8d25fc7f38ffe322caf90ee173f883ab",
         hex::encode(RESULT_PREFIX_WITHDRAW)
     );
-    println!("RESULT_PREFIX_LOCK: {}", hex::encode(RESULT_PREFIX_LOCK));
-    println!(
-        "RESULT_PREFIX_METADATA: {}",
+    assert_eq!(
+        "0a9eb877458579dbce83ea57d556be50d1c3160bb5f1719fb172bd3300ac8623",
+        hex::encode(RESULT_PREFIX_LOCK)
+    );
+    assert_eq!(
+        "b315d4d6e8f235f5fabb0b1a0f118507f6c8542fae8e1a9566abe60762047c16",
         hex::encode(RESULT_PREFIX_METADATA)
     );
 }

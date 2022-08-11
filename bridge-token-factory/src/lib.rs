@@ -381,12 +381,7 @@ impl BridgeTokenFactory {
         );
         let token_address = validate_eth_address(parts[0].to_string());
         let recipient_address = validate_eth_address(recipient);
-        result_types::Withdraw {
-            amount: amount.into(),
-            token: token_address,
-            recipient: recipient_address,
-            ..Default::default()
-        }
+        result_types::Withdraw::new(amount, token_address, recipient_address)
     }
 
     #[payable]
@@ -701,12 +696,7 @@ mod tests {
         let address = validate_eth_address(token_locker());
         assert_eq!(
             contract.finish_withdraw(1_000, token_locker()),
-            result_types::Withdraw {
-                amount: 1_000,
-                token: address,
-                recipient: address,
-                ..Default::default()
-            }
+            result_types::Withdraw::new(1_000, address, address)
         );
     }
 
