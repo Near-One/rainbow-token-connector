@@ -158,7 +158,7 @@ impl Contract {
             metadata.name,
             metadata.symbol,
             metadata.decimals,
-            env::block_height()
+            env::block_height(),
         )
     }
 
@@ -236,13 +236,13 @@ impl Contract {
 
         match message {
             Some(message) => ext_token::ext(token.try_into().unwrap())
-                .with_attached_deposit(1)
+                .with_attached_deposit(near_sdk::ONE_YOCTO)
                 .with_static_gas(FT_TRANSFER_CALL_GAS)
-                .ft_transfer_call(target.try_into().unwrap(), amount.into(), None, message),
+                .ft_transfer_call(target, amount.into(), None, message),
             None => ext_token::ext(token.try_into().unwrap())
-                .with_attached_deposit(1)
+                .with_attached_deposit(near_sdk::ONE_YOCTO)
                 .with_static_gas(FT_TRANSFER_GAS)
-                .ft_transfer(target.into(), amount.into(), None),
+                .ft_transfer(target, amount.into(), None),
         }
     }
 
