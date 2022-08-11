@@ -1,31 +1,7 @@
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::{Balance, AccountId, BlockHeight};
-use prover::EthAddress;
+use near_sdk::AccountId;
 
 pub mod prover;
-
-
-
-#[derive(Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
-pub enum ResultType {
-    Withdraw {
-        amount: Balance,
-        token: EthAddress,
-        recipient: EthAddress,
-    },
-    Lock {
-        token: String,
-        amount: Balance,
-        recipient: EthAddress,
-    },
-    Metadata {
-        token: String,
-        name: String,
-        symbol: String,
-        decimals: u8,
-        block_height: BlockHeight,
-    }
-}
+pub mod result_types;
 
 pub struct Recipient {
     pub target: AccountId,
@@ -59,7 +35,7 @@ pub fn parse_recipient(recipient: String) -> Recipient {
         }
     } else {
         Recipient {
-            target:  recipient.parse().unwrap(),
+            target: recipient.parse().unwrap(),
             message: None,
         }
     }

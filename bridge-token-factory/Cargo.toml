@@ -23,7 +23,7 @@ near-contract-standards = "4.0.0"
 eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "8644d02031250470556b07fdf3506f13357eb8b7" }
 admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "8644d02031250470556b07fdf3506f13357eb8b7" }
 ethabi = "12.0.0"
-bridge-common = { path = "../bridge-common" }
+bridge-common = { path = "../bridge-common", default-features = false }
 hex = "0.4.2"
 bridge-token = { path = "../bridge-token" }
 
