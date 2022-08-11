@@ -20,8 +20,8 @@ overflow-checks = true
 [dependencies]
 near-sdk = "4.0.0"
 near-contract-standards = "4.0.0"
-eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "8644d02031250470556b07fdf3506f13357eb8b7" }
-admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "8644d02031250470556b07fdf3506f13357eb8b7" }
+eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "67966a151122815039f07b02065ab3a2bba09804" }
+admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "67966a151122815039f07b02065ab3a2bba09804" }
 ethabi = "12.0.0"
 bridge-common = { path = "../bridge-common" }
 hex = "0.4.2"
@@ -29,3 +29,7 @@ bridge-token = { path = "../bridge-token" }
 
 [dev-dependencies]
 uint = { version = "0.8.3", default-features = false }
+
+[patch]
+[patch.crates-io]
+eth2_hashing = { git = "https://github.com/near/rainbow-bridge", rev = "67966a151122815039f07b02065ab3a2bba09804" }
