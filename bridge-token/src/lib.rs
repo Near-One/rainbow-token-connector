@@ -11,7 +11,7 @@ use near_sdk::{
 };
 
 /// Gas to call finish withdraw method on factory.
-const FINISH_WITHDRAW_GAS: Gas = Gas(50_000_000_000_000);
+const FINISH_WITHDRAW_GAS: Gas = Gas(Gas::ONE_TERA.0 * 50);
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]

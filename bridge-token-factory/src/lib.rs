@@ -1,5 +1,3 @@
-use std::convert::TryInto;
-
 use admin_controlled::{AdminControlled, Mask};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap, UnorderedSet};
@@ -13,7 +11,7 @@ pub use bridge_common::prover::{validate_eth_address, Proof};
 use bridge_common::{parse_recipient, Recipient, ResultType};
 pub use lock_event::EthLockedEvent;
 pub use log_metadata_event::TokenMetadataEvent;
-use near_sdk_inner::PromiseOrValue;
+use near_sdk_inner::{PromiseOrValue, ONE_NEAR};
 
 mod lock_event;
 mod log_metadata_event;
@@ -24,27 +22,27 @@ const BRIDGE_TOKEN_BINARY: &'static [u8] = include_bytes!(std::env!(
 ));
 
 /// Initial balance for the BridgeToken contract to cover storage and related.
-const BRIDGE_TOKEN_INIT_BALANCE: Balance = 3_000_000_000_000_000_000_000_000; // 3e24yN, 3N
+const BRIDGE_TOKEN_INIT_BALANCE: Balance = ONE_NEAR * 3; // 3e24yN, 3N
 
 /// Gas to initialize BridgeToken contract.
-const BRIDGE_TOKEN_NEW: Gas = Gas(10_000_000_000_000);
+const BRIDGE_TOKEN_NEW: Gas = Gas(Gas::ONE_TERA.0 * 10);
 
 /// Gas to call mint method on bridge token.
-const MINT_GAS: Gas = Gas(10_000_000_000_000);
+const MINT_GAS: Gas = Gas(Gas::ONE_TERA.0 * 10);
 
 /// Gas to call finish deposit method.
 /// This doesn't cover the gas required for calling mint method.
-const FINISH_DEPOSIT_GAS: Gas = Gas(30_000_000_000_000);
+const FINISH_DEPOSIT_GAS: Gas = Gas(Gas::ONE_TERA.0 * 30);
 
 /// Gas to call finish update_metadata method.
-const FINISH_UPDATE_METADATA_GAS: Gas = Gas(5_000_000_000_000);
+const FINISH_UPDATE_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 
 /// Amount of gas used by set_metadata in the factory, without taking into account
 /// the gas consumed by the promise.
-const OUTER_SET_METADATA_GAS: Gas = Gas(15_000_000_000_000);
+const OUTER_SET_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 15);
 
 /// Amount of gas used by bridge token to set the metadata.
-const SET_METADATA_GAS: Gas = Gas(5_000_000_000_000);
+const SET_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 
 /// Controller storage key.
 const CONTROLLER_STORAGE_KEY: &[u8] = b"aCONTROLLER";
@@ -350,7 +348,7 @@ impl BridgeTokenFactory {
                     ext_bridge_token::ext(self.get_bridge_token_account_id(token))
                         .with_static_gas(FT_TRANSFER_CALL_GAS)
                         .with_attached_deposit(1)
-                        .ft_transfer_call(target.try_into().unwrap(), amount.into(), None, message),
+                        .ft_transfer_call(target, amount.into(), None, message),
                 ),
             None => ext_bridge_token::ext(self.get_bridge_token_account_id(token))
                 .with_static_gas(MINT_GAS)
@@ -370,7 +368,7 @@ impl BridgeTokenFactory {
         #[serializer(borsh)] recipient: String,
     ) -> ResultType {
         let token = env::predecessor_account_id();
-        let parts: Vec<&str> = token.as_str().split(".").collect();
+        let parts: Vec<&str> = token.as_str().split('.').collect();
         assert_eq!(
             token.to_string(),
             format!("{}.{}", parts[0], env::current_account_id()),
