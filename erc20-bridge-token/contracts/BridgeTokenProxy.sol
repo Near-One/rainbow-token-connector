@@ -1,4 +1,6 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8;
+
 import "@openzeppelin/contracts/proxy/Proxy.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
