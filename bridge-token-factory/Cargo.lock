@@ -203,6 +203,9 @@ dependencies = [
  "hex",
  "near-contract-standards",
  "near-sdk",
+ "rand 0.7.3",
+ "serde",
+ "serde_json",
  "uint 0.8.5",
 ]
 

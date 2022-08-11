@@ -29,6 +29,9 @@ bridge-token = { path = "../bridge-token" }
 
 [dev-dependencies]
 uint = { version = "0.8.3", default-features = false }
+rand = "0.7.3"
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
 
 [patch]
 [patch.crates-io]

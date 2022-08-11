@@ -173,7 +173,7 @@ fn test_eth_token_transfer() {
         token: DAI_ADDRESS.to_string(),
         sender: SENDER_ADDRESS.to_string(),
         amount: 1_000,
-        recipient: ALICE.to_string(),
+        recipient: ALICE.parse().unwrap(),
     }
     .to_log_entry_data();
 
@@ -226,7 +226,7 @@ fn test_with_invalid_proof() {
         token: DAI_ADDRESS.to_string(),
         sender: SENDER_ADDRESS.to_string(),
         amount: 1_000,
-        recipient: ALICE.to_string(),
+        recipient: ALICE.parse().unwrap(),
     }
     .to_log_entry_data();
 
