@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
@@ -11,7 +12,6 @@ contract BridgeToken is
     AccessControlUpgradeable,
     PausableUpgradeable
 {
-
     string private _name;
     string private _symbol;
     uint8 private _decimals;
@@ -26,7 +26,7 @@ contract BridgeToken is
         uint8 decimals_
     ) external initializer {
 
-        __ERC20_init(_name, _symbol);
+        __ERC20_init(name_, symbol_);
         __AccessControl_init();
 
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
