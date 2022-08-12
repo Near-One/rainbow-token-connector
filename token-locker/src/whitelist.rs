@@ -9,6 +9,10 @@ pub enum WhitelistMode {
     CheckAccountAndToken,
 }
 
+fn get_token_account_key(token: AccountId, account: AccountId) -> String {
+    format!("{}:{}", token, account)
+}
+
 impl Contract {
     pub fn set_token_whitelist_mode(&mut self, token: AccountId, mode: WhitelistMode) {
         assert_self();
@@ -21,8 +25,8 @@ impl Contract {
             self.whitelist_tokens.get(&token).is_some(),
             "The whitelisted token mode is not set",
         );
-        let token_account_key = format!("{}:{}", token, account);
-        self.whitelist_accounts.insert(&token_account_key);
+        self.whitelist_accounts
+            .insert(&get_token_account_key(token, account));
     }
 
     pub fn check_whitelist_token(&mut self, token: AccountId, account: AccountId) {
@@ -37,7 +41,7 @@ impl Contract {
 
         match token_whitelist_mode {
             WhitelistMode::CheckAccountAndToken => {
-                let token_account_key = format!("{}:{}", token, account);
+                let token_account_key = get_token_account_key(token, account);
                 assert!(
                     self.whitelist_accounts.contains(&token_account_key),
                     "{}",
