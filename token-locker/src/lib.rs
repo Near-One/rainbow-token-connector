@@ -50,8 +50,8 @@ enum StorageKey {
 pub struct Contract {
     /// The account of the prover that we can use to prove.
     pub prover_account: AccountId,
-    /// Ethereum address of the token bridge contract, in hex.
-    bridge_address: EthAddress,
+    /// Ethereum address of the token factory contract, in hex.
+    factory_address: EthAddress,
     /// Hashes of the events that were already used.
     pub used_events: UnorderedSet<Vec<u8>>,
     /// Mask determining all paused functions
@@ -119,12 +119,12 @@ pub trait ExtToken {
 impl Contract {
     #[init]
     /// `prover_account`: NEAR account of the Near Prover contract;
-    /// `bridge_address`: Ethereum address of the token bridge contract, in hex.
-    pub fn new(prover_account: AccountId, bridge_address: String) -> Self {
+    /// `factory_address`: Ethereum address of the token factory contract, in hex.
+    pub fn new(prover_account: AccountId, factory_address: String) -> Self {
         Self {
             prover_account,
             used_events: UnorderedSet::new(StorageKey::UsedEvents),
-            bridge_address: validate_eth_address(bridge_address),
+            factory_address: validate_eth_address(factory_address),
             paused: Mask::default(),
             whitelist_tokens: UnorderedMap::new(StorageKey::WhitelistTokens),
             whitelist_accounts: UnorderedSet::new(StorageKey::WhitelistAccounts),
@@ -170,10 +170,10 @@ impl Contract {
         let event = EthUnlockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
             event.bridge_address,
-            self.bridge_address,
+            self.factory_address,
             "Event's address {} does not match locker address of this token {}",
             hex::encode(&event.bridge_address),
-            hex::encode(&self.bridge_address),
+            hex::encode(&self.factory_address),
         );
         let proof_1 = proof.clone();
         ext_prover::ext(self.prover_account.clone())
@@ -270,6 +270,11 @@ impl Contract {
 
         env::log_str(&format!("RecordProof:{}", hex::encode(proof_key)));
         required_deposit
+    }
+
+    #[private]
+    pub fn update_factory_address(&mut self, factory_address: String) {
+        self.factory_address = validate_eth_address(factory_address);
     }
 }
 
