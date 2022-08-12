@@ -33,7 +33,7 @@ contract BridgeTokenFactory is  AccessControlUpgradeable, PausableUpgradeable{
 
     mapping(string => WhitelistMode) private _whitelist_tokens;
     mapping(bytes => bool) private _whitelist_accounts;
-    bool private _is_whitelist_mode_enabled = true;
+    bool private _is_whitelist_mode_enabled;
 
     address public ProofConsumerAddress;
     bytes32 public constant PAUSE_ROLE = keccak256("PAUSE_ROLE");
@@ -85,6 +85,7 @@ contract BridgeTokenFactory is  AccessControlUpgradeable, PausableUpgradeable{
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender()); 
         _setupRole(PAUSE_ROLE, _msgSender()); 
         _setupRole(WHITELIST_ADMIN_ROLE, _msgSender());
+        _is_whitelist_mode_enabled = true;
     }
 
     function isBridgeToken(address token) external view returns (bool) {

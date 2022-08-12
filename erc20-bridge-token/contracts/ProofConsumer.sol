@@ -11,7 +11,7 @@ contract ProofConsumer {
     using ProofDecoder for Borsh.Data;
 
     INearProver public prover;
-    bytes public nearTokenFactory;
+    bytes public nearTokenLocker;
 
     /// Proofs from blocks that are below the acceptance height will be rejected.
     // If `minBlockAcceptanceHeight` value is zero - proofs from block with any height are accepted.
@@ -21,17 +21,17 @@ contract ProofConsumer {
     mapping(bytes32 => bool) public usedProofs;
 
     constructor (
-        bytes memory _nearTokenFactory,
+        bytes memory _nearTokenLocker,
         INearProver _prover,
         uint64 _minBlockAcceptanceHeight
     )  {
         require(
-            _nearTokenFactory.length > 0,
+            _nearTokenLocker.length > 0,
             "Invalid Near Token Factory address"
         );
         require(address(_prover) != address(0), "Invalid Near prover address");
 
-        nearTokenFactory = _nearTokenFactory;
+        nearTokenLocker = _nearTokenLocker;
         prover = _prover;
         minBlockAcceptanceHeight = _minBlockAcceptanceHeight;
     }
@@ -77,7 +77,7 @@ contract ProofConsumer {
                     .outcome_with_id
                     .outcome
                     .executor_id
-            ) == keccak256(nearTokenFactory),
+            ) == keccak256(nearTokenLocker),
             "Can only unlock tokens/set metadata from the linked proof produced on Near blockchain"
         );
 
