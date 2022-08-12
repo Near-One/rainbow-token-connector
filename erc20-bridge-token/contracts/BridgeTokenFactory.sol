@@ -16,7 +16,13 @@ import "./BridgeToken.sol";
 import "./BridgeTokenProxy.sol";
 
 contract BridgeTokenFactory is  AccessControlUpgradeable, PausableUpgradeable{
-    enum WhitelistMode { NotInited, Blocked, CheckToken, CheckAccountAndToken }
+    enum WhitelistMode {
+        NotInited,
+        Blocked,
+        CheckToken,
+        CheckAccountAndToken
+    }
+    
     using Borsh for Borsh.Data;
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -187,9 +193,9 @@ contract BridgeTokenFactory is  AccessControlUpgradeable, PausableUpgradeable{
         require(token_mode != WhitelistMode.NotInited, "ERR_NOT_INITED_WHITELIST_TOKEN");
 
         if (token_mode == WhitelistMode.CheckAccountAndToken) {
-            require(_whitelist_accounts[abi.encodePacked(token, account)], "ERR_ACCOUNT_NOT_IN_WHAITELIST");
+            require(_whitelist_accounts[abi.encodePacked(token, account)], "ERR_ACCOUNT_NOT_IN_WHITELIST");
         } else if (token_mode == WhitelistMode.Blocked) {
-            revert("ERR_WHAITELIST_TOKEN_BLOCKED");
+            revert("ERR_WHITELIST_TOKEN_BLOCKED");
         }
     }
 }

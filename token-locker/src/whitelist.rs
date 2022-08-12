@@ -19,7 +19,7 @@ impl Contract {
         assert_self();
         assert!(
             self.whitelist_tokens.get(&token).is_some(),
-            "The token mode should be set first"
+            "The whitelisted token mode is not set",
         );
         let token_account_key = format!("{}:{}", token, account);
         self.whitelist_accounts.insert(&token_account_key);
@@ -33,14 +33,18 @@ impl Contract {
         let token_whitelist_mode = self
             .whitelist_tokens
             .get(&token)
-            .unwrap_or_else(|| env::panic_str("The token is not exist in the whitelist"));
+            .unwrap_or_else(|| env::panic_str("The token is not whitelisted"));
 
         match token_whitelist_mode {
             WhitelistMode::CheckAccountAndToken => {
                 let token_account_key = format!("{}:{}", token, account);
                 assert!(
                     self.whitelist_accounts.contains(&token_account_key),
-                    "The token:account key is not exist in the whitelist"
+                    "{}",
+                    format!(
+                        "The {} key does not exist in the whitelist",
+                        token_account_key
+                    ),
                 );
             }
             WhitelistMode::CheckToken => {}
