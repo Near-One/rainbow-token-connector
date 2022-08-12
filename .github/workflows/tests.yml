@@ -21,6 +21,9 @@ jobs:
           - subject: bridge-token-factory
             cmd: make prepare && make res/bridge_token_factory.wasm
 
+          - subject: token-locker
+            cmd: make prepare && make res/rainbow_bridge_near_token_locker.wasm
+
     name: Build and diff ${{ matrix.subject }}
     steps:
       - name: Clone the repository
