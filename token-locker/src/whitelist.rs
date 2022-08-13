@@ -1,5 +1,5 @@
 use near_sdk::serde::{Deserialize, Serialize};
-use near_sdk::{assert_self, env, AccountId};
+use near_sdk::{env, AccountId};
 
 use crate::*;
 
