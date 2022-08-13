@@ -8,7 +8,8 @@ impl FungibleTokenReceiver for Contract {
     /// msg: `Ethereum` address to receive the tokens on.
     fn ft_on_transfer(
         &mut self,
-        _sender_id: AccountId,
+        #[allow(unused_variables)]
+        sender_id: AccountId,
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128> {
