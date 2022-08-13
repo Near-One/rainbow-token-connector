@@ -12,7 +12,8 @@ async function main() {
     console.log("Account balance:", (await deployer.getBalance()).toString())
 
     const ProofConsumerContract = await ethers.getContractFactory("ProofConsumer");
-    const proofConsumer = await ProofConsumerContract.deploy(NEAR_TOKEN_LOCKER, PROVER_ADDRESS, MIN_BLOCK_ACCEPTANCE_HEIGHT)
+    const proofConsumer = await ProofConsumerContract.deploy(NEAR_TOKEN_LOCKER, PROVER_ADDRESS, MIN_BLOCK_ACCEPTANCE_HEIGHT);
+    await proofConsumer.deployed();
     console.log(`ProofConsumer deployed at ${proofConsumer.address}`);
 }
 
