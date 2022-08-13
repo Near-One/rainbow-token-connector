@@ -1,8 +1,10 @@
 use near_sdk::{assert_self, env, AccountId};
+use near_sdk::serde::{Serialize, Deserialize};
 
 use crate::*;
 
-#[derive(BorshDeserialize, BorshSerialize)]
+#[derive(BorshDeserialize, BorshSerialize, Deserialize, Serialize, Debug)]
+#[serde(crate = "near_sdk::serde")]
 pub enum WhitelistMode {
     Blocked,
     CheckToken,
@@ -13,6 +15,7 @@ fn get_token_account_key(token: AccountId, account: AccountId) -> String {
     format!("{}:{}", token, account)
 }
 
+#[near_bindgen]
 impl Contract {
     pub fn set_token_whitelist_mode(&mut self, token: AccountId, mode: WhitelistMode) {
         assert_self();
