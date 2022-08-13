@@ -16,7 +16,7 @@ async function deposit({ nearAccountId, ethTokenFactoryAddress, txReceiptId, rec
         deps: { keyStore: keyStore }
     });
 
-    const proof = await getProof({ near, txReceiptId, nearAccountId });
+    const proof = await getProof({ near, txReceiptId, receiverId });
     const borshProof = borshifyOutcomeProof(proof.proofData);
     const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
     const BridgeTokenFactory = BridgeTokenFactoryContract.attach(ethTokenFactoryAddress);
@@ -27,7 +27,7 @@ async function deposit({ nearAccountId, ethTokenFactoryAddress, txReceiptId, rec
 async function getProof({
     near,
     txReceiptId,
-    nearAccountId
+    receiverId
 }) {
     const status = await near.connection.provider.status();
     const headBlock = await near.connection.provider.block({
@@ -42,7 +42,7 @@ async function getProof({
             {
                 type: 'receipt',
                 receipt_id: txReceiptId,
-                receiver_id: nearAccountId,
+                receiver_id: receiverId,
                 light_client_head: headBlockHash
             }
         )
