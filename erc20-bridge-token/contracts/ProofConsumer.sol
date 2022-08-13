@@ -27,7 +27,7 @@ contract ProofConsumer {
     )  {
         require(
             _nearTokenLocker.length > 0,
-            "Invalid Near Token Factory address"
+            "Invalid Near Token Locker address"
         );
         require(address(_prover) != address(0), "Invalid Near prover address");
 

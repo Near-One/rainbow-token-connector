@@ -1,5 +1,5 @@
+use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{assert_self, env, AccountId};
-use near_sdk::serde::{Serialize, Deserialize};
 
 use crate::*;
 
@@ -17,13 +17,13 @@ fn get_token_account_key(token: AccountId, account: AccountId) -> String {
 
 #[near_bindgen]
 impl Contract {
+    #[private]
     pub fn set_token_whitelist_mode(&mut self, token: AccountId, mode: WhitelistMode) {
-        assert_self();
         self.whitelist_tokens.insert(&token, &mode);
     }
 
+    #[private]
     pub fn add_account_to_whitelist(&mut self, token: AccountId, account: AccountId) {
-        assert_self();
         assert!(
             self.whitelist_tokens.get(&token).is_some(),
             "The whitelisted token mode is not set",

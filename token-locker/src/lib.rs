@@ -51,7 +51,7 @@ pub struct Contract {
     /// The account of the prover that we can use to prove.
     pub prover_account: AccountId,
     /// Ethereum address of the token factory contract, in hex.
-    factory_address: EthAddress,
+    pub eth_factory_address: EthAddress,
     /// Hashes of the events that were already used.
     pub used_events: UnorderedSet<Vec<u8>>,
     /// Mask determining all paused functions
@@ -124,7 +124,7 @@ impl Contract {
         Self {
             prover_account,
             used_events: UnorderedSet::new(StorageKey::UsedEvents),
-            factory_address: validate_eth_address(factory_address),
+            eth_factory_address: validate_eth_address(factory_address),
             paused: Mask::default(),
             whitelist_tokens: UnorderedMap::new(StorageKey::WhitelistTokens),
             whitelist_accounts: UnorderedSet::new(StorageKey::WhitelistAccounts),
@@ -169,11 +169,11 @@ impl Contract {
         self.check_not_paused(PAUSE_DEPOSIT);
         let event = EthUnlockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
-            event.bridge_address,
-            self.factory_address,
-            "Event's address {} does not match locker address of this token {}",
-            hex::encode(&event.bridge_address),
-            hex::encode(&self.factory_address),
+            event.eth_factory_address,
+            self.eth_factory_address,
+            "Event's address {} does not match eth factory address of this token {}",
+            hex::encode(&event.eth_factory_address),
+            hex::encode(&self.eth_factory_address),
         );
         let proof_1 = proof.clone();
         ext_prover::ext(self.prover_account.clone())
@@ -274,7 +274,7 @@ impl Contract {
 
     #[private]
     pub fn update_factory_address(&mut self, factory_address: String) {
-        self.factory_address = validate_eth_address(factory_address);
+        self.eth_factory_address = validate_eth_address(factory_address);
     }
 }
 
@@ -342,7 +342,7 @@ mod tests {
 
     fn create_proof(locker: String, token: String) -> Proof {
         let event_data = EthUnlockedEvent {
-            bridge_address: locker
+            eth_factory_address: locker
                 .from_hex::<Vec<_>>()
                 .unwrap()
                 .as_slice()

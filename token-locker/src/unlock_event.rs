@@ -6,7 +6,7 @@ use near_sdk::{AccountId, Balance};
 /// Data that was emitted by the Ethereum Unlocked event.
 #[derive(Debug, Eq, PartialEq)]
 pub struct EthUnlockedEvent {
-    pub bridge_address: EthAddress,
+    pub eth_factory_address: EthAddress,
     pub token: String,
     pub sender: String,
     pub amount: Balance,
@@ -38,7 +38,7 @@ impl EthUnlockedEvent {
             .as_u128();
         let recipient = event.log.params[3].value.clone().to_string().unwrap();
         Self {
-            bridge_address: event.locker_address,
+            eth_factory_address: event.locker_address,
             token,
             sender,
             amount,
@@ -51,7 +51,7 @@ impl EthUnlockedEvent {
         EthEvent::to_log_entry_data(
             "Withdraw",
             EthUnlockedEvent::event_params(),
-            self.bridge_address,
+            self.eth_factory_address,
             vec![hex::decode(self.sender.clone()).unwrap()],
             vec![
                 Token::String(self.token.clone()),
