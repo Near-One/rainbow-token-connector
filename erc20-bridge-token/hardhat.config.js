@@ -9,7 +9,7 @@ require('solidity-coverage')
 require('dotenv').config();
 
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
-const ETH_PRIVATE_KEY = process.env.ETH_PRIVATE_KEY;
+const ETH_PRIVATE_KEY = process.env.ETH_PRIVATE_KEY || '11'.repeat(32);
 const NEAR_RPC_URL = process.env.NEAR_RPC_URL;
 const NEAR_NETWORK = process.env.NEAR_NETWORK;
 const NEAR_TOKEN_LOCKER = process.env.NEAR_TOKEN_LOCKER;
