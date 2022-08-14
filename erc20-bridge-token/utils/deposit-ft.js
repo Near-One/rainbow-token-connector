@@ -7,7 +7,7 @@ function keyStorePath() {
     return path.join(os.homedir(), '.near-credentials');
 }
 
-async function deposit({ nearAccountId, ethTokenFactoryAddress, txReceiptId, receiverId, nearNodeUrl, nearNetworkId }) {
+async function deposit({ nearAccountId, ethTokenFactoryAddress, nearOnEthClientAddress, txReceiptId, receiverId, nearNodeUrl, nearNetworkId }) {
     const keyStore = new nearAPI.keyStores.UnencryptedFileSystemKeyStore(keyStorePath())
     const near = await nearAPI.connect({
         nodeUrl: nearNodeUrl,
@@ -16,41 +16,45 @@ async function deposit({ nearAccountId, ethTokenFactoryAddress, txReceiptId, rec
         deps: { keyStore: keyStore }
     });
 
-    const proof = await getProof({ near, txReceiptId, receiverId });
-    const borshProof = borshifyOutcomeProof(proof.proofData);
+    const nearOnEthClientAbi = [
+        "function bridgeState() view returns (tuple(uint currentHeight, uint nextTimestamp, uint nextValidAt, uint numBlockProducers))",
+    ];
+    const clientContract = new ethers.Contract(nearOnEthClientAddress, nearOnEthClientAbi, ethers.provider);
+    const clientState = await clientContract.bridgeState();
+    const proofBlockHeight = clientState.currentHeight.toNumber();
+    const proof = await getProof({ near, txReceiptId, receiverId, proofBlockHeight });
+    const borshProof = borshifyOutcomeProof(proof);
     const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
     const BridgeTokenFactory = BridgeTokenFactoryContract.attach(ethTokenFactoryAddress);
-    const res = await BridgeTokenFactory.deposit(borshProof, proof.proofBlockHeight);
+    const res = await BridgeTokenFactory.deposit(borshProof, proofBlockHeight);
     console.log(res);
 }
 
 async function getProof({
     near,
     txReceiptId,
-    receiverId
+    receiverId,
+    proofBlockHeight,
 }) {
-    const status = await near.connection.provider.status();
-    const headBlock = await near.connection.provider.block({
-        blockId: status.sync_info.latest_block_height
+    const proofBlock = await near.connection.provider.block({
+        blockId: proofBlockHeight,
     });
-    const proofBlockHeight = headBlock.header.height;
-    const headBlockHash = headBlock.header.last_final_block;
-
+    const proofBlockHash = proofBlock.header.hash;
     try {
-        let proofData = await near.connection.provider.sendJsonRpc(
+        const proof = await near.connection.provider.sendJsonRpc(
             'light_client_proof',
             {
                 type: 'receipt',
                 receipt_id: txReceiptId,
                 receiver_id: receiverId,
-                light_client_head: headBlockHash
+                light_client_head: proofBlockHash
             }
-        )
+        );
 
-        return { proofData, proofBlockHeight }
+        return proof;
     } catch (txRevertMessage) {
-        console.log('Failed to get proof.')
-        console.log(txRevertMessage.toString())
+        console.log('Failed to get proof.');
+        console.log(txRevertMessage.toString());
     }
 }
 

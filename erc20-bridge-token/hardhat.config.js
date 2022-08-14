@@ -13,6 +13,7 @@ const ETH_PRIVATE_KEY = process.env.ETH_PRIVATE_KEY;
 const NEAR_RPC_URL = process.env.NEAR_RPC_URL;
 const NEAR_NETWORK = process.env.NEAR_NETWORK;
 const NEAR_TOKEN_LOCKER = process.env.NEAR_TOKEN_LOCKER;
+const NEAR_ON_ETH_CLIENT_ADDRESS = process.env.NEAR_ON_ETH_CLIENT_ADDRESS;
 
 task('deposit-ft', 'Deposit near tokens on the eth side')
   .addParam('nearAccount', 'Near account id to get the proof')
@@ -23,6 +24,7 @@ task('deposit-ft', 'Deposit near tokens on the eth side')
     await deposit({
       nearAccountId: taskArgs.nearAccount,
       ethTokenFactoryAddress: taskArgs.factory,
+      nearOnEthClientAddress: NEAR_ON_ETH_CLIENT_ADDRESS,
       txReceiptId: taskArgs.txReceiptId,
       receiverId: NEAR_TOKEN_LOCKER,
       nearNodeUrl: NEAR_RPC_URL,
