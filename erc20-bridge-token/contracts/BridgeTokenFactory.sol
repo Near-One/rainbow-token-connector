@@ -14,6 +14,7 @@ import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 import "./IProofConsumer.sol";
 import "./BridgeToken.sol";
 import "./BridgeTokenProxy.sol";
+import "./ResultsDecoder.sol";
 
 contract BridgeTokenFactory is  AccessControlUpgradeable, PausableUpgradeable{
     enum WhitelistMode {
@@ -59,21 +60,6 @@ contract BridgeTokenFactory is  AccessControlUpgradeable, PausableUpgradeable{
         uint8 decimals
     );
 
-    struct LockResult {
-        string token;
-        uint128 amount;
-        address recipient;
-    }
-
-    struct MetadataResult {
-        string token;
-        string name;
-        string symbol;
-        uint8 decimals;
-        uint64 blockHeight;
-    }
-
-
     // BridgeTokenFactory is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
     function initialize(address _ProofConsumerAddress)
@@ -114,7 +100,7 @@ contract BridgeTokenFactory is  AccessControlUpgradeable, PausableUpgradeable{
 
     function setMetadata(bytes memory proofData, uint64 proofBlockHeight) public whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
         ProofDecoder.ExecutionStatus memory status = IProofConsumer(ProofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
-        MetadataResult memory result = _decodeMetadataResult(status.successValue);
+        ResultsDecoder.MetadataResult memory result = ResultsDecoder.decodeMetadataResult(status.successValue);
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
         require(result.blockHeight >= BridgeToken(_nearToEthToken[result.token]).metadataLastUpdated(), "ERR_OLD_METADATA");
         BridgeToken(_nearToEthToken[result.token]).setMetadata(result.name, result.symbol, result.decimals, result.blockHeight);
@@ -123,7 +109,7 @@ contract BridgeTokenFactory is  AccessControlUpgradeable, PausableUpgradeable{
 
     function deposit(bytes memory proofData, uint64 proofBlockHeight) public whenNotPaused {
         ProofDecoder.ExecutionStatus memory status = IProofConsumer(ProofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
-        LockResult memory result = _decodeLockResult(status.successValue);
+        ResultsDecoder.LockResult memory result = ResultsDecoder.decodeLockResult(status.successValue);
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
         BridgeToken(_nearToEthToken[result.token]).mint(result.recipient, result.amount);
         emit Deposit(result.amount, result.recipient);
@@ -136,25 +122,7 @@ contract BridgeTokenFactory is  AccessControlUpgradeable, PausableUpgradeable{
         emit Withdraw(_ethToNearToken[bridgeTokenProxy], msg.sender, amount, recipient);
     }
 
-    function _decodeMetadataResult(bytes memory data) internal pure returns(MetadataResult memory result) {
-        Borsh.Data memory borshData = Borsh.from(data);
-        result.token = string(borshData.decodeBytes());
-        result.name = string(borshData.decodeBytes());
-        result.symbol = string(borshData.decodeBytes());
-        result.decimals = borshData.decodeU8();
-        result.blockHeight = borshData.decodeU64();
-        borshData.done();
-    }
-
-    function _decodeLockResult(bytes memory data) internal pure returns(LockResult memory result) {
-        Borsh.Data memory borshData = Borsh.from(data);
-        result.token = string(borshData.decodeBytes());
-        result.amount = borshData.decodeU128();
-        bytes20 recipient = borshData.decodeBytes20();
-        result.recipient = address(uint160(recipient));
-        borshData.done();
-    }
-      function pause() external onlyRole(PAUSE_ROLE) {
+    function pause() external onlyRole(PAUSE_ROLE) {
         _pause();
     }
 
