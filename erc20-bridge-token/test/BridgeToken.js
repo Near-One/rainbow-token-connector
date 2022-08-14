@@ -24,6 +24,7 @@ describe('BridgeToken', () => {
     ProofConsumer = await (await (await ethers.getContractFactory('ProofConsumer')).deploy(Buffer.from('nearfuntoken', 'utf-8'), ProverMock.address, minBlockAcceptanceHeight)).deployed()
     BridgeTokenFactory = await ethers.getContractFactory('BridgeTokenFactory')
     BridgeTokenFactory = await upgrades.deployProxy(BridgeTokenFactory, [ProofConsumer.address], { initializer: 'initialize' })
+    await ProofConsumer.transferOwnership(BridgeTokenFactory.address);
   })
 
   it('can create empty token', async function () {
