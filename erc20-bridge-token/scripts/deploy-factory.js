@@ -1,16 +1,17 @@
 require('dotenv').config();
 const { ethers, upgrades } = require("hardhat");
 
-
-const NEAR_TOKEN_FACTORY = Buffer.from(process.env.NEAR_TOKEN_FACTORY, 'utf-8');
-const PROVER_ADDRESS = process.env.PROVER_ADDRESS;
-const MIN_BLOCK_ACCEPTANCE_HEIGHT = parseInt(process.env.MIN_BLOCK_ACCEPTANCE_HEIGHT);
+const PROOF_CONSUMER_ADDRESS = process.env.PROOF_CONSUMER_ADDRESS;
 
 async function main() {
-    const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
-    const BridgeTokenFactory = await upgrades.deployProxy(BridgeTokenFactoryContract, [NEAR_TOKEN_FACTORY, PROVER_ADDRESS, MIN_BLOCK_ACCEPTANCE_HEIGHT], { initializer: 'initialize' })
-    await BridgeTokenFactory.deployed();
-    console.log(`BridgeTokenFactory deployed at ${BridgeTokenFactory.address}`);
+  const [deployer] = await ethers.getSigners();
+  console.log("Deploying contracts with the account:", deployer.address);
+  console.log("Account balance:", (await deployer.getBalance()).toString());
+
+  const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
+  const BridgeTokenFactory = await upgrades.deployProxy(BridgeTokenFactoryContract, [PROOF_CONSUMER_ADDRESS], { initializer: 'initialize' })
+  await BridgeTokenFactory.deployed();
+  console.log(`BridgeTokenFactory deployed at ${BridgeTokenFactory.address}`);
 }
 
 main()

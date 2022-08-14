@@ -8,7 +8,7 @@ impl FungibleTokenReceiver for Contract {
     /// msg: `Ethereum` address to receive the tokens on.
     fn ft_on_transfer(
         &mut self,
-        _sender_id: AccountId,
+        #[allow(unused_variables)] sender_id: AccountId,
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128> {
@@ -19,12 +19,8 @@ impl FungibleTokenReceiver for Contract {
         // Emit the information for transfer via a separate callback to itself.
         // This is done because there is no event prover and this function must return integer value per FT standard.
         ext_self::ext(env::current_account_id())
-        .with_static_gas(FT_FINISH_DEPOSIT_GAS)
-        .finish_deposit(
-            env::predecessor_account_id(),
-            amount.0,
-            eth_address,
-        );
+            .with_static_gas(FT_FINISH_DEPOSIT_GAS)
+            .finish_deposit(env::predecessor_account_id(), amount.0, eth_address);
         PromiseOrValue::Value(U128(0))
     }
 }
