@@ -19,7 +19,7 @@ task('deposit-ft', 'Deposit near tokens on the eth side')
   .addParam('nearAccount', 'Near account id to get the proof')
   .addParam('factory', 'The address of the eth factory contract')
   .addParam('txReceiptId', 'Receipt id of the lock event on Near side')
-  .setAction(async (taskArgs, hre) => {
+  .setAction(async (taskArgs) => {
     const { deposit } = require('./utils/deposit-ft.js');
     await deposit({
       nearAccountId: taskArgs.nearAccount,
@@ -30,6 +30,22 @@ task('deposit-ft', 'Deposit near tokens on the eth side')
       nearNodeUrl: NEAR_RPC_URL,
       nearNetworkId: NEAR_NETWORK,
     })
+  });
+
+task('new-token', 'Deploy new bridge token')
+  .addParam('nearTokenAccount', 'Near account id of the token')
+  .addParam('factory', 'The address of the eth factory contract')
+  .setAction(async (taskArgs) => {
+    const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
+    const BridgeTokenFactory = BridgeTokenFactoryContract.attach(taskArgs.factory);
+
+    console.log("Deploy new bridge token:", taskArgs.nearTokenAccount);
+    let tx = await BridgeTokenFactory.newBridgeToken(taskArgs.nearTokenAccount);
+    await tx.wait(5);
+    const tokenProxyAddress = await BridgeTokenFactory.nearToEthToken(taskArgs.nearTokenAccount);
+    BridgeTokenInstance = await ethers.getContractFactory('BridgeToken');
+    const token = BridgeTokenInstance.attach(tokenProxyAddress);
+    console.log(`Token deployed at ${tokenProxyAddress}`);
   });
 
 module.exports = {

@@ -26,8 +26,7 @@ async function deposit({ nearAccountId, ethTokenFactoryAddress, nearOnEthClientA
     const borshProof = borshifyOutcomeProof(proof);
     const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
     const BridgeTokenFactory = BridgeTokenFactoryContract.attach(ethTokenFactoryAddress);
-    const res = await BridgeTokenFactory.deposit(borshProof, proofBlockHeight);
-    console.log(res);
+    await BridgeTokenFactory.deposit(borshProof, proofBlockHeight);
 }
 
 async function getProof({
