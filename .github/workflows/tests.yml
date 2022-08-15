@@ -54,6 +54,18 @@ jobs:
           yarn
           yarn test
 
+  test-erc20-bridge-token:
+    runs-on: self-hosted
+    name: Test erc20-bridge-token
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v2
+      - name: Test
+        run: |
+          cd erc20-bridge-token
+          yarn
+          yarn test
+
   test-bridge-token-factory:
     runs-on: self-hosted
     name: Test bridge-token-factory

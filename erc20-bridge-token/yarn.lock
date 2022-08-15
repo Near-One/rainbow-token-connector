@@ -1019,7 +1019,7 @@
     "@nodelib/fs.scandir" "2.1.5"
     fastq "^1.6.0"
 
-"@nomiclabs/hardhat-ethers@^2.0.6":
+"@nomiclabs/hardhat-ethers@^2.1.0":
   version "2.1.0"
   resolved "https://registry.yarnpkg.com/@nomiclabs/hardhat-ethers/-/hardhat-ethers-2.1.0.tgz#9b7dc94d669ad9dc286b94f6f2f1513118c7027b"
   integrity sha512-vlW90etB3675QWG7tMrHaDoTa7ymMB7irM4DAQ98g8zJoe9YqEggeDnbO6v5b+BLth/ty4vN6Ko/kaqRN1krHw==
@@ -7046,7 +7046,7 @@ hardhat-contract-sizer@^2.5.1:
     chalk "^4.0.0"
     cli-table3 "^0.6.0"
 
-hardhat@^2.8:
+hardhat@^2.10.1:
   version "2.10.1"
   resolved "https://registry.yarnpkg.com/hardhat/-/hardhat-2.10.1.tgz#37fdc0c96d6a5d16b322269db2ad8f9f115c4046"
   integrity sha512-0FN9TyCtn7Lt25SB2ei2G7nA2rZjP+RN6MvFOm+zYwherxLZNo6RbD8nDz88eCbhRapevmXqOiL2nM8INKsjmA==
