@@ -2,12 +2,20 @@ const { ethers } = require("hardhat");
 const { nearAPI, borshifyOutcomeProof } = require("rainbow-bridge-utils");
 const os = require("os");
 const path = require("path");
-
+const { getProof } = require("./near-proof");
 function keyStorePath() {
     return path.join(os.homedir(), '.near-credentials');
 }
 
-async function deposit({ nearAccountId, ethTokenFactoryAddress, nearOnEthClientAddress, txReceiptId, receiverId, nearNodeUrl, nearNetworkId }) {
+async function finishDeposit({
+    nearAccountId,
+    ethTokenFactoryAddress,
+    nearOnEthClientAddress,
+    txReceiptId,
+    receiverId,
+    nearNodeUrl,
+    nearNetworkId
+}) {
     const keyStore = new nearAPI.keyStores.UnencryptedFileSystemKeyStore(keyStorePath())
     const near = await nearAPI.connect({
         nodeUrl: nearNodeUrl,
@@ -29,33 +37,4 @@ async function deposit({ nearAccountId, ethTokenFactoryAddress, nearOnEthClientA
     await BridgeTokenFactory.deposit(borshProof, proofBlockHeight);
 }
 
-async function getProof({
-    near,
-    txReceiptId,
-    receiverId,
-    proofBlockHeight,
-}) {
-    const proofBlock = await near.connection.provider.block({
-        blockId: proofBlockHeight,
-    });
-    const proofBlockHash = proofBlock.header.hash;
-    try {
-        const proof = await near.connection.provider.sendJsonRpc(
-            'light_client_proof',
-            {
-                type: 'receipt',
-                receipt_id: txReceiptId,
-                receiver_id: receiverId,
-                light_client_head: proofBlockHash
-            }
-        );
-
-        return proof;
-    } catch (txRevertMessage) {
-        console.log('Failed to get proof.');
-        console.log(txRevertMessage.toString());
-    }
-}
-
-exports.deposit = deposit;
-exports.getProof = getProof;
+exports.finishDeposit = finishDeposit;
