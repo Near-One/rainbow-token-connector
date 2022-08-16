@@ -115,11 +115,11 @@ contract BridgeTokenFactory is  AccessControlUpgradeable, PausableUpgradeable{
         emit Deposit(result.amount, result.recipient);
     }
 
-    function withdraw(string memory token, address bridgeTokenProxy, uint256 amount, string memory recipient) public whenNotPaused {
+    function withdraw(string memory token, uint256 amount, string memory recipient) public whenNotPaused {
         _check_whitelist_token(token, msg.sender);
         require(_isBridgeToken[_nearToEthToken[token]], "ERR_NOT_BRIDGE_TOKEN");
         BridgeToken(_nearToEthToken[token]).burn(msg.sender, amount);
-        emit Withdraw(_ethToNearToken[bridgeTokenProxy], msg.sender, amount, recipient);
+        emit Withdraw(token, msg.sender, amount, recipient);
     }
 
     function pause() external onlyRole(PAUSE_ROLE) {

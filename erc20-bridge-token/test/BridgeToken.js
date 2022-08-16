@@ -173,7 +173,7 @@ describe('BridgeToken', () => {
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 2);
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(metadataProof), 1090);
 
-    await BridgeTokenFactory.withdraw(nearTokenId, tokenProxyAddress, 100, 'testrecipient.near')
+    await BridgeTokenFactory.withdraw(nearTokenId, 100, 'testrecipient.near')
     expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal('0')
   })
 
@@ -196,7 +196,7 @@ describe('BridgeToken', () => {
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(metadataProof), 1090);
     await BridgeTokenFactory.pause()
     await expect(
-      BridgeTokenFactory.withdraw(nearTokenId, tokenProxyAddress, 100, 'testrecipient.near')
+      BridgeTokenFactory.withdraw(nearTokenId, 100, 'testrecipient.near')
     )
       .to
       .be
@@ -222,14 +222,14 @@ describe('BridgeToken', () => {
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(metadataProof), 1090);
     await BridgeTokenFactory.pause()
     await expect(
-      BridgeTokenFactory.withdraw(nearTokenId, tokenProxyAddress, 100, 'testrecipient.near')
+      BridgeTokenFactory.withdraw(nearTokenId, 100, 'testrecipient.near')
     )
       .to
       .be
       .revertedWith('Pausable: paused');
     await BridgeTokenFactory.unpause()
 
-    await BridgeTokenFactory.withdraw(nearTokenId, tokenProxyAddress, 100, 'testrecipient.near')
+    await BridgeTokenFactory.withdraw(nearTokenId, 100, 'testrecipient.near')
     expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal('0')
   })
 
