@@ -55,7 +55,7 @@ task('add-token-to-whitelist-eth', 'Add a token to whitelist')
     await BridgeTokenFactory.setTokenWhitelistMode(taskArgs.nearTokenAccount, 2);
   });
 
-task('withdraw-ft', 'Withdraw bridged tokens on the eth side')
+task('withdraw-ft', 'Withdraw bridged tokens from the Ethereum side')
   .addParam('factory', 'The address of the eth factory contract')
   .addParam('token', 'Near token account id')
   .addParam('bridgeTokenProxy', 'Bridged token address on eth')
