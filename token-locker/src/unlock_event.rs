@@ -19,7 +19,7 @@ impl EthUnlockedEvent {
             ("token".to_string(), ParamType::String, false),
             ("sender".to_string(), ParamType::Address, true),
             ("amount".to_string(), ParamType::Uint(256), false),
-            ("account_id".to_string(), ParamType::String, false),
+            ("recipient".to_string(), ParamType::String, false),
         ]
     }
 
