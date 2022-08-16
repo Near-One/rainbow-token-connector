@@ -15,7 +15,7 @@ const NEAR_NETWORK = process.env.NEAR_NETWORK;
 const NEAR_TOKEN_LOCKER = process.env.NEAR_TOKEN_LOCKER;
 const NEAR_ON_ETH_CLIENT_ADDRESS = process.env.NEAR_ON_ETH_CLIENT_ADDRESS;
 
-task('finish-deposit-ft', 'Deposit near tokens on the eth side')
+task('finish-deposit-ft', 'Deposit NEP-141 tokens on the Ethereum side')
   .addParam('nearAccount', 'Near account id to get the proof')
   .addParam('factory', 'The address of the eth factory contract')
   .addParam('txReceiptId', 'Receipt id of the lock event on Near side')
