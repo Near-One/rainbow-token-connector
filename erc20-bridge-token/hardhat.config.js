@@ -44,7 +44,15 @@ task('new-token', 'Deploy new bridge token')
     await tx.wait(5);
     const tokenProxyAddress = await BridgeTokenFactory.nearToEthToken(taskArgs.nearTokenAccount);
     console.log(`Token deployed at ${tokenProxyAddress}`);
-    await BridgeTokenFactoryContract.setTokenWhitelistMode(tokenProxyAddress, 2);
+  });
+
+task('add-token-to-whitelist-eth', 'Add a token to whitelist')
+  .addParam('nearTokenAccount', 'Near account id of the token')
+  .addParam('factory', 'The address of the eth factory contract')
+  .setAction(async (taskArgs) => {
+    const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
+    const BridgeTokenFactory = BridgeTokenFactoryContract.attach(taskArgs.factory);
+    await BridgeTokenFactory.setTokenWhitelistMode(taskArgs.nearTokenAccount, 2);
   });
 
 task('withdraw-ft', 'Withdraw bridged tokens on the eth side')
