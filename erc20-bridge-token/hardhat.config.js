@@ -5,6 +5,7 @@ require("@nomiclabs/hardhat-waffle");
 require('hardhat-contract-sizer');
 require('@openzeppelin/hardhat-upgrades')
 require('solidity-coverage')
+require("@nomiclabs/hardhat-etherscan");
 
 require('dotenv').config();
 
@@ -14,6 +15,7 @@ const NEAR_RPC_URL = process.env.NEAR_RPC_URL;
 const NEAR_NETWORK = process.env.NEAR_NETWORK;
 const NEAR_TOKEN_LOCKER = process.env.NEAR_TOKEN_LOCKER;
 const NEAR_ON_ETH_CLIENT_ADDRESS = process.env.NEAR_ON_ETH_CLIENT_ADDRESS;
+const ETHERSCAN_API_KEY = process.env.ETHERSCAN_API_KEY;
 
 task('finish-deposit-ft', 'Deposit NEP-141 tokens on the Ethereum side')
   .addParam('nearAccount', 'Near account id to get the proof')
@@ -86,6 +88,16 @@ task('finish-withdraw-ft', 'Finish withdraw on near side')
     });
   });
 
+task('etherscan-verify', 'Verify contract on etherscan')
+  .addParam('address', 'Contract address')
+  .addParam('args', 'Constructor arguments in JSON array')
+  .setAction(async (taskArgs, hre) => {
+    await hre.run("verify:verify", {
+      address: taskArgs.address,
+      constructorArguments: JSON.parse(taskArgs.args),
+    });
+  });
+
 module.exports = {
   paths: {
     sources: './contracts',
@@ -109,5 +121,8 @@ module.exports = {
       url: `https://eth-goerli.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
       accounts: [`${ETH_PRIVATE_KEY}`]
     }
-  }
+  },
+  etherscan: {
+    apiKey: ETHERSCAN_API_KEY
+  },
 }
