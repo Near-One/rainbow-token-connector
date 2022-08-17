@@ -104,18 +104,6 @@ describe('BridgeToken', () => {
       .revertedWith('Pausable: paused');
   })
 
-  it('user cannot update metadata', async function () {
-    await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
-    const metadataProof = require('./proof_template.json');
-    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, 1089)).toString('base64');
-    await expect(
-      (BridgeTokenFactory.connect(user)).setMetadata(borshifyOutcomeProof(metadataProof), 1089)
-    )
-      .to
-      .be
-      .revertedWith(`AccessControl: account ${user.address.toLowerCase()} is missing role ${ADMIN_ROLE}`);
-  })
-
   it('deposit token', async function () {
     const { token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     const metadataProof = require('./proof_template.json');
