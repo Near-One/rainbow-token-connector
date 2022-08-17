@@ -22,16 +22,39 @@ task('finish-deposit-ft', 'Deposit NEP-141 tokens on the Ethereum side')
   .addParam('factory', 'The address of the eth factory contract')
   .addParam('txReceiptId', 'Receipt id of the lock event on Near side')
   .setAction(async (taskArgs) => {
-    const { finishDeposit } = require('./utils/deposit-ft.js');
-    await finishDeposit({
+    const { findProof } = require('./utils/near-proof.js');
+    const proof = await findProof({
       nearAccountId: taskArgs.nearAccount,
-      ethTokenFactoryAddress: taskArgs.factory,
       nearOnEthClientAddress: NEAR_ON_ETH_CLIENT_ADDRESS,
       txReceiptId: taskArgs.txReceiptId,
       receiverId: NEAR_TOKEN_LOCKER,
       nearNodeUrl: NEAR_RPC_URL,
       nearNetworkId: NEAR_NETWORK,
-    })
+    });
+
+    const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
+    const BridgeTokenFactory = BridgeTokenFactoryContract.attach(taskArgs.factory);
+    await BridgeTokenFactory.deposit(proof.borshProof, proof.proofBlockHeight);
+  });
+
+task('set-metadata-ft', 'Set metadata for NEP-141 tokens on the Ethereum side')
+  .addParam('nearAccount', 'Near account id to get the proof')
+  .addParam('factory', 'The address of the eth factory contract')
+  .addParam('txReceiptId', 'Receipt id of the lock event on Near side')
+  .setAction(async (taskArgs) => {
+    const { findProof } = require('./utils/near-proof.js');
+    const proof = await findProof({
+      nearAccountId: taskArgs.nearAccount,
+      nearOnEthClientAddress: NEAR_ON_ETH_CLIENT_ADDRESS,
+      txReceiptId: taskArgs.txReceiptId,
+      receiverId: NEAR_TOKEN_LOCKER,
+      nearNodeUrl: NEAR_RPC_URL,
+      nearNetworkId: NEAR_NETWORK,
+    });
+
+    const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
+    const BridgeTokenFactory = BridgeTokenFactoryContract.attach(taskArgs.factory);
+    await BridgeTokenFactory.setMetadata(proof.borshProof, proof.proofBlockHeight);
   });
 
 task('new-token', 'Deploy new bridge token')
