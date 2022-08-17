@@ -90,7 +90,6 @@ pub trait ExtContract {
     fn finish_log_metadata(
         &self,
         #[callback]
-        #[serializer(borsh)]
         metadata: FungibleTokenMetadata,
     ) -> result_types::Metadata;
 }
@@ -138,7 +137,7 @@ impl Contract {
             .with_static_gas(FT_GET_METADATA_GAS)
             .ft_metadata()
             .then(
-                ext_self::ext(token_id)
+                ext_self::ext(env::current_account_id())
                     .with_static_gas(FT_FINISH_LOG_METADATA_GAS)
                     .finish_log_metadata(),
             )
@@ -150,7 +149,6 @@ impl Contract {
     pub fn finish_log_metadata(
         &self,
         #[callback]
-        #[serializer(borsh)]
         metadata: FungibleTokenMetadata,
     ) -> result_types::Metadata {
         result_types::Metadata::new(
