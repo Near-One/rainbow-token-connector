@@ -91,6 +91,7 @@ pub trait ExtContract {
         &self,
         #[callback]
         metadata: FungibleTokenMetadata,
+        token_id: AccountId,
     ) -> result_types::Metadata;
 }
 
@@ -139,7 +140,7 @@ impl Contract {
             .then(
                 ext_self::ext(env::current_account_id())
                     .with_static_gas(FT_FINISH_LOG_METADATA_GAS)
-                    .finish_log_metadata(),
+                    .finish_log_metadata(token_id),
             )
     }
 
@@ -150,9 +151,10 @@ impl Contract {
         &self,
         #[callback]
         metadata: FungibleTokenMetadata,
+        token_id: AccountId,
     ) -> result_types::Metadata {
         result_types::Metadata::new(
-            env::predecessor_account_id().into(),
+            token_id.to_string(),
             metadata.name,
             metadata.symbol,
             metadata.decimals,
