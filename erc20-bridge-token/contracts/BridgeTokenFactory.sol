@@ -98,7 +98,7 @@ contract BridgeTokenFactory is  AccessControlUpgradeable, PausableUpgradeable{
         return bridgeTokenProxy;
     }
 
-    function setMetadata(bytes memory proofData, uint64 proofBlockHeight) public whenNotPaused onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setMetadata(bytes memory proofData, uint64 proofBlockHeight) public whenNotPaused {
         ProofDecoder.ExecutionStatus memory status = IProofConsumer(ProofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
         ResultsDecoder.MetadataResult memory result = ResultsDecoder.decodeMetadataResult(status.successValue);
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
