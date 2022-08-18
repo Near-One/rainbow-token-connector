@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/proxy/Proxy.sol";
 import "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -13,7 +13,7 @@ contract BridgeTokenProxy is ERC1967Proxy, AccessControl {
     }
 
     function upgradeTo(address implementation)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         super._upgradeTo(implementation);

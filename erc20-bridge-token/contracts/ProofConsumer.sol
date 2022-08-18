@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -7,7 +7,9 @@ import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
 import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
 import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 
-contract ProofConsumer is Ownable {
+import "./IProofConsumer.sol";
+
+contract ProofConsumer is Ownable, IProofConsumer {
     using Borsh for Borsh.Data;
     using ProofDecoder for Borsh.Data;
 
@@ -42,7 +44,7 @@ contract ProofConsumer is Ownable {
     function parseAndConsumeProof(
         bytes memory proofData,
         uint64 proofBlockHeight
-    ) external onlyOwner returns (ProofDecoder.ExecutionStatus memory result) {
+    ) external onlyOwner override returns (ProofDecoder.ExecutionStatus memory result) {
         require(
             prover.proveOutcome(proofData, proofBlockHeight),
             "Proof should be valid"

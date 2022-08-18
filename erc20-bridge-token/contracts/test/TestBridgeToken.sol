@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -17,7 +17,7 @@ contract TestBridgeToken is
     string private _symbol;
     uint8 private _decimals;
 
-    uint64 _metadataLastUpdated;
+    uint64 private _metadataLastUpdated;
 
     bytes32 public constant PAUSE_ROLE = keccak256("PAUSE_ROLE");
 
@@ -50,7 +50,7 @@ contract TestBridgeToken is
         string memory symbol_,
         uint8 decimals_,
         uint64 blockHeight_
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _metadataLastUpdated = blockHeight_;
         _name = name_;
         _symbol = symbol_;
@@ -58,7 +58,7 @@ contract TestBridgeToken is
     }
 
     function mint(address beneficiary, uint256 amount)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
         whenNotPaused
     {
@@ -66,7 +66,7 @@ contract TestBridgeToken is
     }
 
     function burn(address act, uint256 amount)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
         whenNotPaused
     {
@@ -85,11 +85,11 @@ contract TestBridgeToken is
         return _decimals;
     }
 
-    function metadataLastUpdated() public view virtual returns (uint64) {
+    function metadataLastUpdated() external view virtual returns (uint64) {
         return _metadataLastUpdated;
     }
 
-    function returnTestString() public pure returns (string memory) {
+    function returnTestString() external pure returns (string memory) {
         return "test";
     }
 }

@@ -530,7 +530,7 @@ library ProofDecoder {
 
 // File contracts/IProofConsumer.sol
 
-pragma solidity ^0.8;
+pragma solidity ^0.8.0;
 
 interface IProofConsumer {
         function parseAndConsumeProof(

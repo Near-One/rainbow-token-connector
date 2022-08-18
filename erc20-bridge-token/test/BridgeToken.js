@@ -110,16 +110,37 @@ describe('BridgeToken', () => {
     metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, 1089)).toString('base64');
     await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089);
 
+    const amountToTransfer = 100;
     const lockResultProof = metadataProof;
-    lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
-      prefix: RESULT_PREFIX_LOCK,
-      token: nearTokenId,
-      amount: 100,
-      recipient: ethers.utils.arrayify(adminAccount.address),
-    }).toString('base64');
+    lockResultProof.outcome_proof.outcome.status.SuccessValue =
+      serialize(
+        SCHEMA, 'LockResult', {
+          prefix: RESULT_PREFIX_LOCK,
+          token: nearTokenId,
+          amount: amountToTransfer,
+          recipient: ethers.utils.arrayify(adminAccount.address),
+        }
+    )
+      .toString('base64');
+
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'B'.repeat(44);
-    await BridgeTokenFactory.deposit(borshifyOutcomeProof(metadataProof), 1090);
-    expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal('100')
+
+    // Deposit and verify event is emitted
+    await expect(
+        BridgeTokenFactory
+          .deposit(borshifyOutcomeProof(metadataProof), 1090)
+    )
+      .to
+      .emit(BridgeTokenFactory, 'Deposit')
+      .withArgs(nearTokenId, amountToTransfer, adminAccount.address);
+
+    expect(
+      (await token.balanceOf(adminAccount.address))
+          .toString()
+    )
+      .to
+      .be
+      .equal(amountToTransfer.toString())
   })
 
   it('cant deposit if contract paused', async function () {
