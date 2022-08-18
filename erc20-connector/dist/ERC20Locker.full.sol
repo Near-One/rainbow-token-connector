@@ -1,6 +1,6 @@
 // Sources flattened with hardhat v2.8.3 https://hardhat.org
 
-// File @openzeppelin/contracts/token/ERC20/IERC20.sol@v4.7.1
+// File @openzeppelin/contracts/token/ERC20/IERC20.sol@v4.7.2
 
 // OpenZeppelin Contracts (last updated v4.6.0) (token/ERC20/IERC20.sol)
 
@@ -85,7 +85,7 @@ interface IERC20 {
 }
 
 
-// File @openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol@v4.7.1
+// File @openzeppelin/contracts/token/ERC20/extensions/draft-IERC20Permit.sol@v4.7.2
 
 // OpenZeppelin Contracts v4.4.1 (token/ERC20/extensions/draft-IERC20Permit.sol)
 
@@ -148,7 +148,7 @@ interface IERC20Permit {
 }
 
 
-// File @openzeppelin/contracts/utils/Address.sol@v4.7.1
+// File @openzeppelin/contracts/utils/Address.sol@v4.7.2
 
 // OpenZeppelin Contracts (last updated v4.7.0) (utils/Address.sol)
 
@@ -373,7 +373,7 @@ library Address {
 }
 
 
-// File @openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol@v4.7.1
+// File @openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol@v4.7.2
 
 // OpenZeppelin Contracts (last updated v4.7.0) (token/ERC20/utils/SafeERC20.sol)
 
@@ -490,7 +490,7 @@ library SafeERC20 {
 }
 
 
-// File @openzeppelin/contracts/utils/math/SafeMath.sol@v4.7.1
+// File @openzeppelin/contracts/utils/math/SafeMath.sol@v4.7.2
 
 // OpenZeppelin Contracts (last updated v4.6.0) (utils/math/SafeMath.sol)
 
