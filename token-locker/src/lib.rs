@@ -289,7 +289,7 @@ mod tests {
     use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
     use near_sdk::env::sha256;
     use near_sdk::test_utils::{accounts, VMContextBuilder};
-    use near_sdk::{testing_env, MockedBlockchain};
+    use near_sdk::testing_env;
     use uint::rustc_hex::{FromHex, ToHex};
 
     use super::*;
@@ -370,6 +370,7 @@ mod tests {
         set_env!(predecessor_account_id: accounts(0));
         let mut contract = Contract::new(prover(), token_locker());
         set_env!(predecessor_account_id: accounts(1));
+        contract.set_token_whitelist_mode(accounts(1), WhitelistMode::CheckToken);
         contract.ft_on_transfer(accounts(2), U128(1_000_000), ethereum_address_from_id(0));
         contract.finish_deposit(
             accounts(1).into(),
