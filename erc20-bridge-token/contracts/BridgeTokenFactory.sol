@@ -17,16 +17,16 @@ import "./BridgeTokenProxy.sol";
 import "./ResultsDecoder.sol";
 
 contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
+    using Borsh for Borsh.Data;
+    using SafeMathUpgradeable for uint256;
+    using SafeERC20Upgradeable for IERC20Upgradeable;
+
     enum WhitelistMode {
         NotInitialized,
         Blocked,
         CheckToken,
         CheckAccountAndToken
     }
-
-    using Borsh for Borsh.Data;
-    using SafeMathUpgradeable for uint256;
-    using SafeERC20Upgradeable for IERC20Upgradeable;
 
     mapping(address => string) private _ethToNearToken;
     mapping(string => address) private _nearToEthToken;
@@ -92,7 +92,10 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
         require(!_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_TOKEN_EXIST");
 
         BridgeToken bridgeToken = new BridgeToken();
-        BridgeTokenProxy bridgeTokenProxy = new BridgeTokenProxy(address(bridgeToken), abi.encodeWithSelector(BridgeToken(address(0)).initialize.selector, "", "", 0));
+        BridgeTokenProxy bridgeTokenProxy = new BridgeTokenProxy(
+            address(bridgeToken),
+            abi.encodeWithSelector(BridgeToken(address(0)).initialize.selector, "", "", 0)
+        );
         _isBridgeToken[address(bridgeTokenProxy)] = true;
         _ethToNearToken[address(bridgeTokenProxy)] = nearTokenId;
         _nearToEthToken[nearTokenId] = address(bridgeTokenProxy);
@@ -101,19 +104,25 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
     }
 
     function setMetadata(bytes memory proofData, uint64 proofBlockHeight) external whenNotPaused {
-        ProofDecoder.ExecutionStatus memory status = IProofConsumer(proofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
+        ProofDecoder.ExecutionStatus memory status =
+            IProofConsumer(proofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
         ResultsDecoder.MetadataResult memory result = ResultsDecoder.decodeMetadataResult(status.successValue);
 
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
-        require(result.blockHeight >= BridgeToken(_nearToEthToken[result.token]).metadataLastUpdated(), "ERR_OLD_METADATA");
+        require(
+            result.blockHeight >= BridgeToken(_nearToEthToken[result.token]).metadataLastUpdated(),
+            "ERR_OLD_METADATA"
+        );
 
-        BridgeToken(_nearToEthToken[result.token]).setMetadata(result.name, result.symbol, result.decimals, result.blockHeight);
+        BridgeToken(_nearToEthToken[result.token])
+            .setMetadata(result.name, result.symbol, result.decimals, result.blockHeight);
 
         emit SetMetadata(_nearToEthToken[result.token], result.name, result.symbol, result.decimals);
     }
 
     function deposit(bytes memory proofData, uint64 proofBlockHeight) external whenNotPaused {
-        ProofDecoder.ExecutionStatus memory status = IProofConsumer(proofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
+        ProofDecoder.ExecutionStatus memory status
+            = IProofConsumer(proofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
         ResultsDecoder.LockResult memory result = ResultsDecoder.decodeLockResult(status.successValue);
 
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
@@ -167,12 +176,12 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
             return;
         }
 
-        WhitelistMode token_mode = _whitelistedTokens[token];
-        require(token_mode != WhitelistMode.NotInitialized, "ERR_NOT_INITIALIZED_WHITELIST_TOKEN");
+        WhitelistMode tokenMode = _whitelistedTokens[token];
+        require(tokenMode != WhitelistMode.NotInitialized, "ERR_NOT_INITIALIZED_WHITELIST_TOKEN");
 
-        if (token_mode == WhitelistMode.CheckAccountAndToken) {
+        if (tokenMode == WhitelistMode.CheckAccountAndToken) {
             require(_whitelistedAccounts[abi.encodePacked(token, account)], "ERR_ACCOUNT_NOT_IN_WHITELIST");
-        } else if (token_mode == WhitelistMode.Blocked) {
+        } else if (tokenMode == WhitelistMode.Blocked) {
             revert("ERR_WHITELIST_TOKEN_BLOCKED");
         }
     }

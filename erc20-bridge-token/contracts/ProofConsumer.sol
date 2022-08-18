@@ -44,7 +44,7 @@ contract ProofConsumer is Ownable, IProofConsumer {
     function parseAndConsumeProof(
         bytes memory proofData,
         uint64 proofBlockHeight
-    ) external onlyOwner returns (ProofDecoder.ExecutionStatus memory result) {
+    ) external onlyOwner override returns (ProofDecoder.ExecutionStatus memory result) {
         require(
             prover.proveOutcome(proofData, proofBlockHeight),
             "Proof should be valid"

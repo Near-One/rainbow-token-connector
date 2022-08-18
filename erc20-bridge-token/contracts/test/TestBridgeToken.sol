@@ -17,7 +17,7 @@ contract TestBridgeToken is
     string private _symbol;
     uint8 private _decimals;
 
-    uint64 _metadataLastUpdated;
+    uint64 private _metadataLastUpdated;
 
     bytes32 public constant PAUSE_ROLE = keccak256("PAUSE_ROLE");
 
