@@ -215,7 +215,7 @@ library Borsh {
 
 // File contracts/ResultsDecoder.sol
 
-pragma solidity ^0.8;
+pragma solidity ^0.8.0;
 
 library ResultsDecoder {
     using Borsh for Borsh.Data;

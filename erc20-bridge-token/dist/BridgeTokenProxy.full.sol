@@ -1170,7 +1170,7 @@ abstract contract AccessControl is Context, IAccessControl, ERC165 {
 
 // File contracts/BridgeTokenProxy.sol
 
-pragma solidity ^0.8;
+pragma solidity ^0.8.0;
 
 
 
@@ -1182,7 +1182,7 @@ contract BridgeTokenProxy is ERC1967Proxy, AccessControl {
     }
 
     function upgradeTo(address implementation)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         super._upgradeTo(implementation);
