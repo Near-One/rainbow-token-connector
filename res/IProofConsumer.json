@@ -1,0 +1,62 @@
+{
+  "_format": "hh-sol-artifact-1",
+  "contractName": "IProofConsumer",
+  "sourceName": "contracts/IProofConsumer.sol",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "bytes",
+          "name": "proofData",
+          "type": "bytes"
+        },
+        {
+          "internalType": "uint64",
+          "name": "proofBlockHeight",
+          "type": "uint64"
+        }
+      ],
+      "name": "parseAndConsumeProof",
+      "outputs": [
+        {
+          "components": [
+            {
+              "internalType": "uint8",
+              "name": "enumIndex",
+              "type": "uint8"
+            },
+            {
+              "internalType": "bool",
+              "name": "unknown",
+              "type": "bool"
+            },
+            {
+              "internalType": "bool",
+              "name": "failed",
+              "type": "bool"
+            },
+            {
+              "internalType": "bytes",
+              "name": "successValue",
+              "type": "bytes"
+            },
+            {
+              "internalType": "bytes32",
+              "name": "successReceiptId",
+              "type": "bytes32"
+            }
+          ],
+          "internalType": "struct ProofDecoder.ExecutionStatus",
+          "name": "result",
+          "type": "tuple"
+        }
+      ],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "linkReferences": {},
+  "deployedLinkReferences": {}
+}

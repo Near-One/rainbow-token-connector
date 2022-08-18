@@ -15,6 +15,9 @@ jobs:
           - subject: erc20-connector
             cmd: ./erc20-connector/build.sh
 
+          - subject: erc20-bridge-token
+            cmd: ./erc20-bridge-token/build.sh
+
           - subject: bridge-token
             cmd: make prepare && make --always-make res/bridge_token.wasm
 

@@ -11,5 +11,5 @@ docker run \
      --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
      -w /host/erc20-bridge-token \
      -e RUSTFLAGS='-C link-arg=-s' \
-     node:17-buster \
+     node:18-buster \
      ./dist.sh
