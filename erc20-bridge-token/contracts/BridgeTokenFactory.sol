@@ -32,9 +32,9 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
     mapping(string => address) private _nearToEthToken;
     mapping(address => bool) private _isBridgeToken;
 
-    mapping(string => WhitelistMode) private _whitelist_tokens;
-    mapping(bytes => bool) private _whitelist_accounts;
-    bool private _is_whitelist_mode_enabled;
+    mapping(string => WhitelistMode) private _whitelistedTokens;
+    mapping(bytes => bool) private _whitelistedAccounts;
+    bool private _isWhitelistModeEnabled;
 
     address public proofConsumerAddress;
     bytes32 public constant PAUSE_ROLE = keccak256("PAUSE_ROLE");
@@ -71,7 +71,7 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _setupRole(PAUSE_ROLE, _msgSender());
         _setupRole(WHITELIST_ADMIN_ROLE, _msgSender());
-        _is_whitelist_mode_enabled = true;
+        _isWhitelistModeEnabled = true;
     }
 
     function isBridgeToken(address token) external view returns (bool) {
@@ -108,21 +108,26 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
         require(result.blockHeight >= BridgeToken(_nearToEthToken[result.token]).metadataLastUpdated(), "ERR_OLD_METADATA");
 
         BridgeToken(_nearToEthToken[result.token]).setMetadata(result.name, result.symbol, result.decimals, result.blockHeight);
+
         emit SetMetadata(_nearToEthToken[result.token], result.name, result.symbol, result.decimals);
     }
 
     function deposit(bytes memory proofData, uint64 proofBlockHeight) external whenNotPaused {
         ProofDecoder.ExecutionStatus memory status = IProofConsumer(proofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
         ResultsDecoder.LockResult memory result = ResultsDecoder.decodeLockResult(status.successValue);
+
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
         BridgeToken(_nearToEthToken[result.token]).mint(result.recipient, result.amount);
+
         emit Deposit(result.amount, result.recipient);
     }
 
     function withdraw(string memory token, uint256 amount, string memory recipient) external whenNotPaused {
-        _check_whitelist_token(token, msg.sender);
+        _checkWhitelistedToken(token, msg.sender);
         require(_isBridgeToken[_nearToEthToken[token]], "ERR_NOT_BRIDGE_TOKEN");
+
         BridgeToken(_nearToEthToken[token]).burn(msg.sender, amount);
+
         emit Withdraw(token, msg.sender, amount, recipient);
     }
 
@@ -140,33 +145,33 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
        proxy.upgradeTo(implementation);
     }
 
-    function enable_whitelist_mode() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _is_whitelist_mode_enabled = true;
+    function enableWhitelistMode() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _isWhitelistModeEnabled = true;
     }
 
-    function disable_whitelist_mode() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _is_whitelist_mode_enabled = false;
+    function disableWhitelistMode() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _isWhitelistModeEnabled = false;
     }
 
     function setTokenWhitelistMode(string calldata token, WhitelistMode mode) external onlyRole(WHITELIST_ADMIN_ROLE) {
-        _whitelist_tokens[token] = mode;
+        _whitelistedTokens[token] = mode;
     }
 
     function addAccountToWhitelist(string calldata token, address account) external onlyRole(WHITELIST_ADMIN_ROLE) {
-        require(_whitelist_tokens[token] != WhitelistMode.NotInitialized, "ERR_NOT_INITIALIZED_WHITELIST_TOKEN");
-       _whitelist_accounts[abi.encodePacked(token, account)] = true;
+        require(_whitelistedTokens[token] != WhitelistMode.NotInitialized, "ERR_NOT_INITIALIZED_WHITELIST_TOKEN");
+       _whitelistedAccounts[abi.encodePacked(token, account)] = true;
     }
 
-    function _check_whitelist_token(string memory token, address account) internal view {
-        if (!_is_whitelist_mode_enabled) {
+    function _checkWhitelistedToken(string memory token, address account) internal view {
+        if (!_isWhitelistModeEnabled) {
             return;
         }
 
-        WhitelistMode token_mode = _whitelist_tokens[token];
+        WhitelistMode token_mode = _whitelistedTokens[token];
         require(token_mode != WhitelistMode.NotInitialized, "ERR_NOT_INITIALIZED_WHITELIST_TOKEN");
 
         if (token_mode == WhitelistMode.CheckAccountAndToken) {
-            require(_whitelist_accounts[abi.encodePacked(token, account)], "ERR_ACCOUNT_NOT_IN_WHITELIST");
+            require(_whitelistedAccounts[abi.encodePacked(token, account)], "ERR_ACCOUNT_NOT_IN_WHITELIST");
         } else if (token_mode == WhitelistMode.Blocked) {
             revert("ERR_WHITELIST_TOKEN_BLOCKED");
         }
