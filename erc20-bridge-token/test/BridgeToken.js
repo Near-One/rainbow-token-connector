@@ -298,4 +298,109 @@ describe('BridgeToken', () => {
       .be
       .revertedWith(`AccessControl: account ${user.address.toLowerCase()} is missing role ${ADMIN_ROLE}`);
   })
+
+  describe("Whitelist", function() {
+    let tokenInfo;
+    let testProofId = 1;
+    const recipient = "testrecipient.near";
+
+    beforeEach(async function() {
+      tokenInfo = await createEmptyToken(
+        nearTokenId,
+        BridgeTokenFactory,
+        BridgeTokenInstance
+      );
+      const metadataProof = require("./proof_template.json");
+      metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(
+        SCHEMA,
+        "SetMetadataResult",
+        createDefaultERC20Metadata(nearTokenId, 1089)
+      ).toString("base64");
+      await BridgeTokenFactory.setMetadata(
+        borshifyOutcomeProof(metadataProof),
+        1089
+      );
+
+      const lockResultProof = metadataProof;
+      lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(
+        SCHEMA,
+        "LockResult",
+        {
+          prefix: RESULT_PREFIX_LOCK,
+          token: nearTokenId,
+          amount: 100,
+          recipient: ethers.utils.arrayify(adminAccount.address),
+        }
+      ).toString("base64");
+      const source = "123456789FGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+      lockResultProof.outcome_proof.outcome.receipt_ids[0] = source[
+        testProofId
+      ].repeat(44);
+      testProofId += 1;
+      await BridgeTokenFactory.deposit(
+        borshifyOutcomeProof(metadataProof),
+        1090
+      );
+    });
+
+    it("Test account in whitelist", async function() {
+      await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 3);
+      await BridgeTokenFactory.addAccountToWhitelist(
+        nearTokenId,
+        adminAccount.address
+      );
+      await BridgeTokenFactory.withdraw(nearTokenId, 100, recipient);
+      expect(
+        (await tokenInfo.token.balanceOf(adminAccount.address)).toString()
+      ).to.be.equal("0");
+    });
+
+    it("Test token in whitelist", async function() {
+      await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 2);
+      await BridgeTokenFactory.withdraw(nearTokenId, 100, recipient);
+      expect(
+        (await tokenInfo.token.balanceOf(adminAccount.address)).toString()
+      ).to.be.equal("0");
+    });
+
+    it("Test token or account not in whitelist", async function() {
+      await expect(
+        BridgeTokenFactory.withdraw(nearTokenId, 100, recipient)
+      ).to.be.revertedWith("ERR_NOT_INITIALIZED_WHITELIST_TOKEN");
+
+      await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 1);
+      await expect(
+        BridgeTokenFactory.withdraw(nearTokenId, 100, recipient)
+      ).to.be.revertedWith("ERR_WHITELIST_TOKEN_BLOCKED");
+
+      await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 3);
+
+      await expect(
+        BridgeTokenFactory.withdraw(nearTokenId, 100, recipient)
+      ).to.be.revertedWith("ERR_ACCOUNT_NOT_IN_WHITELIST");
+
+      // Disable whitelist mode
+      await BridgeTokenFactory.disableWhitelistMode();
+      await BridgeTokenFactory.withdraw(nearTokenId, 50, recipient);
+      expect(
+        (await tokenInfo.token.balanceOf(adminAccount.address)).toString()
+      ).to.be.equal("50");
+
+      // Enable whitelist mode
+      await BridgeTokenFactory.enableWhitelistMode();
+      await expect(
+        BridgeTokenFactory.withdraw(nearTokenId, 100, recipient)
+      ).to.be.revertedWith("ERR_ACCOUNT_NOT_IN_WHITELIST");
+
+      await BridgeTokenFactory.addAccountToWhitelist(
+        nearTokenId,
+        adminAccount.address
+      );
+      await BridgeTokenFactory.withdraw(nearTokenId, 50, recipient);
+
+      expect(
+        (await tokenInfo.token.balanceOf(adminAccount.address)).toString()
+      ).to.be.equal("0");
+    });
+  });
 })
