@@ -172,6 +172,10 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
        _whitelistedAccounts[abi.encodePacked(token, account)] = true;
     }
 
+    function removeAccountFromWhitelist(string calldata token, address account) external onlyRole(WHITELIST_ADMIN_ROLE) {
+        delete _whitelistedAccounts[abi.encodePacked(token, account)];
+    }
+
     function _checkWhitelistedToken(string memory token, address account) internal view {
         if (!_isWhitelistModeEnabled) {
             return;

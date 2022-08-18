@@ -32,6 +32,12 @@ impl Contract {
             .insert(&get_token_account_key(token, account));
     }
 
+    #[private]
+    pub fn remove_account_from_whitelist(&mut self, token: AccountId, account: AccountId) -> bool {
+        self.whitelist_accounts
+            .remove(&get_token_account_key(token, account))
+    }
+
     pub fn check_whitelist_token(&mut self, token: AccountId, account: AccountId) {
         if !self.is_whitelist_mode_enabled {
             return;
