@@ -42,19 +42,20 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
 
     // Event when funds are withdrawn from Ethereum back to NEAR.
     event Withdraw (
-        string token,
+        string indexed token,
         address indexed sender,
         uint256 amount,
         string recipient
     );
 
     event Deposit (
+        string indexed token,
         uint256 amount,
         address recipient
     );
 
     event SetMetadata (
-        address token,
+        address indexed token,
         string name,
         string symbol,
         uint8 decimals
@@ -128,7 +129,7 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
         BridgeToken(_nearToEthToken[result.token]).mint(result.recipient, result.amount);
 
-        emit Deposit(result.amount, result.recipient);
+        emit Deposit(result.token, result.amount, result.recipient);
     }
 
     function withdraw(string memory token, uint256 amount, string memory recipient) external whenNotPaused {
