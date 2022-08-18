@@ -7,7 +7,9 @@ import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
 import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
 import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 
-contract ProofConsumer is Ownable {
+import "./IProofConsumer.sol";
+
+contract ProofConsumer is Ownable, IProofConsumer {
     using Borsh for Borsh.Data;
     using ProofDecoder for Borsh.Data;
 
