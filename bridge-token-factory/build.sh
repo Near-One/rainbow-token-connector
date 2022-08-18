@@ -19,6 +19,7 @@ docker run \
      --cap-add=SYS_PTRACE --security-opt seccomp=unconfined \
      -w /host/bridge-token-factory \
      -e RUSTFLAGS='-C link-arg=-s' \
+     -e BRIDGE_TOKEN=/host/res/bridge_token.wasm \
      nearprotocol/contract-builder$tag \
      /bin/bash -c "rustup target add wasm32-unknown-unknown; cargo build --target wasm32-unknown-unknown --release"
 

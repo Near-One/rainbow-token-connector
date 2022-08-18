@@ -1,6 +1,6 @@
 // Sources flattened with hardhat v2.8.3 https://hardhat.org
 
-// File @openzeppelin/contracts/token/ERC20/IERC20.sol@v4.7.1
+// File @openzeppelin/contracts/token/ERC20/IERC20.sol@v4.7.2
 
 // OpenZeppelin Contracts (last updated v4.6.0) (token/ERC20/IERC20.sol)
 
@@ -85,7 +85,7 @@ interface IERC20 {
 }
 
 
-// File @openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol@v4.7.1
+// File @openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol@v4.7.2
 
 // OpenZeppelin Contracts v4.4.1 (token/ERC20/extensions/IERC20Metadata.sol)
 
@@ -114,7 +114,7 @@ interface IERC20Metadata is IERC20 {
 }
 
 
-// File @openzeppelin/contracts/utils/Context.sol@v4.7.1
+// File @openzeppelin/contracts/utils/Context.sol@v4.7.2
 
 // OpenZeppelin Contracts v4.4.1 (utils/Context.sol)
 
@@ -141,7 +141,7 @@ abstract contract Context {
 }
 
 
-// File @openzeppelin/contracts/token/ERC20/ERC20.sol@v4.7.1
+// File @openzeppelin/contracts/token/ERC20/ERC20.sol@v4.7.2
 
 // OpenZeppelin Contracts (last updated v4.7.0) (token/ERC20/ERC20.sol)
 

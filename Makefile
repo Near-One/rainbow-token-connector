@@ -1,6 +1,6 @@
 CARGO = cargo
 
-.PHONY = res/bridge_token.wasm res/bridge_token_factory.wasm res/bridge_token_no_icon.wasm res/bridge_token_factory_no_icon.wasm res/ERC20MetadataLogger.json
+.PHONY = res/bridge_token.wasm res/bridge_token_factory.wasm res/rainbow_bridge_near_token_locker.wasm res/bridge_token_no_icon.wasm res/bridge_token_factory_no_icon.wasm res/ERC20MetadataLogger.json
 
 all: res/bridge_token.wasm res/bridge_token_factory.wasm res/rainbow_bridge_near_token_locker.wasm res/ERC20MetadataLogger.json
 
