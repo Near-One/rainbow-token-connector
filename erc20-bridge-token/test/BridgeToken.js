@@ -27,6 +27,26 @@ describe('BridgeToken', () => {
     await ProofConsumer.transferOwnership(BridgeTokenFactory.address);
   })
 
+  async function setMetadata(nearTokenId, tokenProxyAddress) {
+    const metadataProof = require('./proof_template.json');
+    const metadata = createDefaultERC20Metadata(nearTokenId, 1089);
+    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(
+      SCHEMA,
+      "SetMetadataResult",
+      metadata
+    ).toString("base64");
+    await expect(
+      BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089)
+    )
+      .to.emit(BridgeTokenFactory, "SetMetadata")
+      .withArgs(
+        tokenProxyAddress,
+        metadata.name,
+        metadata.symbol,
+        metadata.decimals
+      );
+  }
+
   it('can create empty token', async function () {
     await BridgeTokenFactory.newBridgeToken(nearTokenId)
     const tokenProxyAddress = await BridgeTokenFactory.nearToEthToken(nearTokenId)
@@ -46,19 +66,20 @@ describe('BridgeToken', () => {
       .to
       .be
       .revertedWith('ERR_TOKEN_EXIST')
-
   })
-  it('can update metadata', async function () {
-    const { token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
-    const metadataProof = require('./proof_template.json');
-    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, 1089)).toString('base64');
 
-    await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089);
-    expect(await token.name()).to.equal('NEAR ERC20')
-    expect(await token.symbol()).to.equal('NEAR')
-    expect((await token.decimals()).toString()).to.equal('18')
-    expect((await token.metadataLastUpdated()).toString()).to.equal('1089')
-  })
+  it("can update metadata", async function() {
+    const { tokenProxyAddress, token } = await createEmptyToken(
+      nearTokenId,
+      BridgeTokenFactory,
+      BridgeTokenInstance
+    );
+    await setMetadata(nearTokenId, tokenProxyAddress);
+    expect(await token.name()).to.equal("NEAR ERC20");
+    expect(await token.symbol()).to.equal("NEAR");
+    expect((await token.decimals()).toString()).to.equal("18");
+    expect((await token.metadataLastUpdated()).toString()).to.equal("1089");
+  });
 
   it('cannot update metadata with old block height', async function () {
     await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
@@ -105,13 +126,15 @@ describe('BridgeToken', () => {
   })
 
   it('deposit token', async function () {
-    const { token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
-    const metadataProof = require('./proof_template.json');
-    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, 1089)).toString('base64');
-    await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089);
+    const { tokenProxyAddress, token } = await createEmptyToken(
+      nearTokenId,
+      BridgeTokenFactory,
+      BridgeTokenInstance
+    );
+    setMetadata(nearTokenId, tokenProxyAddress);
 
     const amountToTransfer = 100;
-    const lockResultProof = metadataProof;
+    const lockResultProof = require('./proof_template.json');;
     lockResultProof.outcome_proof.outcome.status.SuccessValue =
       serialize(
         SCHEMA, 'LockResult', {
@@ -128,7 +151,7 @@ describe('BridgeToken', () => {
     // Deposit and verify event is emitted
     await expect(
         BridgeTokenFactory
-          .deposit(borshifyOutcomeProof(metadataProof), 1090)
+          .deposit(borshifyOutcomeProof(lockResultProof), 1090)
     )
       .to
       .emit(BridgeTokenFactory, 'Deposit')
@@ -144,12 +167,10 @@ describe('BridgeToken', () => {
   })
 
   it('cant deposit if contract paused', async function () {
-    await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
-    const metadataProof = require('./proof_template.json');
-    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, 1089)).toString('base64');
-    await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089);
+    let {tokenProxyAddress} = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
+    await setMetadata(nearTokenId, tokenProxyAddress);
 
-    const lockResultProof = metadataProof;
+    const lockResultProof = require('./proof_template.json');
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
@@ -159,7 +180,7 @@ describe('BridgeToken', () => {
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'C'.repeat(44);
     await BridgeTokenFactory.pause()
     await expect(
-      BridgeTokenFactory.deposit(borshifyOutcomeProof(metadataProof), 1090)
+      BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), 1090)
     )
       .to
       .be
@@ -167,33 +188,43 @@ describe('BridgeToken', () => {
   })
   it('withdraw token', async function () {
     const { tokenProxyAddress, token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
-    const metadataProof = require('./proof_template.json');
-    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, 1089)).toString('base64');
-    await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089);
+    await setMetadata(nearTokenId, tokenProxyAddress);
 
-    const lockResultProof = metadataProof;
+    const amountToTransfer = 100;
+    const recipient = "testrecipient.near";
+    const lockResultProof = require('./proof_template.json');
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
-      amount: 100,
+      amount: amountToTransfer,
       recipient: ethers.utils.arrayify(adminAccount.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'D'.repeat(44);
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 2);
-    await BridgeTokenFactory.deposit(borshifyOutcomeProof(metadataProof), 1090);
+    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), 1090);
 
-    await BridgeTokenFactory.withdraw(nearTokenId, 100, 'testrecipient.near')
+    await expect(
+      BridgeTokenFactory.withdraw(
+        nearTokenId,
+        amountToTransfer,
+        recipient
+      )
+    )
+      .to.emit(BridgeTokenFactory, "Withdraw")
+      .withArgs(
+        nearTokenId,
+        adminAccount.address,
+        amountToTransfer,
+        recipient
+      );
     expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal('0')
   })
 
   it('cant withdraw token when paused', async function () {
     const { tokenProxyAddress } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
+    await setMetadata(nearTokenId, tokenProxyAddress);
 
-    const metadataProof = require('./proof_template.json');
-    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, 1089)).toString('base64');
-    await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089);
-
-    const lockResultProof = metadataProof;
+    const lockResultProof = require('./proof_template.json');
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
@@ -202,7 +233,7 @@ describe('BridgeToken', () => {
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'F'.repeat(44);
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 2);
-    await BridgeTokenFactory.deposit(borshifyOutcomeProof(metadataProof), 1090);
+    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), 1090);
     await BridgeTokenFactory.pause()
     await expect(
       BridgeTokenFactory.withdraw(nearTokenId, 100, 'testrecipient.near')
@@ -214,12 +245,9 @@ describe('BridgeToken', () => {
 
   it('can deposit and withdraw after unpausing', async function () {
     const { tokenProxyAddress, token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
+    await setMetadata(nearTokenId, tokenProxyAddress);
 
-    const metadataProof = require('./proof_template.json');
-    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, 1089)).toString('base64');
-    await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089);
-
-    const lockResultProof = metadataProof;
+    const lockResultProof = require('./proof_template.json');
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
@@ -228,7 +256,7 @@ describe('BridgeToken', () => {
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'G'.repeat(44);
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 2);
-    await BridgeTokenFactory.deposit(borshifyOutcomeProof(metadataProof), 1090);
+    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), 1090);
     await BridgeTokenFactory.pause()
     await expect(
       BridgeTokenFactory.withdraw(nearTokenId, 100, 'testrecipient.near')
@@ -244,11 +272,9 @@ describe('BridgeToken', () => {
 
   it('upgrade token contract', async function () {
     const { tokenProxyAddress, token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
-    const metadataProof = require('./proof_template.json');
-    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, 1089)).toString('base64');
-    await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089);
+    await setMetadata(nearTokenId, tokenProxyAddress);
 
-    const lockResultProof = metadataProof;
+    const lockResultProof = require('./proof_template.json');
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
@@ -256,7 +282,7 @@ describe('BridgeToken', () => {
       recipient: ethers.utils.arrayify(adminAccount.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'B'.repeat(44);
-    await BridgeTokenFactory.deposit(borshifyOutcomeProof(metadataProof), 1090);
+    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), 1090);
 
     expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal('100')
 
@@ -273,12 +299,10 @@ describe('BridgeToken', () => {
   })
 
   it('user cant upgrade token contract', async function () {
-    const { token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
-    const metadataProof = require('./proof_template.json');
-    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, 1089)).toString('base64');
-    await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089);
+    const { tokenProxyAddress, token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
+    await setMetadata(nearTokenId, tokenProxyAddress);
 
-    const lockResultProof = metadataProof;
+    const lockResultProof = require('./proof_template.json');
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
@@ -286,7 +310,7 @@ describe('BridgeToken', () => {
       recipient: ethers.utils.arrayify(adminAccount.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'C'.repeat(44);
-    await BridgeTokenFactory.deposit(borshifyOutcomeProof(metadataProof), 1090);
+    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), 1090);
 
     expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal('100')
 
@@ -310,18 +334,9 @@ describe('BridgeToken', () => {
         BridgeTokenFactory,
         BridgeTokenInstance
       );
-      const metadataProof = require("./proof_template.json");
-      metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(
-        SCHEMA,
-        "SetMetadataResult",
-        createDefaultERC20Metadata(nearTokenId, 1089)
-      ).toString("base64");
-      await BridgeTokenFactory.setMetadata(
-        borshifyOutcomeProof(metadataProof),
-        1089
-      );
+      setMetadata(nearTokenId, tokenInfo.tokenProxyAddress);
 
-      const lockResultProof = metadataProof;
+      const lockResultProof = require('./proof_template.json');
       lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(
         SCHEMA,
         "LockResult",
@@ -338,7 +353,7 @@ describe('BridgeToken', () => {
       ].repeat(44);
       testProofId += 1;
       await BridgeTokenFactory.deposit(
-        borshifyOutcomeProof(metadataProof),
+        borshifyOutcomeProof(lockResultProof),
         1090
       );
     });
@@ -389,7 +404,7 @@ describe('BridgeToken', () => {
       // Enable whitelist mode
       await BridgeTokenFactory.enableWhitelistMode();
       await expect(
-        BridgeTokenFactory.withdraw(nearTokenId, 100, recipient)
+        BridgeTokenFactory.withdraw(nearTokenId, 50, recipient)
       ).to.be.revertedWith("ERR_ACCOUNT_NOT_IN_WHITELIST");
 
       await BridgeTokenFactory.addAccountToWhitelist(
