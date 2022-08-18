@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8;
+pragma solidity ^0.8.0;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
@@ -49,7 +49,7 @@ contract BridgeToken is
         string memory symbol_,
         uint8 decimals_,
         uint64 blockHeight_
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _metadataLastUpdated = blockHeight_;
         _name = name_;
         _symbol = symbol_;
@@ -57,7 +57,7 @@ contract BridgeToken is
     }
 
     function mint(address beneficiary, uint256 amount)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
         whenNotPaused
     {
@@ -65,7 +65,7 @@ contract BridgeToken is
     }
 
     function burn(address act, uint256 amount)
-        public
+        external
         onlyRole(DEFAULT_ADMIN_ROLE)
         whenNotPaused
     {
@@ -84,7 +84,7 @@ contract BridgeToken is
         return _decimals;
     }
 
-    function metadataLastUpdated() public view virtual returns (uint64) {
+    function metadataLastUpdated() external view virtual returns (uint64) {
         return _metadataLastUpdated;
     }
 }
