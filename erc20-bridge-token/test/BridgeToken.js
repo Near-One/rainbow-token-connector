@@ -378,6 +378,24 @@ describe('BridgeToken', () => {
       ).to.be.equal("0");
     });
 
+    it("Test remove account from whitelist", async function() {
+      await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 3);
+      await BridgeTokenFactory.addAccountToWhitelist(
+        nearTokenId,
+        adminAccount.address
+      );
+      await BridgeTokenFactory.withdraw(nearTokenId, 50, recipient);
+
+      await BridgeTokenFactory.removeAccountFromWhitelist(nearTokenId, adminAccount.address);
+      await expect(
+        BridgeTokenFactory.withdraw(nearTokenId, 50, recipient)
+      ).to.be.revertedWith("ERR_ACCOUNT_NOT_IN_WHITELIST");
+
+      expect(
+        (await tokenInfo.token.balanceOf(adminAccount.address)).toString()
+      ).to.be.equal("50");
+    });
+
     it("Test token or account not in whitelist", async function() {
       await expect(
         BridgeTokenFactory.withdraw(nearTokenId, 100, recipient)

@@ -472,4 +472,22 @@ mod tests {
         set_env!(predecessor_account_id: token_account);
         contract.ft_on_transfer(sender_account, U128(1_000_000), ethereum_address_from_id(0));
     }
+
+    #[test]
+    #[should_panic(expected = "does not exist in the whitelist")]
+    fn test_remove_account_from_whitelist() {
+        set_env!(predecessor_account_id: accounts(0));
+        let mut contract = Contract::new(prover(), token_locker());
+
+        let token_account = accounts(1);
+        let sender_account = accounts(2);
+        contract.set_token_whitelist_mode(token_account.clone(), WhitelistMode::CheckAccountAndToken);
+        contract.add_account_to_whitelist(token_account.clone(), sender_account.clone());
+
+        set_env!(predecessor_account_id: token_account.clone());
+        contract.ft_on_transfer(sender_account.clone(), U128(1_000_000), ethereum_address_from_id(0));
+
+        contract.remove_account_from_whitelist(token_account.clone(), sender_account.clone());
+        contract.ft_on_transfer(sender_account.clone(), U128(1_000_000), ethereum_address_from_id(0));
+    }
 }
