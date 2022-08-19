@@ -27,9 +27,16 @@ describe('BridgeToken', () => {
     await ProofConsumer.transferOwnership(BridgeTokenFactory.address);
   })
 
+  function getProofTemplate() {
+    return {
+      proof: require("./proof_template.json"),
+      proofBlockHeight: 1089,
+    };
+  }
+
   async function setMetadata(nearTokenId, tokenProxyAddress) {
-    const metadataProof = require('./proof_template.json');
-    const metadata = createDefaultERC20Metadata(nearTokenId, 1089);
+    const { proof: metadataProof, proofBlockHeight } = getProofTemplate();
+    const metadata = createDefaultERC20Metadata(nearTokenId, proofBlockHeight);
     metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(
       SCHEMA,
       "SetMetadataResult",
@@ -37,7 +44,7 @@ describe('BridgeToken', () => {
     ).toString("base64");
     
     await expect(
-      BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089)
+      BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), proofBlockHeight)
     )
       .to
       .emit(BridgeTokenFactory, "SetMetadata")
@@ -86,15 +93,15 @@ describe('BridgeToken', () => {
 
   it('cannot update metadata with old block height', async function () {
     await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
-    const metadataProof = require('./proof_template.json');
-    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, 1089)).toString('base64');
-    await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089);
+    const { proof: metadataProof, proofBlockHeight } = getProofTemplate();
+    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, proofBlockHeight)).toString('base64');
+    await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), proofBlockHeight);
     // Change the receipt_id (to 'AAA..AAA') for the lockResultProof to make it another metadataProof
     metadataProof.outcome_proof.outcome.receipt_ids[0] = 'A'.repeat(44);
     // Change the block height to make it an old metadataProof
-    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, 1087)).toString('base64');
+    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, proofBlockHeight - 1)).toString('base64');
     await expect(
-      BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1087)
+      BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), proofBlockHeight)
     )
       .to
       .be
@@ -104,9 +111,9 @@ describe('BridgeToken', () => {
   it('cannot update metadata of nonexistent token', async function () {
     await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     const metadataProof = require('./proof_template.json');
-    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata("nonexisting-token", 1089)).toString('base64');
+    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata("nonexisting-token", proofBlockHeight)).toString('base64');
     await expect(
-      BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089)
+      BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), proofBlockHeight)
     )
       .to
       .be
@@ -115,13 +122,13 @@ describe('BridgeToken', () => {
 
   it('cannot update metadata when paused', async function () {
     await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
-    const metadataProof = require('./proof_template.json');
+    const { proof: metadataProof, proofBlockHeight } = getProofTemplate();
     metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId)).toString('base64');
 
-    await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089);
+    await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), proofBlockHeight);
     await BridgeTokenFactory.pause()
     await expect(
-      BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089)
+      BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), proofBlockHeight)
     )
       .to
       .be
@@ -138,7 +145,7 @@ describe('BridgeToken', () => {
     setMetadata(nearTokenId, tokenProxyAddress);
 
     const amountToTransfer = 100;
-    const lockResultProof = require('./proof_template.json');;
+    const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
     lockResultProof.outcome_proof.outcome.status.SuccessValue =
       serialize(
         SCHEMA, 'LockResult', {
@@ -155,7 +162,7 @@ describe('BridgeToken', () => {
     // Deposit and verify event is emitted
     await expect(
         BridgeTokenFactory
-          .deposit(borshifyOutcomeProof(lockResultProof), 1090)
+          .deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight)
     )
       .to
       .emit(BridgeTokenFactory, 'Deposit')
@@ -174,7 +181,7 @@ describe('BridgeToken', () => {
     let {tokenProxyAddress} = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await setMetadata(nearTokenId, tokenProxyAddress);
 
-    const lockResultProof = require('./proof_template.json');
+    const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
@@ -184,7 +191,7 @@ describe('BridgeToken', () => {
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'C'.repeat(44);
     await BridgeTokenFactory.pause()
     await expect(
-      BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), 1090)
+      BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight)
     )
       .to
       .be
@@ -196,7 +203,7 @@ describe('BridgeToken', () => {
 
     const amountToTransfer = 100;
     const recipient = "testrecipient.near";
-    const lockResultProof = require('./proof_template.json');
+    const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
@@ -205,7 +212,7 @@ describe('BridgeToken', () => {
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'D'.repeat(44);
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 2);
-    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), 1090);
+    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
 
     await expect(
       BridgeTokenFactory.withdraw(
@@ -228,7 +235,7 @@ describe('BridgeToken', () => {
     const { tokenProxyAddress } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await setMetadata(nearTokenId, tokenProxyAddress);
 
-    const lockResultProof = require('./proof_template.json');
+    const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
@@ -237,7 +244,7 @@ describe('BridgeToken', () => {
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'F'.repeat(44);
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 2);
-    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), 1090);
+    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
     await BridgeTokenFactory.pause()
     await expect(
       BridgeTokenFactory.withdraw(nearTokenId, 100, 'testrecipient.near')
@@ -251,7 +258,7 @@ describe('BridgeToken', () => {
     const { tokenProxyAddress, token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await setMetadata(nearTokenId, tokenProxyAddress);
 
-    const lockResultProof = require('./proof_template.json');
+    const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
@@ -260,7 +267,7 @@ describe('BridgeToken', () => {
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'G'.repeat(44);
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 2);
-    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), 1090);
+    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
     await BridgeTokenFactory.pause()
     await expect(
       BridgeTokenFactory.withdraw(nearTokenId, 100, 'testrecipient.near')
@@ -278,7 +285,7 @@ describe('BridgeToken', () => {
     const { tokenProxyAddress, token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await setMetadata(nearTokenId, tokenProxyAddress);
 
-    const lockResultProof = require('./proof_template.json');
+    const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
@@ -286,7 +293,7 @@ describe('BridgeToken', () => {
       recipient: ethers.utils.arrayify(adminAccount.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'B'.repeat(44);
-    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), 1090);
+    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
 
     expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal('100')
 
@@ -299,14 +306,14 @@ describe('BridgeToken', () => {
     expect(await BridgeTokenV2Proxied.name()).to.equal('NEAR ERC20')
     expect(await BridgeTokenV2Proxied.symbol()).to.equal('NEAR')
     expect((await BridgeTokenV2Proxied.decimals()).toString()).to.equal('18')
-    expect((await BridgeTokenV2Proxied.metadataLastUpdated()).toString()).to.equal('1089')
+    expect((await BridgeTokenV2Proxied.metadataLastUpdated()).toString()).to.equal(proofBlockHeight.toString())
   })
 
   it('user cant upgrade token contract', async function () {
     const { tokenProxyAddress, token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await setMetadata(nearTokenId, tokenProxyAddress);
 
-    const lockResultProof = require('./proof_template.json');
+    const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
@@ -314,7 +321,7 @@ describe('BridgeToken', () => {
       recipient: ethers.utils.arrayify(adminAccount.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'C'.repeat(44);
-    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), 1090);
+    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
 
     expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal('100')
 
@@ -341,7 +348,7 @@ describe('BridgeToken', () => {
       
       setMetadata(nearTokenId, tokenInfo.tokenProxyAddress);
 
-      const lockResultProof = require('./proof_template.json');
+      const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
       lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(
         SCHEMA,
         "LockResult",
@@ -352,14 +359,14 @@ describe('BridgeToken', () => {
           recipient: ethers.utils.arrayify(adminAccount.address),
         }
       ).toString("base64");
-      const source = "123456789FGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-      lockResultProof.outcome_proof.outcome.receipt_ids[0] = source[
+      const base58Alphabet = "123456789FGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
+      lockResultProof.outcome_proof.outcome.receipt_ids[0] = base58Alphabet[
         testProofId
       ].repeat(44);
       testProofId += 1;
       await BridgeTokenFactory.deposit(
         borshifyOutcomeProof(lockResultProof),
-        1090
+        proofBlockHeight
       );
     });
 
