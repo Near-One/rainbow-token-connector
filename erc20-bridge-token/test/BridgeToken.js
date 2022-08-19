@@ -35,10 +35,12 @@ describe('BridgeToken', () => {
       "SetMetadataResult",
       metadata
     ).toString("base64");
+    
     await expect(
       BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), 1089)
     )
-      .to.emit(BridgeTokenFactory, "SetMetadata")
+      .to
+      .emit(BridgeTokenFactory, "SetMetadata")
       .withArgs(
         tokenProxyAddress,
         metadata.name,
@@ -74,6 +76,7 @@ describe('BridgeToken', () => {
       BridgeTokenFactory,
       BridgeTokenInstance
     );
+    
     await setMetadata(nearTokenId, tokenProxyAddress);
     expect(await token.name()).to.equal("NEAR ERC20");
     expect(await token.symbol()).to.equal("NEAR");
@@ -131,6 +134,7 @@ describe('BridgeToken', () => {
       BridgeTokenFactory,
       BridgeTokenInstance
     );
+    
     setMetadata(nearTokenId, tokenProxyAddress);
 
     const amountToTransfer = 100;
@@ -334,6 +338,7 @@ describe('BridgeToken', () => {
         BridgeTokenFactory,
         BridgeTokenInstance
       );
+      
       setMetadata(nearTokenId, tokenInfo.tokenProxyAddress);
 
       const lockResultProof = require('./proof_template.json');
