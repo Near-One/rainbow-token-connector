@@ -153,7 +153,7 @@ describe('BridgeToken', () => {
           prefix: RESULT_PREFIX_LOCK,
           token: nearTokenId,
           amount: amountToTransfer,
-          recipient: ethers.utils.arrayify(adminAccount.address),
+          recipient: ethers.utils.arrayify(user.address),
         }
     )
       .toString('base64');
@@ -167,10 +167,10 @@ describe('BridgeToken', () => {
     )
       .to
       .emit(BridgeTokenFactory, 'Deposit')
-      .withArgs(nearTokenId, amountToTransfer, adminAccount.address);
+      .withArgs(nearTokenId, amountToTransfer, user.address);
 
     expect(
-      (await token.balanceOf(adminAccount.address))
+      (await token.balanceOf(user.address))
           .toString()
     )
       .to
@@ -210,14 +210,14 @@ describe('BridgeToken', () => {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
       amount: amountToTransfer,
-      recipient: ethers.utils.arrayify(adminAccount.address),
+      recipient: ethers.utils.arrayify(user.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'D'.repeat(44);
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 2);
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
 
     await expect(
-      BridgeTokenFactory.withdraw(
+      BridgeTokenFactory.connect(user).withdraw(
         nearTokenId,
         amountToTransfer,
         recipient
@@ -226,11 +226,11 @@ describe('BridgeToken', () => {
       .to.emit(BridgeTokenFactory, "Withdraw")
       .withArgs(
         nearTokenId,
-        adminAccount.address,
+        user.address,
         amountToTransfer,
         recipient
       );
-    expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal('0')
+    expect((await token.balanceOf(user.address)).toString()).to.be.equal('0')
   })
 
   it('cant withdraw token when paused', async function () {
@@ -243,7 +243,7 @@ describe('BridgeToken', () => {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
       amount: amountToTransfer,
-      recipient: ethers.utils.arrayify(adminAccount.address),
+      recipient: ethers.utils.arrayify(user.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'F'.repeat(44);
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 2);
@@ -267,22 +267,22 @@ describe('BridgeToken', () => {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
       amount: amountToTransfer,
-      recipient: ethers.utils.arrayify(adminAccount.address),
+      recipient: ethers.utils.arrayify(user.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'G'.repeat(44);
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 2);
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
     await BridgeTokenFactory.pause()
     await expect(
-      BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
+      BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
     )
       .to
       .be
       .revertedWith('Pausable: paused');
     await BridgeTokenFactory.unpause()
 
-    await BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
-    expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal('0')
+    await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
+    expect((await token.balanceOf(user.address)).toString()).to.be.equal('0')
   })
 
   it('upgrade token contract', async function () {
@@ -295,12 +295,12 @@ describe('BridgeToken', () => {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
       amount: amountToTransfer,
-      recipient: ethers.utils.arrayify(adminAccount.address),
+      recipient: ethers.utils.arrayify(user.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'B'.repeat(44);
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
 
-    expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal(amountToTransfer.toString())
+    expect((await token.balanceOf(user.address)).toString()).to.be.equal(amountToTransfer.toString())
 
     const BridgeTokenV2Instance = await ethers.getContractFactory("TestBridgeToken");
     const BridgeTokenV2 = await (await BridgeTokenV2Instance.deploy()).deployed();
@@ -324,12 +324,12 @@ describe('BridgeToken', () => {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
       amount: amountToTransfer,
-      recipient: ethers.utils.arrayify(adminAccount.address),
+      recipient: ethers.utils.arrayify(user.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'C'.repeat(44);
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
 
-    expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal(amountToTransfer.toString())
+    expect((await token.balanceOf(user.address)).toString()).to.be.equal(amountToTransfer.toString())
 
     const BridgeTokenV2Instance = await ethers.getContractFactory("TestBridgeToken");
     const BridgeTokenV2 = await (await BridgeTokenV2Instance.deploy()).deployed();
@@ -363,7 +363,7 @@ describe('BridgeToken', () => {
           prefix: RESULT_PREFIX_LOCK,
           token: nearTokenId,
           amount: amountToLock,
-          recipient: ethers.utils.arrayify(adminAccount.address),
+          recipient: ethers.utils.arrayify(user.address),
         }
       ).toString("base64");
       const base58Alphabet = "123456789FGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
@@ -382,20 +382,20 @@ describe('BridgeToken', () => {
       await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 3);
       await BridgeTokenFactory.addAccountToWhitelist(
         nearTokenId,
-        adminAccount.address
+        user.address
       );
-      await BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient);
+      await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, recipient);
       expect(
-        (await tokenInfo.token.balanceOf(adminAccount.address)).toString()
+        (await tokenInfo.token.balanceOf(user.address)).toString()
       ).to.be.equal("0");
     });
 
     it("Test token in whitelist", async function() {
       const amountToTransfer = amountToLock;
       await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 2);
-      await BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient);
+      await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, recipient);
       expect(
-        (await tokenInfo.token.balanceOf(adminAccount.address)).toString()
+        (await tokenInfo.token.balanceOf(user.address)).toString()
       ).to.be.equal("0");
     });
 
@@ -404,9 +404,9 @@ describe('BridgeToken', () => {
       await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 3);
       await BridgeTokenFactory.addAccountToWhitelist(
         nearTokenId,
-        adminAccount.address
+        user.address
       );
-      await BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient);
+      await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, recipient);
 
       await BridgeTokenFactory.removeAccountFromWhitelist(nearTokenId, adminAccount.address);
       await expect(
@@ -414,7 +414,7 @@ describe('BridgeToken', () => {
       ).to.be.revertedWith("ERR_ACCOUNT_NOT_IN_WHITELIST");
 
       expect(
-        (await tokenInfo.token.balanceOf(adminAccount.address)).toString()
+        (await tokenInfo.token.balanceOf(user.address)).toString()
       ).to.be.equal(amountToTransfer.toString());
     });
 
@@ -437,9 +437,9 @@ describe('BridgeToken', () => {
 
       // Disable whitelist mode
       await BridgeTokenFactory.disableWhitelistMode();
-      await BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient);
+      await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, recipient);
       expect(
-        (await tokenInfo.token.balanceOf(adminAccount.address)).toString()
+        (await tokenInfo.token.balanceOf(user.address)).toString()
       ).to.be.equal(amountToTransfer.toString());
 
       // Enable whitelist mode
@@ -450,12 +450,12 @@ describe('BridgeToken', () => {
 
       await BridgeTokenFactory.addAccountToWhitelist(
         nearTokenId,
-        adminAccount.address
+        user.address
       );
-      await BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient);
+      await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, recipient);
 
       expect(
-        (await tokenInfo.token.balanceOf(adminAccount.address)).toString()
+        (await tokenInfo.token.balanceOf(user.address)).toString()
       ).to.be.equal("0");
     });
   });
