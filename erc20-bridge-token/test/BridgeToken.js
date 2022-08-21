@@ -99,9 +99,10 @@ describe('BridgeToken', () => {
     // Change the receipt_id (to 'AAA..AAA') for the lockResultProof to make it another metadataProof
     metadataProof.outcome_proof.outcome.receipt_ids[0] = 'A'.repeat(44);
     // Change the block height to make it an old metadataProof
-    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, proofBlockHeight - 1)).toString('base64');
+    const oldProofBlockHeight = proofBlockHeight - 1;
+    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, oldProofBlockHeight)).toString('base64');
     await expect(
-      BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), proofBlockHeight)
+      BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), oldProofBlockHeight)
     )
       .to
       .be
@@ -110,7 +111,7 @@ describe('BridgeToken', () => {
 
   it('cannot update metadata of nonexistent token', async function () {
     await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
-    const metadataProof = require('./proof_template.json');
+    const { proof: metadataProof, proofBlockHeight } = getProofTemplate();
     metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata("nonexisting-token", proofBlockHeight)).toString('base64');
     await expect(
       BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), proofBlockHeight)
@@ -181,11 +182,12 @@ describe('BridgeToken', () => {
     let {tokenProxyAddress} = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await setMetadata(nearTokenId, tokenProxyAddress);
 
+    const amountToTransfer = 100;
     const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
-      amount: 100,
+      amount: amountToTransfer,
       recipient: ethers.utils.arrayify(adminAccount.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'C'.repeat(44);
@@ -235,11 +237,12 @@ describe('BridgeToken', () => {
     const { tokenProxyAddress } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await setMetadata(nearTokenId, tokenProxyAddress);
 
+    const amountToTransfer = 100;
     const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
-      amount: 100,
+      amount: amountToTransfer,
       recipient: ethers.utils.arrayify(adminAccount.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'F'.repeat(44);
@@ -247,7 +250,7 @@ describe('BridgeToken', () => {
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
     await BridgeTokenFactory.pause()
     await expect(
-      BridgeTokenFactory.withdraw(nearTokenId, 100, 'testrecipient.near')
+      BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
     )
       .to
       .be
@@ -258,11 +261,12 @@ describe('BridgeToken', () => {
     const { tokenProxyAddress, token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await setMetadata(nearTokenId, tokenProxyAddress);
 
+    const amountToTransfer = 100;
     const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
-      amount: 100,
+      amount: amountToTransfer,
       recipient: ethers.utils.arrayify(adminAccount.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'G'.repeat(44);
@@ -270,14 +274,14 @@ describe('BridgeToken', () => {
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
     await BridgeTokenFactory.pause()
     await expect(
-      BridgeTokenFactory.withdraw(nearTokenId, 100, 'testrecipient.near')
+      BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
     )
       .to
       .be
       .revertedWith('Pausable: paused');
     await BridgeTokenFactory.unpause()
 
-    await BridgeTokenFactory.withdraw(nearTokenId, 100, 'testrecipient.near')
+    await BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
     expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal('0')
   })
 
@@ -285,17 +289,18 @@ describe('BridgeToken', () => {
     const { tokenProxyAddress, token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await setMetadata(nearTokenId, tokenProxyAddress);
 
+    const amountToTransfer = 100;
     const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
-      amount: 100,
+      amount: amountToTransfer,
       recipient: ethers.utils.arrayify(adminAccount.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'B'.repeat(44);
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
 
-    expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal('100')
+    expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal(amountToTransfer.toString())
 
     const BridgeTokenV2Instance = await ethers.getContractFactory("TestBridgeToken");
     const BridgeTokenV2 = await (await BridgeTokenV2Instance.deploy()).deployed();
@@ -310,6 +315,7 @@ describe('BridgeToken', () => {
   })
 
   it('user cant upgrade token contract', async function () {
+    const amountToTransfer = 100;
     const { tokenProxyAddress, token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await setMetadata(nearTokenId, tokenProxyAddress);
 
@@ -317,13 +323,13 @@ describe('BridgeToken', () => {
     lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
-      amount: 100,
+      amount: amountToTransfer,
       recipient: ethers.utils.arrayify(adminAccount.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'C'.repeat(44);
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
 
-    expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal('100')
+    expect((await token.balanceOf(adminAccount.address)).toString()).to.be.equal(amountToTransfer.toString())
 
     const BridgeTokenV2Instance = await ethers.getContractFactory("TestBridgeToken");
     const BridgeTokenV2 = await (await BridgeTokenV2Instance.deploy()).deployed();
@@ -338,6 +344,7 @@ describe('BridgeToken', () => {
     let tokenInfo;
     let testProofId = 1;
     const recipient = "testrecipient.near";
+    const amountToLock = 100;
 
     beforeEach(async function() {
       tokenInfo = await createEmptyToken(
@@ -355,7 +362,7 @@ describe('BridgeToken', () => {
         {
           prefix: RESULT_PREFIX_LOCK,
           token: nearTokenId,
-          amount: 100,
+          amount: amountToLock,
           recipient: ethers.utils.arrayify(adminAccount.address),
         }
       ).toString("base64");
@@ -371,77 +378,81 @@ describe('BridgeToken', () => {
     });
 
     it("Test account in whitelist", async function() {
+      const amountToTransfer = amountToLock;
       await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 3);
       await BridgeTokenFactory.addAccountToWhitelist(
         nearTokenId,
         adminAccount.address
       );
-      await BridgeTokenFactory.withdraw(nearTokenId, 100, recipient);
+      await BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient);
       expect(
         (await tokenInfo.token.balanceOf(adminAccount.address)).toString()
       ).to.be.equal("0");
     });
 
     it("Test token in whitelist", async function() {
+      const amountToTransfer = amountToLock;
       await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 2);
-      await BridgeTokenFactory.withdraw(nearTokenId, 100, recipient);
+      await BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient);
       expect(
         (await tokenInfo.token.balanceOf(adminAccount.address)).toString()
       ).to.be.equal("0");
     });
 
     it("Test remove account from whitelist", async function() {
+      const amountToTransfer = amountToLock / 2;
       await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 3);
       await BridgeTokenFactory.addAccountToWhitelist(
         nearTokenId,
         adminAccount.address
       );
-      await BridgeTokenFactory.withdraw(nearTokenId, 50, recipient);
+      await BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient);
 
       await BridgeTokenFactory.removeAccountFromWhitelist(nearTokenId, adminAccount.address);
       await expect(
-        BridgeTokenFactory.withdraw(nearTokenId, 50, recipient)
+        BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient)
       ).to.be.revertedWith("ERR_ACCOUNT_NOT_IN_WHITELIST");
 
       expect(
         (await tokenInfo.token.balanceOf(adminAccount.address)).toString()
-      ).to.be.equal("50");
+      ).to.be.equal(amountToTransfer.toString());
     });
 
     it("Test token or account not in whitelist", async function() {
+      const amountToTransfer = amountToLock / 2;
       await expect(
-        BridgeTokenFactory.withdraw(nearTokenId, 100, recipient)
+        BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient)
       ).to.be.revertedWith("ERR_NOT_INITIALIZED_WHITELIST_TOKEN");
 
       await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 1);
       await expect(
-        BridgeTokenFactory.withdraw(nearTokenId, 100, recipient)
+        BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient)
       ).to.be.revertedWith("ERR_WHITELIST_TOKEN_BLOCKED");
 
       await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, 3);
 
       await expect(
-        BridgeTokenFactory.withdraw(nearTokenId, 100, recipient)
+        BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient)
       ).to.be.revertedWith("ERR_ACCOUNT_NOT_IN_WHITELIST");
 
       // Disable whitelist mode
       await BridgeTokenFactory.disableWhitelistMode();
-      await BridgeTokenFactory.withdraw(nearTokenId, 50, recipient);
+      await BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient);
       expect(
         (await tokenInfo.token.balanceOf(adminAccount.address)).toString()
-      ).to.be.equal("50");
+      ).to.be.equal(amountToTransfer.toString());
 
       // Enable whitelist mode
       await BridgeTokenFactory.enableWhitelistMode();
       await expect(
-        BridgeTokenFactory.withdraw(nearTokenId, 50, recipient)
+        BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient)
       ).to.be.revertedWith("ERR_ACCOUNT_NOT_IN_WHITELIST");
 
       await BridgeTokenFactory.addAccountToWhitelist(
         nearTokenId,
         adminAccount.address
       );
-      await BridgeTokenFactory.withdraw(nearTokenId, 50, recipient);
+      await BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient);
 
       expect(
         (await tokenInfo.token.balanceOf(adminAccount.address)).toString()
