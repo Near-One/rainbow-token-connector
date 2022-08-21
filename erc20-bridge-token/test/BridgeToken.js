@@ -2,7 +2,7 @@ const { expect } = require('chai')
 const { ethers, upgrades } = require('hardhat')
 const { serialize } = require('rainbow-bridge-lib/borsh.js');
 const { borshifyOutcomeProof } = require('rainbow-bridge-lib/borshify-proof.js');
-const { SCHEMA, createEmptyToken, createDefaultERC20Metadata, ADMIN_ROLE, RESULT_PREFIX_LOCK } = require('./helpers.js');
+const { SCHEMA, createEmptyToken, createDefaultERC20Metadata, generateRandomBase58, ADMIN_ROLE, RESULT_PREFIX_LOCK } = require('./helpers.js');
 
 describe('BridgeToken', () => {
   const nearTokenId = 'nearfuntoken'
@@ -37,6 +37,7 @@ describe('BridgeToken', () => {
   async function setMetadata(nearTokenId, tokenProxyAddress) {
     const { proof: metadataProof, proofBlockHeight } = getProofTemplate();
     const metadata = createDefaultERC20Metadata(nearTokenId, proofBlockHeight);
+    metadataProof.outcome_proof.outcome.receipt_ids[0] = generateRandomBase58(64);
     metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(
       SCHEMA,
       "SetMetadataResult",
@@ -54,6 +55,36 @@ describe('BridgeToken', () => {
         metadata.symbol,
         metadata.decimals
       );
+  }
+
+  async function createToken(nearTokenId) {
+    const tokenInfo = await createEmptyToken(
+      nearTokenId,
+      BridgeTokenFactory,
+      BridgeTokenInstance
+    );
+    
+    await setMetadata(nearTokenId, tokenInfo.tokenProxyAddress);
+    return tokenInfo;
+  }
+
+  async function deposit(nearTokenId, amountToLock, recipientAddress) {
+    const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
+    lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(
+      SCHEMA,
+      "LockResult",
+      {
+        prefix: RESULT_PREFIX_LOCK,
+        token: nearTokenId,
+        amount: amountToLock,
+        recipient: ethers.utils.arrayify(recipientAddress),
+      }
+    ).toString("base64");
+    lockResultProof.outcome_proof.outcome.receipt_ids[0] = generateRandomBase58(64);
+    await BridgeTokenFactory.deposit(
+      borshifyOutcomeProof(lockResultProof),
+      proofBlockHeight
+    );
   }
 
   it('can create empty token', async function () {
@@ -342,39 +373,12 @@ describe('BridgeToken', () => {
 
   describe("Whitelist", function() {
     let tokenInfo;
-    let testProofId = 1;
     const recipient = "testrecipient.near";
     const amountToLock = 100;
 
     beforeEach(async function() {
-      tokenInfo = await createEmptyToken(
-        nearTokenId,
-        BridgeTokenFactory,
-        BridgeTokenInstance
-      );
-      
-      setMetadata(nearTokenId, tokenInfo.tokenProxyAddress);
-
-      const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
-      lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(
-        SCHEMA,
-        "LockResult",
-        {
-          prefix: RESULT_PREFIX_LOCK,
-          token: nearTokenId,
-          amount: amountToLock,
-          recipient: ethers.utils.arrayify(user.address),
-        }
-      ).toString("base64");
-      const base58Alphabet = "123456789FGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-      lockResultProof.outcome_proof.outcome.receipt_ids[0] = base58Alphabet[
-        testProofId
-      ].repeat(44);
-      testProofId += 1;
-      await BridgeTokenFactory.deposit(
-        borshifyOutcomeProof(lockResultProof),
-        proofBlockHeight
-      );
+      tokenInfo = await createToken(nearTokenId);
+      await deposit(nearTokenId, amountToLock, user.address);
     });
 
     it("Test account in whitelist", async function() {
@@ -397,6 +401,109 @@ describe('BridgeToken', () => {
       expect(
         (await tokenInfo.token.balanceOf(user.address)).toString()
       ).to.be.equal("0");
+    });
+
+    it("Test multiple tokens", async function() {
+      const amountToTransfer = amountToLock;
+      const whitelistTokens = [
+        "near-token1.near",
+        "near-token2.near",
+        "near-token3.near",
+        "near-token4.near",
+      ];
+      const blacklistTokens = [
+        "near-token5.near",
+        "near-token6.near",
+        "near-token7.near",
+        "near-token8.near",
+      ];
+
+      const tokensInfo = [];
+      for (token of whitelistTokens) {
+        tokensInfo.push(await createToken(token));
+        await deposit(token, amountToTransfer, user.address);
+        await BridgeTokenFactory.setTokenWhitelistMode(token, 2);
+      }
+
+      for (token of blacklistTokens) {
+        await expect(
+          BridgeTokenFactory.connect(user).withdraw(
+            token,
+            amountToTransfer,
+            recipient
+          )
+        ).to.be.revertedWith("ERR_NOT_INITIALIZED_WHITELIST_TOKEN");
+      }
+
+      for (token of whitelistTokens) {
+        await expect(
+          BridgeTokenFactory.connect(user).withdraw(
+            token,
+            amountToTransfer,
+            recipient
+          )
+        )
+          .to.emit(BridgeTokenFactory, "Withdraw")
+          .withArgs(token, user.address, amountToTransfer, recipient);
+      }
+
+      for (tokenInfo of tokensInfo) {
+        expect(
+          (await tokenInfo.token.balanceOf(user.address)).toString()
+        ).to.be.equal("0");
+      }
+    });
+
+    it("Test multiple accounts", async function() {
+      const amountToTransfer = amountToLock;
+      const whitelistTokens = [
+        "near-token1.near",
+        "near-token2.near",
+        "near-token3.near",
+        "near-token4.near",
+      ];
+
+      const signers = await ethers.getSigners();
+      const whitelistAccounts = signers.slice(0, 3);
+      const blacklistAccounts = signers.slice(4, 7);
+
+      const tokensInfo = [];
+      for (token of whitelistTokens) {
+        tokensInfo.push(createToken(token));
+        await BridgeTokenFactory.setTokenWhitelistMode(token, 3);
+
+        for (const account of whitelistAccounts) {
+          await deposit(token, amountToTransfer, account.address);
+          await BridgeTokenFactory.addAccountToWhitelist(
+            token,
+            account.address
+          );
+        }
+      }
+
+      for (token of whitelistTokens) {
+        for (const account of whitelistAccounts) {
+          await expect(
+            BridgeTokenFactory.connect(account).withdraw(
+              token,
+              amountToTransfer,
+              recipient
+            )
+          )
+            .to.emit(BridgeTokenFactory, "Withdraw")
+            .withArgs(token, account.address, amountToTransfer, recipient);
+        }
+
+        for (const account of blacklistAccounts) {
+          await expect(
+            BridgeTokenFactory.connect(account).withdraw(
+              token,
+              amountToTransfer,
+              recipient
+            )
+          ).revertedWith("ERR_ACCOUNT_NOT_IN_WHITELIST");
+        }
+      }
     });
 
     it("Test remove account from whitelist", async function() {
