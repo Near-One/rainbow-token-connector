@@ -78,3 +78,13 @@ jobs:
       - name: Test
         run: |
           make test
+
+  test-token-locker:
+    runs-on: self-hosted
+    name: Test token-locker
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v2
+      - name: Test
+        run: |
+          make test-token-locker

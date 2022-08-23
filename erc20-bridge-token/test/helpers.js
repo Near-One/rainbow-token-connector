@@ -41,4 +41,16 @@ const createDefaultERC20Metadata = (nearTokenId, blockHeight) => {
   }
 }
 
-module.exports = { SCHEMA, createEmptyToken, createDefaultERC20Metadata, ADMIN_ROLE, RESULT_PREFIX_LOCK, RESULT_PREFIX_METADATA };
+
+const generateRandomBase58 = (rawSize) => {
+  var rawInput = "0x";
+  var alphabet = "123456789abcdef";
+
+  for (var i = 0; i < rawSize; i++) {
+    rawInput += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+  }
+
+  return ethers.utils.base58.encode(rawInput);
+}
+
+module.exports = { SCHEMA, createEmptyToken, createDefaultERC20Metadata, generateRandomBase58, ADMIN_ROLE, RESULT_PREFIX_LOCK, RESULT_PREFIX_METADATA };

@@ -30,6 +30,7 @@ bridge-common = { path = "../bridge-common" }
 [dev-dependencies]
 uint = { version = "0.8.3", default-features = false }
 serde_json = "1.0"
+rand = "0.7.3"
 
 [features]
 default = ["migrate_icon"]
