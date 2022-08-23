@@ -165,7 +165,7 @@ describe('BridgeToken', () => {
     metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId)).toString('base64');
 
     await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), proofBlockHeight);
-    await BridgeTokenFactory.pause()
+    await BridgeTokenFactory.pauseSetMetadata();
     await expect(
       BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), proofBlockHeight)
     )
@@ -229,7 +229,7 @@ describe('BridgeToken', () => {
       recipient: ethers.utils.arrayify(adminAccount.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'C'.repeat(44);
-    await BridgeTokenFactory.pause()
+    await BridgeTokenFactory.pauseDeposit();
     await expect(
       BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight)
     )
@@ -286,7 +286,7 @@ describe('BridgeToken', () => {
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'F'.repeat(44);
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckToken);
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
-    await BridgeTokenFactory.pause()
+    await BridgeTokenFactory.pauseWithdraw();
     await expect(
       BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
     )
@@ -310,14 +310,14 @@ describe('BridgeToken', () => {
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'G'.repeat(44);
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckToken);
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
-    await BridgeTokenFactory.pause()
+    await BridgeTokenFactory.pauseWithdraw();
     await expect(
       BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
     )
       .to
       .be
       .revertedWith('Pausable: paused');
-    await BridgeTokenFactory.unpause()
+    await BridgeTokenFactory.pause(0);
 
     await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
     expect((await token.balanceOf(user.address)).toString()).to.be.equal('0')

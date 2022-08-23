@@ -18,12 +18,7 @@ abstract contract SelectivePausableUpgradable is Initializable, ContextUpgradeab
     /**
      * @dev Emitted when the pause is triggered by `account`.
      */
-    event Paused(address account);
-
-    /**
-     * @dev Emitted when the pause is lifted by `account`.
-     */
-    event Unpaused(address account);
+    event Paused(address account, uint flags);
 
     bool private _paused; // Deprecated!
     uint private _pausedFlags;
@@ -72,6 +67,13 @@ abstract contract SelectivePausableUpgradable is Initializable, ContextUpgradeab
     }
 
     /**
+     * @dev Returns paused flags.
+     */
+    function pausedFlags() public view virtual returns (uint) {
+        return _pausedFlags;
+    }
+
+    /**
      * @dev Throws if the contract is paused.
      */
     function _requireNotPaused(uint flag) internal view virtual {
@@ -90,15 +92,7 @@ abstract contract SelectivePausableUpgradable is Initializable, ContextUpgradeab
      */
     function _pause(uint flags) internal virtual {
         _pausedFlags = flags;
-        emit Paused(_msgSender());
-    }
-
-    /**
-     * @dev Returns to normal state.
-     */
-    function _unpause() internal {
-        _pausedFlags = 0;
-        emit Unpaused(_msgSender());
+        emit Paused(_msgSender(), _pausedFlags);
     }
 
     /**

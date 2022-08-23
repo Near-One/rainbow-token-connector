@@ -38,7 +38,10 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
 
     address public proofConsumerAddress;
 
-    bytes32 public constant PAUSE_ROLE = keccak256("PAUSE_ROLE");
+    bytes32 public constant ADMIN_PAUSE_ROLE = keccak256("ADMIN_PAUSE_ROLE");
+    bytes32 public constant PAUSE_DEPOSIT_ROLE = keccak256("PAUSE_DEPOSIT_ROLE");
+    bytes32 public constant PAUSE_WITHDRAW_ROLE = keccak256("PAUSE_WITHDRAW_ROLE");
+    bytes32 public constant PAUSE_SET_METADATA_ROLE = keccak256("PAUSE_SET_METADATA_ROLE");
     bytes32 public constant WHITELIST_ADMIN_ROLE = keccak256("WHITELIST_ADMIN_ROLE");
     uint constant UNPAUSED_ALL = 0;
     uint constant PAUSED_WITHDRAW = 1 << 0;
@@ -75,7 +78,10 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
         __AccessControl_init();
         __Pausable_init_unchained();
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        _setupRole(PAUSE_ROLE, _msgSender());
+        _setupRole(ADMIN_PAUSE_ROLE, _msgSender());
+        _setupRole(PAUSE_DEPOSIT_ROLE, _msgSender());
+        _setupRole(PAUSE_WITHDRAW_ROLE, _msgSender());
+        _setupRole(PAUSE_SET_METADATA_ROLE, _msgSender());
         _setupRole(WHITELIST_ADMIN_ROLE, _msgSender());
         _isWhitelistModeEnabled = true;
     }
@@ -146,12 +152,20 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
         emit Withdraw(token, msg.sender, amount, recipient);
     }
 
-    function pause(uint flags) external onlyRole(PAUSE_ROLE) {
+    function pause(uint flags) external onlyRole(ADMIN_PAUSE_ROLE) {
         _pause(flags);
     }
 
-    function unpause() external onlyRole(PAUSE_ROLE) {
-        _unpause();
+    function pauseDeposit() external onlyRole(PAUSE_DEPOSIT_ROLE) {
+        _pause(pausedFlags() | PAUSED_DEPOSIT);
+    }
+
+    function pauseWithdraw() external onlyRole(PAUSE_WITHDRAW_ROLE) {
+        _pause(pausedFlags() | PAUSED_WITHDRAW);
+    }
+
+    function pauseSetMetadata() external onlyRole(PAUSE_SET_METADATA_ROLE) {
+        _pause(pausedFlags() | PAUSED_SET_METADATA);
     }
 
     function upgradeToken(string calldata nearTokenId, address implementation) external onlyRole(DEFAULT_ADMIN_ROLE) {
