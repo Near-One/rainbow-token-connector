@@ -10,6 +10,7 @@ require("@nomiclabs/hardhat-etherscan");
 require('dotenv').config();
 
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
+const INFURA_API_KEY = process.env.INFURA_API_KEY;
 const ETH_PRIVATE_KEY = process.env.ETH_PRIVATE_KEY || '11'.repeat(32);
 const NEAR_RPC_URL = process.env.NEAR_RPC_URL;
 const NEAR_NETWORK = process.env.NEAR_NETWORK;
@@ -141,7 +142,9 @@ module.exports = {
   },
   networks: {
     goerli: {
-      url: `https://eth-goerli.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
+      url: INFURA_API_KEY
+        ? `https://goerli.infura.io/v3/${INFURA_API_KEY}`
+        : `https://eth-goerli.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
       accounts: [`${ETH_PRIVATE_KEY}`]
     }
   },
