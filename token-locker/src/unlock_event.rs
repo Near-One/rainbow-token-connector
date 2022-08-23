@@ -71,3 +71,32 @@ impl std::fmt::Display for EthUnlockedEvent {
         )
     }
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+#[cfg(test)]
+mod tests {
+    use super::EthUnlockedEvent;
+    use rand::prelude::ThreadRng;
+    use rand::Rng;
+
+    fn generate_random_eth_unlocked_event(rng: &mut ThreadRng) -> EthUnlockedEvent {
+        EthUnlockedEvent {
+            eth_factory_address: rng.gen::<[u8; 20]>(),
+            token: hex::encode(rng.gen::<[u8; 20]>()),
+            sender: hex::encode(rng.gen::<[u8; 20]>()),
+            amount: rng.gen::<u128>(),
+            recipient: "some_recipient.near".parse().unwrap(),
+        }
+    }
+
+    #[test]
+    fn fuzzing_eth_unlocked() {
+        let mut rng = rand::thread_rng();
+        for _ in 0..1000 {
+            let event = generate_random_eth_unlocked_event(&mut rng);
+            let serialized = event.to_log_entry_data();
+            let deserialized = EthUnlockedEvent::from_log_entry_data(serialized.as_ref());
+            assert_eq!(event, deserialized);
+        }
+    }
+}

@@ -41,6 +41,11 @@ test:
 	cd bridge-token-factory && \
 	cargo test --all
 
+
+test-token-locker:
+	cd token-locker && \
+	cargo test --all
+
 # <--
 # For testing purposes only (can be removed at any moment)
 no_icon: res/bridge_token_no_icon.wasm res/bridge_token_factory_no_icon.wasm
