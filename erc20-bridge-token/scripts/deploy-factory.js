@@ -13,6 +13,7 @@ async function main() {
   const BridgeTokenFactory = await upgrades.deployProxy(BridgeTokenFactoryContract, [PROOF_CONSUMER_ADDRESS], { initializer: 'initialize' })
   await BridgeTokenFactory.deployed();
   console.log(`BridgeTokenFactory deployed at ${BridgeTokenFactory.address}`);
+  console.log("Implementation address:", await upgrades.erc1967.getImplementationAddress(BridgeTokenFactory.address));
 
   console.log("Transfer ProofConsumer's ownership to: ", BridgeTokenFactory.address);
   const ProofConsumerContract = await ethers.getContractFactory("ProofConsumer");

@@ -1,7 +1,7 @@
 require('dotenv').config();
 const { ethers, upgrades } = require("hardhat");
 
-const PROXY_ADDRESS = process.env.BRIDGE_TOKEN_FACTORY_PROXY_ADDRESS;
+const TOKEN_FACTORY_ADDRESS = process.env.TOKEN_FACTORY_ADDRESS;
 
 
 async function main() {
@@ -10,9 +10,9 @@ async function main() {
     console.log("Account balance:", (await signerAccount.getBalance()).toString());
 
     const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
-    console.log("Current implementation address:", await upgrades.erc1967.getImplementationAddress(PROXY_ADDRESS));
-    console.log("Upgrade factory, proxy address", PROXY_ADDRESS);
-    await upgrades.upgradeProxy(PROXY_ADDRESS, BridgeTokenFactoryContract);
+    console.log("Current implementation address:", await upgrades.erc1967.getImplementationAddress(TOKEN_FACTORY_ADDRESS));
+    console.log("Upgrade factory, proxy address", TOKEN_FACTORY_ADDRESS);
+    await upgrades.upgradeProxy(TOKEN_FACTORY_ADDRESS, BridgeTokenFactoryContract);
 }
 
 main()

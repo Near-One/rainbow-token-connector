@@ -174,6 +174,10 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
        proxy.upgradeTo(implementation);
     }
 
+    function setProofConsumer(address newProofConsumerAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        proofConsumerAddress = newProofConsumerAddress;
+    }
+
     function enableWhitelistMode() external onlyRole(DEFAULT_ADMIN_ROLE) {
         _isWhitelistModeEnabled = true;
     }
