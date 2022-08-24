@@ -9,7 +9,10 @@ const MIN_BLOCK_ACCEPTANCE_HEIGHT = parseInt(process.env.MIN_BLOCK_ACCEPTANCE_HE
 async function main() {
     const [deployer] = await ethers.getSigners();
     console.log("Deploying contracts with the account:", deployer.address);
-    console.log("Account balance:", (await deployer.getBalance()).toString())
+    console.log("Account balance:", (await deployer.getBalance()).toString());
+    console.log("Prover address:", PROVER_ADDRESS);
+    console.log("Near token locker:", NEAR_TOKEN_LOCKER);
+    console.log("Min block acceptance height:", MIN_BLOCK_ACCEPTANCE_HEIGHT);
 
     const ProofConsumerContract = await ethers.getContractFactory("ProofConsumer");
     const proofConsumer = await ProofConsumerContract.deploy(NEAR_TOKEN_LOCKER, PROVER_ADDRESS, MIN_BLOCK_ACCEPTANCE_HEIGHT);

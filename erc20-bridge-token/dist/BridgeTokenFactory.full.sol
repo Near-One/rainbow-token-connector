@@ -1372,124 +1372,6 @@ abstract contract AccessControlUpgradeable is Initializable, ContextUpgradeable,
 }
 
 
-// File @openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol@v4.7.2
-
-// OpenZeppelin Contracts (last updated v4.7.0) (security/Pausable.sol)
-
-pragma solidity ^0.8.0;
-
-
-/**
- * @dev Contract module which allows children to implement an emergency stop
- * mechanism that can be triggered by an authorized account.
- *
- * This module is used through inheritance. It will make available the
- * modifiers `whenNotPaused` and `whenPaused`, which can be applied to
- * the functions of your contract. Note that they will not be pausable by
- * simply including this module, only once the modifiers are put in place.
- */
-abstract contract PausableUpgradeable is Initializable, ContextUpgradeable {
-    /**
-     * @dev Emitted when the pause is triggered by `account`.
-     */
-    event Paused(address account);
-
-    /**
-     * @dev Emitted when the pause is lifted by `account`.
-     */
-    event Unpaused(address account);
-
-    bool private _paused;
-
-    /**
-     * @dev Initializes the contract in unpaused state.
-     */
-    function __Pausable_init() internal onlyInitializing {
-        __Pausable_init_unchained();
-    }
-
-    function __Pausable_init_unchained() internal onlyInitializing {
-        _paused = false;
-    }
-
-    /**
-     * @dev Modifier to make a function callable only when the contract is not paused.
-     *
-     * Requirements:
-     *
-     * - The contract must not be paused.
-     */
-    modifier whenNotPaused() {
-        _requireNotPaused();
-        _;
-    }
-
-    /**
-     * @dev Modifier to make a function callable only when the contract is paused.
-     *
-     * Requirements:
-     *
-     * - The contract must be paused.
-     */
-    modifier whenPaused() {
-        _requirePaused();
-        _;
-    }
-
-    /**
-     * @dev Returns true if the contract is paused, and false otherwise.
-     */
-    function paused() public view virtual returns (bool) {
-        return _paused;
-    }
-
-    /**
-     * @dev Throws if the contract is paused.
-     */
-    function _requireNotPaused() internal view virtual {
-        require(!paused(), "Pausable: paused");
-    }
-
-    /**
-     * @dev Throws if the contract is not paused.
-     */
-    function _requirePaused() internal view virtual {
-        require(paused(), "Pausable: not paused");
-    }
-
-    /**
-     * @dev Triggers stopped state.
-     *
-     * Requirements:
-     *
-     * - The contract must not be paused.
-     */
-    function _pause() internal virtual whenNotPaused {
-        _paused = true;
-        emit Paused(_msgSender());
-    }
-
-    /**
-     * @dev Returns to normal state.
-     *
-     * Requirements:
-     *
-     * - The contract must be paused.
-     */
-    function _unpause() internal virtual whenPaused {
-        _paused = false;
-        emit Unpaused(_msgSender());
-    }
-
-    /**
-     * @dev This empty reserved space is put in place to allow future versions to add new
-     * variables without shifting down storage in the inheritance chain.
-     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
-     */
-    uint256[49] private __gap;
-}
-
-
 // File rainbow-bridge-sol/nearprover/contracts/INearProver.sol@v2.0.1
 
 pragma solidity ^0.8;
@@ -2461,6 +2343,124 @@ contract ERC20Upgradeable is Initializable, ContextUpgradeable, IERC20Upgradeabl
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
     uint256[45] private __gap;
+}
+
+
+// File @openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol@v4.7.2
+
+// OpenZeppelin Contracts (last updated v4.7.0) (security/Pausable.sol)
+
+pragma solidity ^0.8.0;
+
+
+/**
+ * @dev Contract module which allows children to implement an emergency stop
+ * mechanism that can be triggered by an authorized account.
+ *
+ * This module is used through inheritance. It will make available the
+ * modifiers `whenNotPaused` and `whenPaused`, which can be applied to
+ * the functions of your contract. Note that they will not be pausable by
+ * simply including this module, only once the modifiers are put in place.
+ */
+abstract contract PausableUpgradeable is Initializable, ContextUpgradeable {
+    /**
+     * @dev Emitted when the pause is triggered by `account`.
+     */
+    event Paused(address account);
+
+    /**
+     * @dev Emitted when the pause is lifted by `account`.
+     */
+    event Unpaused(address account);
+
+    bool private _paused;
+
+    /**
+     * @dev Initializes the contract in unpaused state.
+     */
+    function __Pausable_init() internal onlyInitializing {
+        __Pausable_init_unchained();
+    }
+
+    function __Pausable_init_unchained() internal onlyInitializing {
+        _paused = false;
+    }
+
+    /**
+     * @dev Modifier to make a function callable only when the contract is not paused.
+     *
+     * Requirements:
+     *
+     * - The contract must not be paused.
+     */
+    modifier whenNotPaused() {
+        _requireNotPaused();
+        _;
+    }
+
+    /**
+     * @dev Modifier to make a function callable only when the contract is paused.
+     *
+     * Requirements:
+     *
+     * - The contract must be paused.
+     */
+    modifier whenPaused() {
+        _requirePaused();
+        _;
+    }
+
+    /**
+     * @dev Returns true if the contract is paused, and false otherwise.
+     */
+    function paused() public view virtual returns (bool) {
+        return _paused;
+    }
+
+    /**
+     * @dev Throws if the contract is paused.
+     */
+    function _requireNotPaused() internal view virtual {
+        require(!paused(), "Pausable: paused");
+    }
+
+    /**
+     * @dev Throws if the contract is not paused.
+     */
+    function _requirePaused() internal view virtual {
+        require(paused(), "Pausable: not paused");
+    }
+
+    /**
+     * @dev Triggers stopped state.
+     *
+     * Requirements:
+     *
+     * - The contract must not be paused.
+     */
+    function _pause() internal virtual whenNotPaused {
+        _paused = true;
+        emit Paused(_msgSender());
+    }
+
+    /**
+     * @dev Returns to normal state.
+     *
+     * Requirements:
+     *
+     * - The contract must be paused.
+     */
+    function _unpause() internal virtual whenPaused {
+        _paused = false;
+        emit Unpaused(_msgSender());
+    }
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[49] private __gap;
 }
 
 
@@ -3805,6 +3805,109 @@ library ResultsDecoder {
 }
 
 
+// File contracts/SelectivePausableUpgradable.sol
+
+
+pragma solidity ^0.8.0;
+
+
+/**
+ * @dev Contract module which allows children to implement an emergency stop
+ * mechanism that can be triggered by an authorized account.
+ *
+ * This module is used through inheritance. It will make available the
+ * modifiers `whenNotPaused` and `whenPaused`, which can be applied to
+ * the functions of your contract. Note that they will not be pausable by
+ * simply including this module, only once the modifiers are put in place.
+ */
+abstract contract SelectivePausableUpgradable is Initializable, ContextUpgradeable {
+    /**
+     * @dev Emitted when the pause is triggered by `account`.
+     */
+    event Paused(address account, uint flags);
+
+    uint private _pausedFlags;
+
+    /**
+     * @dev Initializes the contract in unpaused state.
+     */
+    function __Pausable_init() internal onlyInitializing {
+        __Pausable_init_unchained();
+    }
+
+    function __Pausable_init_unchained() internal onlyInitializing {
+        _pausedFlags = 0;
+    }
+
+    /**
+     * @dev Modifier to make a function callable only when the contract is not paused.
+     *
+     * Requirements:
+     *
+     * - The contract must not be paused.
+     */
+    modifier whenNotPaused(uint flag) {
+        _requireNotPaused(flag);
+        _;
+    }
+
+    /**
+     * @dev Modifier to make a function callable only when the contract is paused.
+     *
+     * Requirements:
+     *
+     * - The contract must be paused.
+     */
+    modifier whenPaused(uint flag) {
+        _requirePaused(flag);
+        _;
+    }
+
+    /**
+     * @dev Returns true if the contract is paused, and false otherwise.
+     */
+    function paused(uint flag) public view virtual returns (bool) {
+        return (_pausedFlags & flag) != 0;
+    }
+
+    /**
+     * @dev Returns paused flags.
+     */
+    function pausedFlags() public view virtual returns (uint) {
+        return _pausedFlags;
+    }
+
+    /**
+     * @dev Throws if the contract is paused.
+     */
+    function _requireNotPaused(uint flag) internal view virtual {
+        require(!paused(flag), "Pausable: paused");
+    }
+
+    /**
+     * @dev Throws if the contract is not paused.
+     */
+    function _requirePaused(uint flag) internal view virtual {
+        require(paused(flag), "Pausable: not paused");
+    }
+
+    /**
+     * @dev Triggers stopped state.
+     */
+    function _pause(uint flags) internal virtual {
+        _pausedFlags = flags;
+        emit Paused(_msgSender(), _pausedFlags);
+    }
+
+    /**
+     * @dev This empty reserved space is put in place to allow future versions to add new
+     * variables without shifting down storage in the inheritance chain.
+     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
+     */
+    uint256[49] private __gap;
+}
+
+
 // File contracts/BridgeTokenFactory.sol
 
 pragma solidity ^0.8.0;
@@ -3818,7 +3921,7 @@ pragma solidity ^0.8.0;
 
 
 
-contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
+contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgradable {
     using Borsh for Borsh.Data;
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -3839,8 +3942,16 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
     bool private _isWhitelistModeEnabled;
 
     address public proofConsumerAddress;
-    bytes32 public constant PAUSE_ROLE = keccak256("PAUSE_ROLE");
+
+    bytes32 public constant ADMIN_PAUSE_ROLE = keccak256("ADMIN_PAUSE_ROLE");
+    bytes32 public constant PAUSE_DEPOSIT_ROLE = keccak256("PAUSE_DEPOSIT_ROLE");
+    bytes32 public constant PAUSE_WITHDRAW_ROLE = keccak256("PAUSE_WITHDRAW_ROLE");
+    bytes32 public constant PAUSE_SET_METADATA_ROLE = keccak256("PAUSE_SET_METADATA_ROLE");
     bytes32 public constant WHITELIST_ADMIN_ROLE = keccak256("WHITELIST_ADMIN_ROLE");
+    uint constant UNPAUSED_ALL = 0;
+    uint constant PAUSED_WITHDRAW = 1 << 0;
+    uint constant PAUSED_DEPOSIT = 1 << 1;
+    uint constant PAUSED_SET_METADATA = 1 << 2;
 
     // Event when funds are withdrawn from Ethereum back to NEAR.
     event Withdraw (
@@ -3872,7 +3983,10 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
         __AccessControl_init();
         __Pausable_init_unchained();
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        _setupRole(PAUSE_ROLE, _msgSender());
+        _setupRole(ADMIN_PAUSE_ROLE, _msgSender());
+        _setupRole(PAUSE_DEPOSIT_ROLE, _msgSender());
+        _setupRole(PAUSE_WITHDRAW_ROLE, _msgSender());
+        _setupRole(PAUSE_SET_METADATA_ROLE, _msgSender());
         _setupRole(WHITELIST_ADMIN_ROLE, _msgSender());
         _isWhitelistModeEnabled = true;
     }
@@ -3906,7 +4020,7 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
         return bridgeTokenProxy;
     }
 
-    function setMetadata(bytes memory proofData, uint64 proofBlockHeight) external whenNotPaused {
+    function setMetadata(bytes memory proofData, uint64 proofBlockHeight) external whenNotPaused(PAUSED_SET_METADATA) {
         ProofDecoder.ExecutionStatus memory status =
             IProofConsumer(proofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
         ResultsDecoder.MetadataResult memory result = ResultsDecoder.decodeMetadataResult(status.successValue);
@@ -3923,7 +4037,7 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
         emit SetMetadata(_nearToEthToken[result.token], result.name, result.symbol, result.decimals);
     }
 
-    function deposit(bytes memory proofData, uint64 proofBlockHeight) external whenNotPaused {
+    function deposit(bytes memory proofData, uint64 proofBlockHeight) external whenNotPaused(PAUSED_DEPOSIT) {
         ProofDecoder.ExecutionStatus memory status
             = IProofConsumer(proofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
         ResultsDecoder.LockResult memory result = ResultsDecoder.decodeLockResult(status.successValue);
@@ -3934,7 +4048,7 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
         emit Deposit(result.token, result.amount, result.recipient);
     }
 
-    function withdraw(string memory token, uint256 amount, string memory recipient) external whenNotPaused {
+    function withdraw(string memory token, uint256 amount, string memory recipient) external whenNotPaused(PAUSED_WITHDRAW) {
         _checkWhitelistedToken(token, msg.sender);
         require(_isBridgeToken[_nearToEthToken[token]], "ERR_NOT_BRIDGE_TOKEN");
 
@@ -3943,12 +4057,20 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
         emit Withdraw(token, msg.sender, amount, recipient);
     }
 
-    function pause() external onlyRole(PAUSE_ROLE) {
-        _pause();
+    function pause(uint flags) external onlyRole(ADMIN_PAUSE_ROLE) {
+        _pause(flags);
     }
 
-    function unpause() external onlyRole(PAUSE_ROLE) {
-        _unpause();
+    function pauseDeposit() external onlyRole(PAUSE_DEPOSIT_ROLE) {
+        _pause(pausedFlags() | PAUSED_DEPOSIT);
+    }
+
+    function pauseWithdraw() external onlyRole(PAUSE_WITHDRAW_ROLE) {
+        _pause(pausedFlags() | PAUSED_WITHDRAW);
+    }
+
+    function pauseSetMetadata() external onlyRole(PAUSE_SET_METADATA_ROLE) {
+        _pause(pausedFlags() | PAUSED_SET_METADATA);
     }
 
     function upgradeToken(string calldata nearTokenId, address implementation) external onlyRole(DEFAULT_ADMIN_ROLE) {

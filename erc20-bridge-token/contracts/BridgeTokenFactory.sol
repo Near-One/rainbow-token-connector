@@ -5,7 +5,6 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 
 import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
 import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
@@ -15,8 +14,9 @@ import "./IProofConsumer.sol";
 import "./BridgeToken.sol";
 import "./BridgeTokenProxy.sol";
 import "./ResultsDecoder.sol";
+import "./SelectivePausableUpgradable.sol";
 
-contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
+contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgradable {
     using Borsh for Borsh.Data;
     using SafeMathUpgradeable for uint256;
     using SafeERC20Upgradeable for IERC20Upgradeable;
@@ -37,8 +37,16 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
     bool private _isWhitelistModeEnabled;
 
     address public proofConsumerAddress;
-    bytes32 public constant PAUSE_ROLE = keccak256("PAUSE_ROLE");
+
+    bytes32 public constant ADMIN_PAUSE_ROLE = keccak256("ADMIN_PAUSE_ROLE");
+    bytes32 public constant PAUSE_DEPOSIT_ROLE = keccak256("PAUSE_DEPOSIT_ROLE");
+    bytes32 public constant PAUSE_WITHDRAW_ROLE = keccak256("PAUSE_WITHDRAW_ROLE");
+    bytes32 public constant PAUSE_SET_METADATA_ROLE = keccak256("PAUSE_SET_METADATA_ROLE");
     bytes32 public constant WHITELIST_ADMIN_ROLE = keccak256("WHITELIST_ADMIN_ROLE");
+    uint constant UNPAUSED_ALL = 0;
+    uint constant PAUSED_WITHDRAW = 1 << 0;
+    uint constant PAUSED_DEPOSIT = 1 << 1;
+    uint constant PAUSED_SET_METADATA = 1 << 2;
 
     // Event when funds are withdrawn from Ethereum back to NEAR.
     event Withdraw (
@@ -70,7 +78,10 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
         __AccessControl_init();
         __Pausable_init_unchained();
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        _setupRole(PAUSE_ROLE, _msgSender());
+        _setupRole(ADMIN_PAUSE_ROLE, _msgSender());
+        _setupRole(PAUSE_DEPOSIT_ROLE, _msgSender());
+        _setupRole(PAUSE_WITHDRAW_ROLE, _msgSender());
+        _setupRole(PAUSE_SET_METADATA_ROLE, _msgSender());
         _setupRole(WHITELIST_ADMIN_ROLE, _msgSender());
         _isWhitelistModeEnabled = true;
     }
@@ -104,7 +115,7 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
         return bridgeTokenProxy;
     }
 
-    function setMetadata(bytes memory proofData, uint64 proofBlockHeight) external whenNotPaused {
+    function setMetadata(bytes memory proofData, uint64 proofBlockHeight) external whenNotPaused(PAUSED_SET_METADATA) {
         ProofDecoder.ExecutionStatus memory status =
             IProofConsumer(proofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
         ResultsDecoder.MetadataResult memory result = ResultsDecoder.decodeMetadataResult(status.successValue);
@@ -121,7 +132,7 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
         emit SetMetadata(_nearToEthToken[result.token], result.name, result.symbol, result.decimals);
     }
 
-    function deposit(bytes memory proofData, uint64 proofBlockHeight) external whenNotPaused {
+    function deposit(bytes memory proofData, uint64 proofBlockHeight) external whenNotPaused(PAUSED_DEPOSIT) {
         ProofDecoder.ExecutionStatus memory status
             = IProofConsumer(proofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
         ResultsDecoder.LockResult memory result = ResultsDecoder.decodeLockResult(status.successValue);
@@ -132,7 +143,7 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
         emit Deposit(result.token, result.amount, result.recipient);
     }
 
-    function withdraw(string memory token, uint256 amount, string memory recipient) external whenNotPaused {
+    function withdraw(string memory token, uint256 amount, string memory recipient) external whenNotPaused(PAUSED_WITHDRAW) {
         _checkWhitelistedToken(token, msg.sender);
         require(_isBridgeToken[_nearToEthToken[token]], "ERR_NOT_BRIDGE_TOKEN");
 
@@ -141,12 +152,20 @@ contract BridgeTokenFactory is AccessControlUpgradeable, PausableUpgradeable {
         emit Withdraw(token, msg.sender, amount, recipient);
     }
 
-    function pause() external onlyRole(PAUSE_ROLE) {
-        _pause();
+    function pause(uint flags) external onlyRole(ADMIN_PAUSE_ROLE) {
+        _pause(flags);
     }
 
-    function unpause() external onlyRole(PAUSE_ROLE) {
-        _unpause();
+    function pauseDeposit() external onlyRole(PAUSE_DEPOSIT_ROLE) {
+        _pause(pausedFlags() | PAUSED_DEPOSIT);
+    }
+
+    function pauseWithdraw() external onlyRole(PAUSE_WITHDRAW_ROLE) {
+        _pause(pausedFlags() | PAUSED_WITHDRAW);
+    }
+
+    function pauseSetMetadata() external onlyRole(PAUSE_SET_METADATA_ROLE) {
+        _pause(pausedFlags() | PAUSED_SET_METADATA);
     }
 
     function upgradeToken(string calldata nearTokenId, address implementation) external onlyRole(DEFAULT_ADMIN_ROLE) {
