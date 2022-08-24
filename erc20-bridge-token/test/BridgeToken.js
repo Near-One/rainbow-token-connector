@@ -503,6 +503,24 @@ describe('BridgeToken', () => {
     expect(await BridgeTokenFactory.pausedFlags()).to.be.equal(PauseMode.UnpausedAll);
   })
 
+  it("Test setProofConsumer ", async function() {
+    expect(
+      (await BridgeTokenFactory.proofConsumerAddress()).toLowerCase()
+    )
+      .to
+      .be
+      .equal(ProofConsumer.address.toLowerCase());
+
+    const newProofConsumerAddress = "0x0123456789abcdefdeadbeef0123456789abcdef";
+    await BridgeTokenFactory.setProofConsumer(newProofConsumerAddress);
+    expect(
+      (await BridgeTokenFactory.proofConsumerAddress()).toLowerCase()
+    )
+      .to
+      .be
+      .equal(newProofConsumerAddress);
+  });
+
   it("Test grant admin role", async function() {
     await BridgeTokenFactory.connect(adminAccount).disableWhitelistMode();
     await BridgeTokenFactory.connect(adminAccount).enableWhitelistMode();
