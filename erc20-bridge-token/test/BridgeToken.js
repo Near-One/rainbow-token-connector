@@ -599,7 +599,7 @@ describe('BridgeToken', () => {
         newAdminAccount.address
       );
 
-    // Check that adminAccount can again perform admin calls
+    // Check that adminAccount can perform admin calls again
     await BridgeTokenFactory.connect(adminAccount).disableWhitelistMode();
     await BridgeTokenFactory.connect(adminAccount).enableWhitelistMode();
   });
