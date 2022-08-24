@@ -57,7 +57,7 @@ describe('BridgeToken', () => {
       "SetMetadataResult",
       metadata
     ).toString("base64");
-    
+
     await expect(
       BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), proofBlockHeight)
     )
@@ -77,7 +77,7 @@ describe('BridgeToken', () => {
       BridgeTokenFactory,
       BridgeTokenInstance
     );
-    
+
     await setMetadata(nearTokenId, tokenInfo.tokenProxyAddress);
     return tokenInfo;
   }
@@ -101,7 +101,7 @@ describe('BridgeToken', () => {
     );
   }
 
-  it('can create empty token', async function () {
+  it('can create an empty token', async function () {
     await BridgeTokenFactory.newBridgeToken(nearTokenId)
     const tokenProxyAddress = await BridgeTokenFactory.nearToEthToken(nearTokenId)
     const token = BridgeTokenInstance.attach(tokenProxyAddress)
@@ -111,7 +111,7 @@ describe('BridgeToken', () => {
     expect((await token.metadataLastUpdated()).toString()).to.be.equal('0')
   })
 
-  it('cant create token if token already exists', async function () {
+  it('can\'t create token if token already exists', async function () {
     await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await expect(
       createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
@@ -122,13 +122,13 @@ describe('BridgeToken', () => {
       .revertedWith('ERR_TOKEN_EXIST')
   })
 
-  it("can update metadata", async function() {
+  it("can update token's metadata", async function() {
     const { tokenProxyAddress, token } = await createEmptyToken(
       nearTokenId,
       BridgeTokenFactory,
       BridgeTokenInstance
     );
-    
+
     await setMetadata(nearTokenId, tokenProxyAddress);
     expect(await token.name()).to.equal("NEAR ERC20");
     expect(await token.symbol()).to.equal("NEAR");
@@ -136,7 +136,7 @@ describe('BridgeToken', () => {
     expect((await token.metadataLastUpdated()).toString()).to.equal("1089");
   });
 
-  it('cannot update metadata with old block height', async function () {
+  it('can\'t update metadata with old block height', async function () {
     await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     const { proof: metadataProof, proofBlockHeight } = getProofTemplate();
     metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId, proofBlockHeight)).toString('base64');
@@ -154,10 +154,16 @@ describe('BridgeToken', () => {
       .revertedWith('ERR_OLD_METADATA');
   })
 
-  it('cannot update metadata of nonexistent token', async function () {
+  it('can\'t update metadata of non-existent token', async function () {
     await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     const { proof: metadataProof, proofBlockHeight } = getProofTemplate();
-    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata("nonexisting-token", proofBlockHeight)).toString('base64');
+
+    metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(
+      SCHEMA,
+      'SetMetadataResult',
+      createDefaultERC20Metadata("nonexisting-token", proofBlockHeight)
+    ).toString('base64');
+
     await expect(
       BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), proofBlockHeight)
     )
@@ -166,13 +172,19 @@ describe('BridgeToken', () => {
       .revertedWith('ERR_NOT_BRIDGE_TOKEN');
   })
 
-  it('cannot update metadata when paused', async function () {
+  it('can\'t update metadata when paused', async function () {
     await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     const { proof: metadataProof, proofBlockHeight } = getProofTemplate();
     metadataProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'SetMetadataResult', createDefaultERC20Metadata(nearTokenId)).toString('base64');
 
     await BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), proofBlockHeight);
-    await BridgeTokenFactory.pauseSetMetadata();
+    await expect (
+      BridgeTokenFactory.pauseSetMetadata()
+    )
+      .to
+      .emit(BridgeTokenFactory, 'Paused')
+      .withArgs(adminAccount.address, PauseMode.PausedSetMetadata);
+
     await expect(
       BridgeTokenFactory.setMetadata(borshifyOutcomeProof(metadataProof), proofBlockHeight)
     )
@@ -187,7 +199,7 @@ describe('BridgeToken', () => {
       BridgeTokenFactory,
       BridgeTokenInstance
     );
-    
+
     setMetadata(nearTokenId, tokenProxyAddress);
 
     const amountToTransfer = 100;
@@ -223,7 +235,7 @@ describe('BridgeToken', () => {
       .equal(amountToTransfer.toString())
   })
 
-  it('cant deposit if contract paused', async function () {
+  it('can\'t deposit if the contract is paused', async function () {
     let {tokenProxyAddress} = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await setMetadata(nearTokenId, tokenProxyAddress);
 
@@ -236,7 +248,13 @@ describe('BridgeToken', () => {
       recipient: ethers.utils.arrayify(adminAccount.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'C'.repeat(44);
-    await BridgeTokenFactory.pauseDeposit();
+    await expect (
+      BridgeTokenFactory.pauseDeposit()
+    )
+      .to
+      .emit(BridgeTokenFactory, 'Paused')
+      .withArgs(adminAccount.address, PauseMode.PausedDeposit);
+
     await expect(
       BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight)
     )
@@ -268,13 +286,15 @@ describe('BridgeToken', () => {
         recipient
       )
     )
-      .to.emit(BridgeTokenFactory, "Withdraw")
+      .to
+      .emit(BridgeTokenFactory, "Withdraw")
       .withArgs(
         nearTokenId,
         user.address,
         amountToTransfer,
         recipient
       );
+
     expect((await token.balanceOf(user.address)).toString()).to.be.equal('0')
   })
 
@@ -293,7 +313,12 @@ describe('BridgeToken', () => {
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'F'.repeat(44);
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckToken);
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
-    await BridgeTokenFactory.pauseWithdraw();
+    await expect(
+      BridgeTokenFactory.pauseWithdraw()
+    )
+      .to
+      .emit(BridgeTokenFactory, 'Paused')
+      .withArgs(adminAccount.address, PauseMode.PausedWithdraw);
     await expect(
       BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
     )
@@ -317,14 +342,27 @@ describe('BridgeToken', () => {
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'G'.repeat(44);
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckToken);
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
-    await BridgeTokenFactory.pauseWithdraw();
+    await expect(
+      BridgeTokenFactory.pauseWithdraw()
+    )
+      .to
+      .emit(BridgeTokenFactory, 'Paused')
+      .withArgs(adminAccount.address, PauseMode.PausedWithdraw);
+
     await expect(
       BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
     )
       .to
       .be
       .revertedWith('Pausable: paused');
-    await BridgeTokenFactory.pause(0);
+
+    await expect(
+      BridgeTokenFactory.pause(PauseMode.UnpausedAll)
+    )
+      .to
+      .emit(BridgeTokenFactory, 'Paused')
+      .withArgs(adminAccount.address, PauseMode.UnpausedAll);
+
 
     await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
     expect((await token.balanceOf(user.address)).toString()).to.be.equal('0')
@@ -387,30 +425,81 @@ describe('BridgeToken', () => {
 
   it('Test selective pause', async function () {
     // Pause withdraw
-    await BridgeTokenFactory.pauseWithdraw();
+    await expect(
+      BridgeTokenFactory.pauseWithdraw()
+    )
+      .to
+      .emit(BridgeTokenFactory, 'Paused')
+      .withArgs(adminAccount.address, PauseMode.PausedWithdraw);
     expect(await BridgeTokenFactory.pausedFlags()).to.be.equal(PauseMode.PausedWithdraw);
+
     // Pause withdraw again
-    await BridgeTokenFactory.pauseWithdraw();
+    await expect(
+      BridgeTokenFactory.pauseWithdraw()
+    )
+      .to
+      .emit(BridgeTokenFactory, 'Paused')
+      .withArgs(adminAccount.address, PauseMode.PausedWithdraw);
     expect(await BridgeTokenFactory.pausedFlags()).to.be.equal(PauseMode.PausedWithdraw);
     expect(await BridgeTokenFactory.paused(PauseMode.PausedDeposit)).to.be.equal(false);
     expect(await BridgeTokenFactory.paused(PauseMode.PausedWithdraw)).to.be.equal(true);
     expect(await BridgeTokenFactory.paused(PauseMode.PausedSetMetadata)).to.be.equal(false);
+
     // Pause deposit
-    await BridgeTokenFactory.pauseDeposit();
+    await expect(
+      BridgeTokenFactory.pauseDeposit()
+    )
+      .to
+      .emit(BridgeTokenFactory, 'Paused')
+      .withArgs(adminAccount.address, PauseMode.PausedDeposit | PauseMode.PausedWithdraw);
     expect(await BridgeTokenFactory.pausedFlags()).to.be.equal(PauseMode.PausedDeposit | PauseMode.PausedWithdraw);
+
     // Pause set metadata
-    await BridgeTokenFactory.pauseSetMetadata();
+    await expect(
+      BridgeTokenFactory.pauseSetMetadata()
+    )
+      .to
+      .emit(BridgeTokenFactory, 'Paused')
+      .withArgs(adminAccount.address, PauseMode.PausedDeposit | PauseMode.PausedWithdraw | PauseMode.PausedSetMetadata);
+    expect(await BridgeTokenFactory.pausedFlags())
+      .to
+      .be
+      .equal(PauseMode.PausedDeposit | PauseMode.PausedWithdraw | PauseMode.PausedSetMetadata);
+
     // Pause deposit again
-    await BridgeTokenFactory.pauseDeposit();
-    expect(await BridgeTokenFactory.pausedFlags()).to.be.equal(PauseMode.PausedDeposit | PauseMode.PausedWithdraw | PauseMode.PausedSetMetadata);
+    await expect(
+      BridgeTokenFactory.pauseDeposit()
+    )
+      .to
+      .emit(BridgeTokenFactory, 'Paused')
+      .withArgs(adminAccount.address, PauseMode.PausedDeposit | PauseMode.PausedWithdraw | PauseMode.PausedSetMetadata);
+    expect(await BridgeTokenFactory.pausedFlags())
+      .to
+      .be
+      .equal(PauseMode.PausedDeposit | PauseMode.PausedWithdraw | PauseMode.PausedSetMetadata);
+
     // Pause deposit and withdraw
-    await BridgeTokenFactory.pause(PauseMode.PausedDeposit | PauseMode.PausedWithdraw);
-    expect(await BridgeTokenFactory.pausedFlags()).to.be.equal(PauseMode.PausedDeposit | PauseMode.PausedWithdraw);
+    await expect(
+      BridgeTokenFactory.pause(PauseMode.PausedDeposit | PauseMode.PausedWithdraw)
+    )
+      .to
+      .emit(BridgeTokenFactory, 'Paused')
+      .withArgs(adminAccount.address, PauseMode.PausedDeposit | PauseMode.PausedWithdraw);
+    expect(await BridgeTokenFactory.pausedFlags())
+      .to
+      .be
+      .equal(PauseMode.PausedDeposit | PauseMode.PausedWithdraw);
     expect(await BridgeTokenFactory.paused(PauseMode.PausedDeposit)).to.be.equal(true);
     expect(await BridgeTokenFactory.paused(PauseMode.PausedWithdraw)).to.be.equal(true);
     expect(await BridgeTokenFactory.paused(PauseMode.PausedSetMetadata)).to.be.equal(false);
+
     // Unpause all
-    await BridgeTokenFactory.pause(PauseMode.UnpausedAll);
+    await expect(
+      BridgeTokenFactory.pause(PauseMode.UnpausedAll)
+    )
+      .to
+      .emit(BridgeTokenFactory, 'Paused')
+      .withArgs(adminAccount.address, PauseMode.UnpausedAll);
     expect(await BridgeTokenFactory.pausedFlags()).to.be.equal(PauseMode.UnpausedAll);
   })
 
