@@ -20,7 +20,6 @@ abstract contract SelectivePausableUpgradable is Initializable, ContextUpgradeab
      */
     event Paused(address account, uint flags);
 
-    bool private _paused; // Deprecated!
     uint private _pausedFlags;
 
     /**
@@ -31,7 +30,6 @@ abstract contract SelectivePausableUpgradable is Initializable, ContextUpgradeab
     }
 
     function __Pausable_init_unchained() internal onlyInitializing {
-        _paused = false;
         _pausedFlags = 0;
     }
 
@@ -100,5 +98,5 @@ abstract contract SelectivePausableUpgradable is Initializable, ContextUpgradeab
      * variables without shifting down storage in the inheritance chain.
      * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
      */
-    uint256[48] private __gap;
+    uint256[49] private __gap;
 }
