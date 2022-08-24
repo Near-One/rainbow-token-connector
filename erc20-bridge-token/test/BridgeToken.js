@@ -11,6 +11,13 @@ const WhitelistMode = {
   CheckAccountAndToken: 3
 }
 
+const PauseMode = {
+  UnpausedAll: 0,
+  PausedWithdraw: 1,
+  PausedDeposit: 2,
+  PausedSetMetadata: 4,
+}
+
 describe('BridgeToken', () => {
   const nearTokenId = 'nearfuntoken'
   const minBlockAcceptanceHeight = 0
@@ -376,6 +383,35 @@ describe('BridgeToken', () => {
       .to
       .be
       .revertedWith(`AccessControl: account ${user.address.toLowerCase()} is missing role ${ADMIN_ROLE}`);
+  })
+
+  it('Test selective pause', async function () {
+    // Pause withdraw
+    await BridgeTokenFactory.pauseWithdraw();
+    expect(await BridgeTokenFactory.pausedFlags()).to.be.equal(PauseMode.PausedWithdraw);
+    // Pause withdraw again
+    await BridgeTokenFactory.pauseWithdraw();
+    expect(await BridgeTokenFactory.pausedFlags()).to.be.equal(PauseMode.PausedWithdraw);
+    expect(await BridgeTokenFactory.paused(PauseMode.PausedDeposit)).to.be.equal(false);
+    expect(await BridgeTokenFactory.paused(PauseMode.PausedWithdraw)).to.be.equal(true);
+    expect(await BridgeTokenFactory.paused(PauseMode.PausedSetMetadata)).to.be.equal(false);
+    // Pause deposit
+    await BridgeTokenFactory.pauseDeposit();
+    expect(await BridgeTokenFactory.pausedFlags()).to.be.equal(PauseMode.PausedDeposit | PauseMode.PausedWithdraw);
+    // Pause set metadata
+    await BridgeTokenFactory.pauseSetMetadata();
+    // Pause deposit again
+    await BridgeTokenFactory.pauseDeposit();
+    expect(await BridgeTokenFactory.pausedFlags()).to.be.equal(PauseMode.PausedDeposit | PauseMode.PausedWithdraw | PauseMode.PausedSetMetadata);
+    // Pause deposit and withdraw
+    await BridgeTokenFactory.pause(PauseMode.PausedDeposit | PauseMode.PausedWithdraw);
+    expect(await BridgeTokenFactory.pausedFlags()).to.be.equal(PauseMode.PausedDeposit | PauseMode.PausedWithdraw);
+    expect(await BridgeTokenFactory.paused(PauseMode.PausedDeposit)).to.be.equal(true);
+    expect(await BridgeTokenFactory.paused(PauseMode.PausedWithdraw)).to.be.equal(true);
+    expect(await BridgeTokenFactory.paused(PauseMode.PausedSetMetadata)).to.be.equal(false);
+    // Unpause all
+    await BridgeTokenFactory.pause(PauseMode.UnpausedAll);
+    expect(await BridgeTokenFactory.pausedFlags()).to.be.equal(PauseMode.UnpausedAll);
   })
 
   describe("Whitelist", function() {
