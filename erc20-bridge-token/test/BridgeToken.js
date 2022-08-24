@@ -503,6 +503,89 @@ describe('BridgeToken', () => {
     expect(await BridgeTokenFactory.pausedFlags()).to.be.equal(PauseMode.UnpausedAll);
   })
 
+  it("Test grant admin role", async function() {
+    await BridgeTokenFactory.connect(adminAccount).disableWhitelistMode();
+    await BridgeTokenFactory.connect(adminAccount).enableWhitelistMode();
+    const signers = await ethers.getSigners();
+    const newAdminAccount = signers[2];
+    const DEFAULT_ADMIN_ROLE = "0x0000000000000000000000000000000000000000000000000000000000000000";
+    await expect(
+      BridgeTokenFactory.connect(newAdminAccount).disableWhitelistMode()
+    ).to.be.revertedWith(
+      `is missing role ${DEFAULT_ADMIN_ROLE}`
+    );
+    await expect(
+      BridgeTokenFactory.connect(newAdminAccount).enableWhitelistMode()
+    ).to.be.revertedWith(
+      `is missing role ${DEFAULT_ADMIN_ROLE}`
+    );
+
+    // Grant DEFAULT_ADMIN_ROLE to newAdminAccount
+    await expect(
+      BridgeTokenFactory.grantRole(DEFAULT_ADMIN_ROLE, newAdminAccount.address)
+    )
+      .to
+      .emit(BridgeTokenFactory, "RoleGranted")
+      .withArgs(
+        DEFAULT_ADMIN_ROLE,
+        newAdminAccount.address,
+        adminAccount.address
+      );
+    await BridgeTokenFactory.connect(newAdminAccount).disableWhitelistMode();
+    await BridgeTokenFactory.connect(newAdminAccount).enableWhitelistMode();
+
+    // Revoke DEFAULT_ADMIN_ROLE from adminAccount
+    await expect(
+      BridgeTokenFactory
+        .connect(newAdminAccount)
+        .revokeRole(
+          DEFAULT_ADMIN_ROLE,
+          adminAccount.address
+        )
+    )
+      .to
+      .emit(BridgeTokenFactory, "RoleRevoked")
+      .withArgs(
+        DEFAULT_ADMIN_ROLE,
+        adminAccount.address,
+        newAdminAccount.address
+      );
+
+    // Check tx reverted on call from revoked adminAccount
+    await expect(
+      BridgeTokenFactory.connect(adminAccount).disableWhitelistMode()
+    ).to.be.revertedWith(
+      `is missing role ${DEFAULT_ADMIN_ROLE}`
+    );
+    await expect(
+      BridgeTokenFactory.connect(adminAccount).enableWhitelistMode()
+    ).to.be.revertedWith(
+      `is missing role ${DEFAULT_ADMIN_ROLE}`
+    );
+
+    // Check newAdminAccount can perform admin calls
+    await BridgeTokenFactory.connect(newAdminAccount).disableWhitelistMode();
+    await BridgeTokenFactory.connect(newAdminAccount).enableWhitelistMode();
+
+    // Check newAdminAccount can grant DEFAULT_ADMIN_ROLE to adminAccount
+    await expect(
+      BridgeTokenFactory
+        .connect(newAdminAccount)
+        .grantRole(DEFAULT_ADMIN_ROLE, adminAccount.address)
+    )
+      .to
+      .emit(BridgeTokenFactory, "RoleGranted")
+      .withArgs(
+        DEFAULT_ADMIN_ROLE,
+        adminAccount.address,
+        newAdminAccount.address
+      );
+
+    // Check that adminAccount can again perform admin calls
+    await BridgeTokenFactory.connect(adminAccount).disableWhitelistMode();
+    await BridgeTokenFactory.connect(adminAccount).enableWhitelistMode();
+  });
+  
   describe("Whitelist", function() {
     let tokenInfo;
     const recipient = "testrecipient.near";
