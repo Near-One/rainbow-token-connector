@@ -1,15 +1,13 @@
+use near_sdk::AccountId;
 use near_sdk::borsh::{self, BorshSerialize};
 use serde_json::json;
-
-use bridge_token_factory::BridgeTokenFactoryContract;
 use bridge_token_factory::{validate_eth_address, EthLockedEvent, Proof};
-use mock_prover::MockProverContract;
 use near_sdk::json_types::ValidAccountId;
-use near_sdk_sim::runtime::GenesisConfig;
-use near_sdk_sim::{
-    call, deploy, init_simulator, units::to_yocto, view, ContractAccount, ExecutionResult,
-    UserAccount,
-};
+use workspaces::prelude::*;
+use workspaces::{network::Sandbox, Account, Contract, Worker};
+use workspaces::result::CallExecutionDetails;
+use near_units::*;
+use tokio::runtime::Runtime;
 
 const PROVER: &str = "prover";
 const FACTORY: &str = "bridge";
@@ -18,34 +16,49 @@ const DAI_ADDRESS: &str = "6b175474e89094c44da98b954eedeac495271d0f";
 const SENDER_ADDRESS: &str = "00005474e89094c44da98b954eedeac495271d0f";
 const ALICE: &str = "alice";
 
-near_sdk_sim::lazy_static_include::lazy_static_include_bytes! {
-    TEST_TOKEN_WASM_BYTES => "../res/test_token.wasm",
-    TOKEN_WASM_BYTES => "../res/bridge_token.wasm",
-    FACTORY_WASM_BYTES => "../res/bridge_token_factory.wasm",
-    MOCK_PROVER_WASM_BYTES => "../res/mock_prover.wasm",
-}
+const FACTORY_WASM_PATH: &str = "../res/bridge_token_factory.wasm";
+const MOCK_PROVER_WASM_PATH: &str = "../res/mock_prover.wasm";
 
-fn setup_token_factory() -> (UserAccount, ContractAccount<BridgeTokenFactoryContract>) {
-    let mut config = GenesisConfig::default();
-    config.runtime_config.storage_amount_per_byte = 10u128.pow(19);
-    let root = init_simulator(Some(config));
-    let _prover = deploy!(
-        contract: MockProverContract,
-        contract_id: PROVER.to_string(),
-        bytes: &MOCK_PROVER_WASM_BYTES,
-        signer_account: root
-    );
-    let factory = deploy!(
-        contract: BridgeTokenFactoryContract,
-        contract_id: FACTORY.to_string(),
-        bytes: &FACTORY_WASM_BYTES,
-        signer_account: root,
-        init_method: new(
-            PROVER.to_string(), LOCKER_ADDRESS.to_string()
+fn create_contract() -> (Account, Contract, Worker<Sandbox>) {
+    let rt = Runtime::new().unwrap();
+
+    let worker: Worker<Sandbox> = rt.block_on(workspaces::sandbox()).unwrap();
+    let prover_wasm = std::fs::read(MOCK_PROVER_WASM_PATH).unwrap();
+    let prover_contract: Contract = rt.block_on(worker.dev_deploy(&prover_wasm)).unwrap();
+    let prover_id = prover_contract.id();
+
+    let owner = worker.root_account().unwrap();
+    let factory_account = rt
+        .block_on(
+            owner
+                .create_subaccount(&worker, FACTORY)
+                .initial_balance(parse_near!("200 N"))
+                .transact(),
         )
-    );
+        .unwrap()
+        .into_result()
+        .unwrap();
 
-    (root, factory)
+    let factory_wasm = std::fs::read(FACTORY_WASM_PATH).unwrap();
+    let factory_contract: Contract = rt.block_on(factory_account.deploy(&worker, &factory_wasm)).unwrap().result;
+
+    let alice = rt
+        .block_on(
+            owner
+                .create_subaccount(&worker, "alice")
+                .initial_balance(parse_near!("200 N"))
+                .transact(),
+        )
+        .unwrap()
+        .into_result()
+        .unwrap();
+
+    rt.block_on(alice
+        .call(&worker, factory_contract.id(), "new")
+        .args(json!({"prover_account": prover_id, "locker_address": LOCKER_ADDRESS.to_string()}).to_string().into_bytes())
+        .transact()).unwrap();
+
+    (alice, factory_contract, worker)
 }
 
 #[derive(BorshSerialize)]
@@ -135,12 +148,21 @@ macro_rules! call_borsh {
     };
 }
 
-fn err_is(result: &ExecutionResult, expected: &str) {
-    assert!(!result.is_ok(), "Expected error found {:?}", result);
-    let status = format!("{:?}", result.outcome().status);
+fn err_is(result: &Result<CallExecutionDetails, anyhow::Error>, expected: &str) {
+    let status = match result {
+        Ok(result) => {
+            assert!(!result.is_success(), "Expected error found {:?}", result);
+            format!("{:?}", result.outcome())
+        },
+        Err(err) => {
+            format!("{:?}", err)
+        }
+    };
+
     assert!(status.contains(expected), "{}", status);
 }
 
+/*
 #[test]
 fn test_eth_token_transfer() {
     let (user, factory) = setup_token_factory();
@@ -302,45 +324,47 @@ fn test_bridge_token_failures() {
         "Only controller can call mint",
     );
 }
+*/
 
 #[test]
 fn test_deploy_failures() {
-    let (user, factory) = setup_token_factory();
+    let (user, factory, worker) = create_contract();
+    let rt = Runtime::new().unwrap();
 
     // Fails with not enough deposit.
-    err_is(
-        &call!(
-            user,
-            factory.deploy_bridge_token(DAI_ADDRESS.to_string()),
-            deposit = to_yocto("0")
-        ),
+    err_is(&rt.block_on(user.call(&worker, factory.id(), "deploy_bridge_token")
+        .deposit(0)
+        .args(json!({"address": DAI_ADDRESS}).to_string().into_bytes())
+        .max_gas()
+        .transact()),
         "Not enough attached deposit to complete bridge token creation",
     );
 
     // Fails with address is invalid.
     err_is(
-        &call!(
-            user,
-            factory.deploy_bridge_token("not_a_hex".to_string()),
-            deposit = to_yocto("0")
-        ),
+        &rt.block_on(user.call(&worker, factory.id(), "deploy_bridge_token")
+            .deposit(0)
+            .args(json!({"address": "not_a_hex"}).to_string().into_bytes())
+            .max_gas()
+            .transact()),
         "address should be a valid hex string.: OddLength",
     );
 
-    // Fails second time because already exists.
-    call!(
-        user,
-        factory.deploy_bridge_token(DAI_ADDRESS.to_string()),
-        deposit = to_yocto("35")
-    )
-    .assert_success();
+    println!("{}.{}", DAI_ADDRESS.to_string(), factory.id());
+    let new_account_id: near_sdk::AccountId = format!("{}.{}", DAI_ADDRESS.to_string(), factory.id()).parse().unwrap();
 
-    err_is(
-        &call!(
-            user,
-            factory.deploy_bridge_token(DAI_ADDRESS.to_string()),
-            deposit = to_yocto("35")
-        ),
+    // Fails second time because already exists.
+    assert!(&rt.block_on(user.call(&worker, factory.id(), "deploy_bridge_token")
+        .deposit(parse_near!("35 N"))
+        .args(json!({"address": DAI_ADDRESS.to_string()}).to_string().into_bytes())
+        .max_gas()
+        .transact()).unwrap().is_success());
+
+    err_is(&rt.block_on(user.call(&worker, factory.id(), "deploy_bridge_token")
+        .deposit(parse_near!("35 N"))
+        .args(json!({"address": DAI_ADDRESS}).to_string().into_bytes())
+        .max_gas()
+        .transact()),
         "BridgeToken contract already exists.",
     );
 }
