@@ -75,10 +75,19 @@ task('new-token', 'Deploy new bridge token')
 task('add-token-to-whitelist-eth', 'Add a token to whitelist')
   .addParam('nearTokenAccount', 'Near account id of the token')
   .addParam('factory', 'The address of the eth factory contract')
+  .addParam('mode', 'Whitelist mode: [ NotInitialized, Blocked, CheckToken, CheckAccountAndToken ]')
   .setAction(async (taskArgs) => {
+    const WhitelistMode = {
+      NotInitialized: 0,
+      Blocked: 1,
+      CheckToken: 2,
+      CheckAccountAndToken: 3
+    }
     const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
     const BridgeTokenFactory = BridgeTokenFactoryContract.attach(taskArgs.factory);
-    await BridgeTokenFactory.setTokenWhitelistMode(taskArgs.nearTokenAccount, 2);
+    const tx = await BridgeTokenFactory.setTokenWhitelistMode(taskArgs.nearTokenAccount, WhitelistMode[taskArgs.mode]);
+    const receipt = await tx.wait();
+    console.log("Tx hash", receipt.transactionHash);
   });
 
 task('withdraw-ft', 'Withdraw bridged tokens from the Ethereum side')
@@ -146,7 +155,13 @@ module.exports = {
         ? `https://goerli.infura.io/v3/${INFURA_API_KEY}`
         : `https://eth-goerli.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
       accounts: [`${ETH_PRIVATE_KEY}`]
-    }
+    },
+    mainnet: {
+      url: INFURA_API_KEY
+        ? `https://mainnet.infura.io/v3/${INFURA_API_KEY}`
+        : `https://eth-mainnet.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
+      accounts: [`${ETH_PRIVATE_KEY}`]
+    },
   },
   etherscan: {
     apiKey: ETHERSCAN_API_KEY
