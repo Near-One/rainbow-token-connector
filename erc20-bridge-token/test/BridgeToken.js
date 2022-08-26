@@ -276,7 +276,12 @@ describe('BridgeToken', () => {
       recipient: ethers.utils.arrayify(user.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'D'.repeat(44);
+
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckToken);
+    expect(
+      await BridgeTokenFactory.getTokenWhitelistMode(nearTokenId)
+    ).to.be.equal(WhitelistMode.CheckToken);
+
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
 
     await expect(
@@ -312,7 +317,12 @@ describe('BridgeToken', () => {
       recipient: ethers.utils.arrayify(user.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'F'.repeat(44);
+
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckToken);
+    expect(
+      await BridgeTokenFactory.getTokenWhitelistMode(nearTokenId)
+    ).to.be.equal(WhitelistMode.CheckToken);
+
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
     await expect(
       BridgeTokenFactory.pauseWithdraw()
@@ -341,7 +351,12 @@ describe('BridgeToken', () => {
       recipient: ethers.utils.arrayify(user.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'G'.repeat(44);
+
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckToken);
+    expect(
+      await BridgeTokenFactory.getTokenWhitelistMode(nearTokenId)
+    ).to.be.equal(WhitelistMode.CheckToken);
+
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
     await expect(
       BridgeTokenFactory.pauseWithdraw()
@@ -524,7 +539,11 @@ describe('BridgeToken', () => {
 
   it("Test grant admin role", async function() {
     await BridgeTokenFactory.connect(adminAccount).disableWhitelistMode();
+    expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.false;
+
     await BridgeTokenFactory.connect(adminAccount).enableWhitelistMode();
+    expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
+
     const signers = await ethers.getSigners();
     const newAdminAccount = signers[2];
     const DEFAULT_ADMIN_ROLE = "0x0000000000000000000000000000000000000000000000000000000000000000";
@@ -533,11 +552,14 @@ describe('BridgeToken', () => {
     ).to.be.revertedWith(
       `is missing role ${DEFAULT_ADMIN_ROLE}`
     );
+    expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
+
     await expect(
       BridgeTokenFactory.connect(newAdminAccount).enableWhitelistMode()
     ).to.be.revertedWith(
       `is missing role ${DEFAULT_ADMIN_ROLE}`
     );
+    expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
 
     // Grant DEFAULT_ADMIN_ROLE to newAdminAccount
     await expect(
@@ -551,7 +573,10 @@ describe('BridgeToken', () => {
         adminAccount.address
       );
     await BridgeTokenFactory.connect(newAdminAccount).disableWhitelistMode();
+    expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.false;
+
     await BridgeTokenFactory.connect(newAdminAccount).enableWhitelistMode();
+    expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
 
     // Revoke DEFAULT_ADMIN_ROLE from adminAccount
     await expect(
@@ -576,15 +601,20 @@ describe('BridgeToken', () => {
     ).to.be.revertedWith(
       `is missing role ${DEFAULT_ADMIN_ROLE}`
     );
+    expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
+
     await expect(
       BridgeTokenFactory.connect(adminAccount).enableWhitelistMode()
     ).to.be.revertedWith(
       `is missing role ${DEFAULT_ADMIN_ROLE}`
     );
+    expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
 
     // Check newAdminAccount can perform admin calls
     await BridgeTokenFactory.connect(newAdminAccount).disableWhitelistMode();
+    expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.false;
     await BridgeTokenFactory.connect(newAdminAccount).enableWhitelistMode();
+    expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
 
     // Check newAdminAccount can grant DEFAULT_ADMIN_ROLE to adminAccount
     await expect(
@@ -602,7 +632,9 @@ describe('BridgeToken', () => {
 
     // Check that adminAccount can perform admin calls again
     await BridgeTokenFactory.connect(adminAccount).disableWhitelistMode();
+    expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.false;
     await BridgeTokenFactory.connect(adminAccount).enableWhitelistMode();
+    expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
   });
   
   describe("Whitelist", function() {
@@ -618,10 +650,21 @@ describe('BridgeToken', () => {
     it("Test account in whitelist", async function() {
       const amountToTransfer = amountToLock;
       await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckAccountAndToken);
+      expect(
+        await BridgeTokenFactory.getTokenWhitelistMode(nearTokenId)
+      ).to.be.equal(WhitelistMode.CheckAccountAndToken);
+
       await BridgeTokenFactory.addAccountToWhitelist(
         nearTokenId,
         user.address
       );
+      expect(
+        await BridgeTokenFactory.isAccountWhitelistedForToken(
+          nearTokenId,
+          user.address
+        )
+      ).to.be.true;
+
       await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, recipient);
       expect(
         (await tokenInfo.token.balanceOf(user.address)).toString()
@@ -631,6 +674,10 @@ describe('BridgeToken', () => {
     it("Test token in whitelist", async function() {
       const amountToTransfer = amountToLock;
       await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckToken);
+      expect(
+        await BridgeTokenFactory.getTokenWhitelistMode(nearTokenId)
+      ).to.be.equal(WhitelistMode.CheckToken);
+
       await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, recipient);
       expect(
         (await tokenInfo.token.balanceOf(user.address)).toString()
@@ -657,6 +704,9 @@ describe('BridgeToken', () => {
         tokensInfo.push(await createToken(token));
         await deposit(token, amountToTransfer, user.address);
         await BridgeTokenFactory.setTokenWhitelistMode(token, WhitelistMode.CheckToken);
+        expect(
+          await BridgeTokenFactory.getTokenWhitelistMode(token)
+        ).to.be.equal(WhitelistMode.CheckToken);
       }
 
       for (token of blacklistTokens) {
@@ -713,6 +763,9 @@ describe('BridgeToken', () => {
       for (token of whitelistTokens) {
         tokensInfo.push(createToken(token));
         await BridgeTokenFactory.setTokenWhitelistMode(token, WhitelistMode.CheckAccountAndToken);
+        expect(
+          await BridgeTokenFactory.getTokenWhitelistMode(token)
+        ).to.be.equal(WhitelistMode.CheckAccountAndToken);
 
         for (const account of whitelistAccounts) {
           await deposit(token, amountToTransfer, account.address);
@@ -720,6 +773,12 @@ describe('BridgeToken', () => {
             token,
             account.address
           );
+          expect(
+            await BridgeTokenFactory.isAccountWhitelistedForToken(
+              token,
+              account.address
+            )
+          ).to.be.true;
         }
       }
 
@@ -758,13 +817,31 @@ describe('BridgeToken', () => {
     it("Test remove account from whitelist", async function() {
       const amountToTransfer = amountToLock / 2;
       await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckAccountAndToken);
+      expect(
+        await BridgeTokenFactory.getTokenWhitelistMode(nearTokenId)
+      ).to.be.equal(WhitelistMode.CheckAccountAndToken);
+
       await BridgeTokenFactory.addAccountToWhitelist(
         nearTokenId,
         user.address
       );
+      expect(
+        await BridgeTokenFactory.isAccountWhitelistedForToken(
+          nearTokenId,
+          user.address
+        )
+      ).to.be.true;
+
       await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, recipient);
 
       await BridgeTokenFactory.removeAccountFromWhitelist(nearTokenId, adminAccount.address);
+      expect(
+        await BridgeTokenFactory.isAccountWhitelistedForToken(
+          nearTokenId,
+          adminAccount.address
+        )
+      ).to.be.false;
+
       await expect(
         BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient)
       ).to.be.revertedWith("ERR_ACCOUNT_NOT_IN_WHITELIST");
@@ -781,11 +858,18 @@ describe('BridgeToken', () => {
       ).to.be.revertedWith("ERR_NOT_INITIALIZED_WHITELIST_TOKEN");
 
       await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.Blocked);
+      expect(
+        await BridgeTokenFactory.getTokenWhitelistMode(nearTokenId)
+      ).to.be.equal(WhitelistMode.Blocked);
+
       await expect(
         BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient)
       ).to.be.revertedWith("ERR_WHITELIST_TOKEN_BLOCKED");
 
       await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckAccountAndToken);
+      expect(
+        await BridgeTokenFactory.getTokenWhitelistMode(nearTokenId)
+      ).to.be.equal(WhitelistMode.CheckAccountAndToken);
 
       await expect(
         BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient)
@@ -793,6 +877,7 @@ describe('BridgeToken', () => {
 
       // Disable whitelist mode
       await BridgeTokenFactory.disableWhitelistMode();
+      expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.false;
       await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, recipient);
       expect(
         (await tokenInfo.token.balanceOf(user.address)).toString()
@@ -800,6 +885,7 @@ describe('BridgeToken', () => {
 
       // Enable whitelist mode
       await BridgeTokenFactory.enableWhitelistMode();
+      expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
       await expect(
         BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, recipient)
       ).to.be.revertedWith("ERR_ACCOUNT_NOT_IN_WHITELIST");
@@ -808,6 +894,13 @@ describe('BridgeToken', () => {
         nearTokenId,
         user.address
       );
+      expect(
+        await BridgeTokenFactory.isAccountWhitelistedForToken(
+          nearTokenId,
+          user.address
+        )
+      ).to.be.true;
+
       await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, recipient);
 
       expect(
