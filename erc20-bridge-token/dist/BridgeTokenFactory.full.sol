@@ -3955,10 +3955,11 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
 
     // Event when funds are withdrawn from Ethereum back to NEAR.
     event Withdraw (
-        string indexed token,
+        string token,
         address indexed sender,
         uint256 amount,
-        string recipient
+        string recipient,
+        address indexed tokenEthAddress
     );
 
     event Deposit (
@@ -4052,9 +4053,10 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
         _checkWhitelistedToken(token, msg.sender);
         require(_isBridgeToken[_nearToEthToken[token]], "ERR_NOT_BRIDGE_TOKEN");
 
-        BridgeToken(_nearToEthToken[token]).burn(msg.sender, amount);
+        address tokenEthAddress = _nearToEthToken[token];
+        BridgeToken(tokenEthAddress).burn(msg.sender, amount);
 
-        emit Withdraw(token, msg.sender, amount, recipient);
+        emit Withdraw(token, msg.sender, amount, recipient, tokenEthAddress);
     }
 
     function pause(uint flags) external onlyRole(ADMIN_PAUSE_ROLE) {
@@ -4073,6 +4075,18 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
         _pause(pausedFlags() | PAUSED_SET_METADATA);
     }
 
+    function isWhitelistModeEnabled() view external returns(bool) {
+        return _isWhitelistModeEnabled;
+    }
+
+    function getTokenWhitelistMode(string calldata token) view external returns(WhitelistMode) {
+        return _whitelistedTokens[token];
+    }
+
+    function isAccountWhitelistedForToken(string calldata token, address account) view external returns(bool) {
+        return _whitelistedAccounts[abi.encodePacked(token, account)];
+    }
+
     function upgradeToken(string calldata nearTokenId, address implementation) external onlyRole(DEFAULT_ADMIN_ROLE) {
        require(_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_NOT_BRIDGE_TOKEN");
        BridgeTokenProxy proxy = BridgeTokenProxy(payable(_nearToEthToken[nearTokenId]));
@@ -4080,6 +4094,7 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
     }
 
     function setProofConsumer(address newProofConsumerAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(newProofConsumerAddress != address(0), "Proof consumer shouldn't be zero address");
         proofConsumerAddress = newProofConsumerAddress;
     }
 
