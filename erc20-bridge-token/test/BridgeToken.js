@@ -292,7 +292,8 @@ describe('BridgeToken', () => {
         nearTokenId,
         user.address,
         amountToTransfer,
-        recipient
+        recipient,
+        await BridgeTokenFactory.nearToEthToken(nearTokenId)
       );
 
     expect((await token.balanceOf(user.address)).toString()).to.be.equal('0')
@@ -676,8 +677,15 @@ describe('BridgeToken', () => {
             recipient
           )
         )
-          .to.emit(BridgeTokenFactory, "Withdraw")
-          .withArgs(token, user.address, amountToTransfer, recipient);
+          .to
+          .emit(BridgeTokenFactory, "Withdraw")
+          .withArgs(
+            token,
+            user.address,
+            amountToTransfer,
+            recipient,
+            await BridgeTokenFactory.nearToEthToken(token)
+          );
       }
 
       for (tokenInfo of tokensInfo) {
@@ -724,8 +732,15 @@ describe('BridgeToken', () => {
               recipient
             )
           )
-            .to.emit(BridgeTokenFactory, "Withdraw")
-            .withArgs(token, account.address, amountToTransfer, recipient);
+            .to
+            .emit(BridgeTokenFactory, "Withdraw")
+            .withArgs(
+              token, 
+              account.address, 
+              amountToTransfer, 
+              recipient,
+              await BridgeTokenFactory.nearToEthToken(token)
+            );
         }
 
         for (const account of blacklistAccounts) {
