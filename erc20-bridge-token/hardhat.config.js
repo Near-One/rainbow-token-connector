@@ -90,6 +90,18 @@ task('add-token-to-whitelist-eth', 'Add a token to whitelist')
     console.log("Tx hash", receipt.transactionHash);
   });
 
+task('add-account-to-whitelist-eth', 'Add an account to whitelist')
+  .addParam('nearTokenAccount', 'Near account id of the token')
+  .addParam('ethAccount', 'Ethereum account address to add to whitelist')
+  .addParam('factory', 'The address of the factory contract on Ethereum')
+  .setAction(async (taskArgs) => {
+    const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
+    const BridgeTokenFactory = BridgeTokenFactoryContract.attach(taskArgs.factory);
+    const tx = await BridgeTokenFactory.addAccountToWhitelist(taskArgs.nearTokenAccount, taskArgs.ethAccount);
+    const receipt = await tx.wait();
+    console.log("Tx hash", receipt.transactionHash);
+  });
+
 task('withdraw-ft', 'Withdraw bridged tokens from the Ethereum side')
   .addParam('factory', 'The address of the eth factory contract')
   .addParam('token', 'Near token account id')
