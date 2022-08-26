@@ -11,6 +11,7 @@ pub struct EthUnlockedEvent {
     pub sender: String,
     pub amount: Balance,
     pub recipient: AccountId,
+    pub token_eth_address: EthAddress,
 }
 
 impl EthUnlockedEvent {
@@ -20,6 +21,7 @@ impl EthUnlockedEvent {
             ("sender".to_string(), ParamType::Address, true),
             ("amount".to_string(), ParamType::Uint(256), false),
             ("recipient".to_string(), ParamType::String, false),
+            ("tokenEthAddress".to_string(), ParamType::Address, true),
         ]
     }
 
@@ -37,12 +39,14 @@ impl EthUnlockedEvent {
             .unwrap()
             .as_u128();
         let recipient = event.log.params[3].value.clone().to_string().unwrap();
+        let token_eth_address = event.log.params[4].value.clone().to_address().unwrap().0;
         Self {
             eth_factory_address: event.locker_address,
             token,
             sender,
             amount,
             recipient: recipient.parse().unwrap(),
+            token_eth_address,
         }
     }
 
@@ -52,7 +56,10 @@ impl EthUnlockedEvent {
             "Withdraw",
             EthUnlockedEvent::event_params(),
             self.eth_factory_address,
-            vec![hex::decode(self.sender.clone()).unwrap()],
+            vec![
+                hex::decode(self.sender.clone()).unwrap(),
+                self.token_eth_address.to_vec(),
+            ],
             vec![
                 Token::String(self.token.clone()),
                 Token::Uint(self.amount.into()),
@@ -86,6 +93,7 @@ mod tests {
             sender: hex::encode(rng.gen::<[u8; 20]>()),
             amount: rng.gen::<u128>(),
             recipient: "some_recipient.near".parse().unwrap(),
+            token_eth_address: rng.gen::<[u8; 20]>(),
         }
     }
 
