@@ -189,6 +189,7 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
     }
 
     function setProofConsumer(address newProofConsumerAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(newProofConsumerAddress != address(0), "Proof consumer shouldn't be zero address");
         proofConsumerAddress = newProofConsumerAddress;
     }
 
