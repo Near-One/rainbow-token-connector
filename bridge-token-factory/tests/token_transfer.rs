@@ -1,15 +1,13 @@
 use bridge_token_factory::{validate_eth_address, EthLockedEvent, Proof};
-use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::json_types::ValidAccountId;
+use near_sdk::borsh::{self, BorshSerialize};
 use near_sdk::AccountId;
 use near_units::*;
 use serde_json::json;
 use tokio::runtime::Runtime;
 use workspaces::prelude::*;
 use workspaces::result::CallExecutionDetails;
-use workspaces::{network::Sandbox, Account, AccountDetails, Contract, Worker};
+use workspaces::{network::Sandbox, Account, Contract, Worker};
 
-const PROVER: &str = "prover";
 const FACTORY: &str = "bridge";
 const LOCKER_ADDRESS: &str = "11111474e89094c44da98b954eedeac495271d0f";
 const DAI_ADDRESS: &str = "6b175474e89094c44da98b954eedeac495271d0f";
@@ -105,16 +103,6 @@ fn test_eth_token_transfer() {
     let (user, factory, worker) = create_contract();
     let rt = Runtime::new().unwrap();
 
-    let other_user = rt
-        .block_on(
-            user.create_subaccount(&worker, "bob")
-                .initial_balance(parse_near!("50 N"))
-                .transact(),
-        )
-        .unwrap()
-        .into_result()
-        .unwrap();
-
     assert!(&rt
         .block_on(
             user.call(&worker, factory.id(), "deploy_bridge_token")
@@ -135,9 +123,9 @@ fn test_eth_token_transfer() {
             factory.view(
                 &worker,
                 "get_bridge_token_account_id",
-                (json!({"address": DAI_ADDRESS.to_string()})
+                json!({"address": DAI_ADDRESS.to_string()})
                     .to_string()
-                    .into_bytes()),
+                    .into_bytes(),
             ),
         )
         .unwrap()
@@ -293,9 +281,9 @@ fn test_with_invalid_proof() {
             factory.view(
                 &worker,
                 "get_bridge_token_account_id",
-                (json!({"address": DAI_ADDRESS.to_string()})
+                json!({"address": DAI_ADDRESS.to_string()})
                     .to_string()
-                    .into_bytes()),
+                    .into_bytes(),
             ),
         )
         .unwrap()
@@ -508,11 +496,6 @@ fn test_deploy_failures() {
         ),
         "address should be a valid hex string.: OddLength",
     );
-
-    let new_account_id: near_sdk::AccountId =
-        format!("{}.{}", DAI_ADDRESS.to_string(), factory.id())
-            .parse()
-            .unwrap();
 
     // Fails second time because already exists.
     assert!(&rt

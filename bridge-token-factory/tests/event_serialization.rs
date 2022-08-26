@@ -13,8 +13,8 @@ struct PartialLockedEvent {
     recipient: String,
 }
 
-/*
 #[test]
+#[ignore]
 fn real_data_locked_event_serialization() {
     let content = fs::read_to_string("res/locked_events.json")
         .expect("Something went wrong reading the file");
@@ -33,16 +33,43 @@ fn real_data_locked_event_serialization() {
         assert_eq!(re_serialize, serialized);
     }
 }
- */
 
 fn rand_string(rng: &mut ThreadRng) -> String {
-    (0..rng.gen::<u8>())
-        .map(|_| (0x20u8 + (rng.gen::<f32>() * 96.0) as u8) as char)
-        .collect()
+    const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789._-";
+    let string_len = rng.gen_range(2, 64);
+
+    'main: loop {
+        let rand_str: String = (0..string_len)
+            .map(|_| {
+                let idx = rng.gen_range(0, CHARSET.len());
+                CHARSET[idx] as char
+            })
+            .collect();
+
+        let mut last_char_is_separator = true;
+
+        for c in rand_str.chars() {
+            let current_char_is_separator = match c {
+                '-' | '_' | '.' => true,
+                _ => false,
+            };
+
+            if current_char_is_separator && last_char_is_separator {
+                continue 'main;
+            }
+
+            last_char_is_separator = current_char_is_separator;
+        }
+
+        if !last_char_is_separator {
+            return rand_str;
+        }
+    }
 }
 
 fn generate_random_eth_locked_event(rng: &mut ThreadRng) -> EthLockedEvent {
     let rand_str = rand_string(rng);
+
     EthLockedEvent {
         locker_address: rng.gen::<[u8; 20]>(),
         token: hex::encode(rng.gen::<[u8; 20]>()),
@@ -52,7 +79,6 @@ fn generate_random_eth_locked_event(rng: &mut ThreadRng) -> EthLockedEvent {
     }
 }
 
-/*
 #[test]
 fn fuzzing_eth_locked() {
     let mut rng = rand::thread_rng();
@@ -63,4 +89,3 @@ fn fuzzing_eth_locked() {
         assert_eq!(event, deserialized);
     }
 }
-*/
