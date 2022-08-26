@@ -83,8 +83,8 @@ task('add-token-to-whitelist-eth', 'Add a token to whitelist')
 
 task('add-account-to-whitelist-eth', 'Add an account to whitelist')
   .addParam('nearTokenAccount', 'Near account id of the token')
-  .addParam('ethAccount', 'Ethereum account address to add it to whitelist')
-  .addParam('factory', 'The address of the eth factory contract')
+  .addParam('ethAccount', 'Ethereum account address to add to whitelist')
+  .addParam('factory', 'The address of the factory contract on Ethereum')
   .setAction(async (taskArgs) => {
     const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
     const BridgeTokenFactory = BridgeTokenFactoryContract.attach(taskArgs.factory);
