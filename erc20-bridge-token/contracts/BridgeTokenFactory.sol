@@ -170,6 +170,18 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
         _pause(pausedFlags() | PAUSED_SET_METADATA);
     }
 
+    function isWhitelistModeEnabled() view external returns(bool) {
+        return _isWhitelistModeEnabled;
+    }
+
+    function getTokenWhitelistMode(string calldata token) view external returns(WhitelistMode) {
+        return _whitelistedTokens[token];
+    }
+
+    function isAccountWhitelistedForToken(string calldata token, address account) view external returns(bool) {
+        return _whitelistedAccounts[abi.encodePacked(token, account)];
+    }
+
     function upgradeToken(string calldata nearTokenId, address implementation) external onlyRole(DEFAULT_ADMIN_ROLE) {
        require(_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_NOT_BRIDGE_TOKEN");
        BridgeTokenProxy proxy = BridgeTokenProxy(payable(_nearToEthToken[nearTokenId]));
