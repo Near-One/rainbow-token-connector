@@ -50,10 +50,11 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
 
     // Event when funds are withdrawn from Ethereum back to NEAR.
     event Withdraw (
-        string indexed token,
+        string token,
         address indexed sender,
         uint256 amount,
-        string recipient
+        string recipient,
+        address indexed tokenEthAddress
     );
 
     event Deposit (
@@ -147,9 +148,10 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
         _checkWhitelistedToken(token, msg.sender);
         require(_isBridgeToken[_nearToEthToken[token]], "ERR_NOT_BRIDGE_TOKEN");
 
-        BridgeToken(_nearToEthToken[token]).burn(msg.sender, amount);
+        address tokenEthAddress = _nearToEthToken[token];
+        BridgeToken(tokenEthAddress).burn(msg.sender, amount);
 
-        emit Withdraw(token, msg.sender, amount, recipient);
+        emit Withdraw(token, msg.sender, amount, recipient, tokenEthAddress);
     }
 
     function pause(uint flags) external onlyRole(ADMIN_PAUSE_ROLE) {

@@ -11,6 +11,7 @@ pub struct EthUnlockedEvent {
     pub sender: String,
     pub amount: Balance,
     pub recipient: AccountId,
+    pub token_eth_address: EthAddress,
 }
 
 impl EthUnlockedEvent {
@@ -20,6 +21,7 @@ impl EthUnlockedEvent {
             ("sender".to_string(), ParamType::Address, true),
             ("amount".to_string(), ParamType::Uint(256), false),
             ("recipient".to_string(), ParamType::String, false),
+            ("tokenEthAddress".to_string(), ParamType::Address, true),
         ]
     }
 
@@ -37,12 +39,14 @@ impl EthUnlockedEvent {
             .unwrap()
             .as_u128();
         let recipient = event.log.params[3].value.clone().to_string().unwrap();
+        let token_eth_address = event.log.params[4].value.clone().to_address().unwrap().0;
         Self {
             eth_factory_address: event.locker_address,
             token,
             sender,
             amount,
             recipient: recipient.parse().unwrap(),
+            token_eth_address
         }
     }
 
