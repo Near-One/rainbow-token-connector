@@ -351,6 +351,9 @@ mod tests {
             sender: "00005474e89094c44da98b954eedeac495271d0f".to_string(),
             amount: 1000,
             recipient: "123".parse().unwrap(),
+            token_eth_address: validate_eth_address(
+                "0123456789abcdefdeadbeef0123456789abcdef".to_string(),
+            ),
         };
 
         Proof {

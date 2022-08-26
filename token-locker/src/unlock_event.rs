@@ -46,7 +46,7 @@ impl EthUnlockedEvent {
             sender,
             amount,
             recipient: recipient.parse().unwrap(),
-            token_eth_address
+            token_eth_address,
         }
     }
 
@@ -56,7 +56,10 @@ impl EthUnlockedEvent {
             "Withdraw",
             EthUnlockedEvent::event_params(),
             self.eth_factory_address,
-            vec![hex::decode(self.sender.clone()).unwrap()],
+            vec![
+                hex::decode(self.sender.clone()).unwrap(),
+                self.token_eth_address.to_vec(),
+            ],
             vec![
                 Token::String(self.token.clone()),
                 Token::Uint(self.amount.into()),
@@ -90,6 +93,7 @@ mod tests {
             sender: hex::encode(rng.gen::<[u8; 20]>()),
             amount: rng.gen::<u128>(),
             recipient: "some_recipient.near".parse().unwrap(),
+            token_eth_address: rng.gen::<[u8; 20]>(),
         }
     }
 
