@@ -83,7 +83,7 @@ impl From<Proof> for AugmentedProof {
     }
 }
 
-fn err_is(result: &Result<CallExecutionDetails, anyhow::Error>, expected: &str) {
+fn assert_error(result: &Result<CallExecutionDetails, anyhow::Error>, expected: &str) {
     let status = match result {
         Ok(result) => {
             assert!(!result.is_success(), "Expected error found {:?}", result);
@@ -311,7 +311,7 @@ fn test_with_invalid_proof() {
     // since mock_prover will only accept empty proofs.
     proof.proof = vec![vec![]];
 
-    err_is(
+    assert_error(
         &rt.block_on(
             user.call(&worker, factory.id(), "deposit")
                 .max_gas()
@@ -339,7 +339,7 @@ fn test_with_invalid_proof() {
 
     // This deposit event must fail since same deposit event can't be reused.
     // Previous call to deposit with the same event was successful.
-    err_is(
+    assert_error(
         &rt.block_on(
             user.call(&worker, factory.id(), "deposit")
                 .max_gas()
@@ -373,7 +373,7 @@ fn test_bridge_token_failures() {
     let token_account_id = format!("{}.{}", DAI_ADDRESS, factory.id());
 
     // Fail to withdraw because the account is not registered (and have no coins)
-    err_is(
+    assert_error(
         &rt.block_on(
             user.call(&worker, &token_account_id.parse().unwrap(), "withdraw")
                 .max_gas()
@@ -418,7 +418,7 @@ fn test_bridge_token_failures() {
         .is_success());
 
     // Fail to withdraw because the account has no enough balance
-    err_is(
+    assert_error(
         &rt.block_on(
             user.call(&worker, &token_account_id.parse().unwrap(), "withdraw")
                 .max_gas()
@@ -447,7 +447,7 @@ fn test_bridge_token_failures() {
         .unwrap();
 
     // Fail to mint because the caller is not the controller
-    err_is(
+    assert_error(
         &rt.block_on(
             other_user
                 .call(&worker, &token_account_id.parse().unwrap(), "mint")
@@ -473,7 +473,7 @@ fn test_deploy_failures() {
     let rt = Runtime::new().unwrap();
 
     // Fails with not enough deposit.
-    err_is(
+    assert_error(
         &rt.block_on(
             user.call(&worker, factory.id(), "deploy_bridge_token")
                 .deposit(0)
@@ -485,7 +485,7 @@ fn test_deploy_failures() {
     );
 
     // Fails with address is invalid.
-    err_is(
+    assert_error(
         &rt.block_on(
             user.call(&worker, factory.id(), "deploy_bridge_token")
                 .deposit(0)
@@ -512,7 +512,7 @@ fn test_deploy_failures() {
         .unwrap()
         .is_success());
 
-    err_is(
+    assert_error(
         &rt.block_on(
             user.call(&worker, factory.id(), "deploy_bridge_token")
                 .deposit(35*ONE_NEAR)
