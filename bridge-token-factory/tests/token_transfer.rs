@@ -16,6 +16,8 @@ const ALICE: &str = "alice.test.near";
 const FACTORY_WASM_PATH: &str = "../res/bridge_token_factory.wasm";
 const MOCK_PROVER_WASM_PATH: &str = "../res/mock_prover.wasm";
 
+const STORAGE_AMOUNT: u128 = 50_000_000_000_000_000_000_000_000;
+
 fn create_contract() -> (Account, Contract, Worker<Sandbox>) {
     let rt = Runtime::new().unwrap();
 
@@ -191,7 +193,7 @@ fn test_eth_token_transfer() {
     assert!(&rt
         .block_on(
             alice.call(&worker, factory.id(), "deposit")
-                .deposit(ONE_NEAR)
+                .deposit(STORAGE_AMOUNT)
                 .max_gas()
                 .args(proof.try_to_vec().unwrap())
                 .transact()
@@ -321,7 +323,7 @@ fn test_with_invalid_proof() {
         .block_on(
             user.call(&worker, factory.id(), "deposit")
                 .max_gas()
-                .deposit(ONE_NEAR)
+                .deposit(STORAGE_AMOUNT)
                 .args(proof.try_to_vec().unwrap())
                 .transact()
         )
@@ -402,7 +404,7 @@ fn test_bridge_token_failures() {
                 .to_string()
                 .into_bytes()
             )
-            .deposit(ONE_NEAR)
+            .deposit(STORAGE_AMOUNT)
             .transact()
         )
         .unwrap()
