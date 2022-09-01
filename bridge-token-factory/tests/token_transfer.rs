@@ -29,7 +29,7 @@ fn create_contract() -> (Account, Contract, Worker<Sandbox>) {
         .block_on(
             owner
                 .create_subaccount(&worker, FACTORY)
-                .initial_balance(200*ONE_NEAR)
+                .initial_balance(200 * ONE_NEAR)
                 .transact(),
         )
         .unwrap()
@@ -46,7 +46,7 @@ fn create_contract() -> (Account, Contract, Worker<Sandbox>) {
         .block_on(
             owner
                 .create_subaccount(&worker, "alice")
-                .initial_balance(200*ONE_NEAR)
+                .initial_balance(200 * ONE_NEAR)
                 .transact(),
         )
         .unwrap()
@@ -97,23 +97,31 @@ fn assert_error(result: &Result<CallExecutionDetails, anyhow::Error>, expected: 
     assert!(status.contains(expected), "{}", status);
 }
 
-fn get_bridge_token_account_id(address: &str, rt: &Runtime, factory: &Contract, worker: &Worker<Sandbox>) -> String {
-    let mut token_account_id = std::str::from_utf8(
-        &rt.block_on(
-            factory.view(
-                &worker,
-                "get_bridge_token_account_id",
-                json!({"address": address.to_string()})
-                    .to_string()
-                    .into_bytes(),
-            ),
-        ).unwrap()
-            .result,
-    ).unwrap().to_string();
-    token_account_id.pop();
-    token_account_id.remove(0);
+fn remove_quotes(s: &mut String) -> String {
+    s.pop();
+    s.remove(0);
+    s.to_string()
+}
 
-    token_account_id
+fn run_view_function(
+    rt: &Runtime,
+    contract_id: &String,
+    worker: &Worker<Sandbox>,
+    function: &str,
+    args: serde_json::Value,
+) -> String {
+    let mut res = std::str::from_utf8(
+        &rt.block_on(worker.view(
+            &contract_id.parse().unwrap(),
+            function,
+            args.to_string().into_bytes(),
+        ))
+        .unwrap()
+        .result,
+    )
+    .unwrap()
+    .to_string();
+    remove_quotes(&mut res)
 }
 
 #[test]
@@ -124,7 +132,7 @@ fn test_eth_token_transfer() {
     assert!(&rt
         .block_on(
             user.call(&worker, factory.id(), "deploy_bridge_token")
-                .deposit(35*ONE_NEAR)
+                .deposit(35 * ONE_NEAR)
                 .args(
                     json!({"address": DAI_ADDRESS.to_string()})
                         .to_string()
@@ -136,42 +144,37 @@ fn test_eth_token_transfer() {
         .unwrap()
         .is_success());
 
-    let token_account_id: String = get_bridge_token_account_id(DAI_ADDRESS, &rt, &factory, &worker);
+    let token_account_id: String = run_view_function(
+        &rt,
+        &factory.id().to_string(),
+        &worker,
+        "get_bridge_token_account_id",
+        json!({"address": DAI_ADDRESS.to_string()}),
+    );
 
     assert_eq!(
         token_account_id,
         format!("{}.{}", DAI_ADDRESS, factory.id())
     );
 
-    let alice_balance: String = std::str::from_utf8(
-        &rt.block_on(
-            worker.view(
-                &token_account_id.parse().unwrap(),
-                "ft_balance_of",
-                json!({"account_id": user.id().to_string()})
-                    .to_string()
-                    .into_bytes(),
-            ),
-        )
-        .unwrap()
-        .result,
-    )
-    .unwrap()
-    .to_string();
-    assert_eq!(alice_balance, "\"0\"");
+    let alice_balance: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({"account_id": user.id().to_string()}),
+    );
 
-    let total_supply: String = std::str::from_utf8(
-        &rt.block_on(worker.view(
-            &token_account_id.parse().unwrap(),
-            "ft_total_supply",
-            json!({}).to_string().into_bytes(),
-        ))
-        .unwrap()
-        .result,
-    )
-    .unwrap()
-    .to_string();
-    assert_eq!(total_supply, "\"0\"");
+    assert_eq!(alice_balance, "0");
+
+    let total_supply: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_total_supply",
+        json!({}),
+    );
+    assert_eq!(total_supply, "0");
 
     let mut proof = Proof::default();
     proof.log_entry_data = EthLockedEvent {
@@ -186,7 +189,7 @@ fn test_eth_token_transfer() {
     assert!(&rt
         .block_on(
             user.call(&worker, factory.id(), "deposit")
-                .deposit(50*ONE_NEAR)
+                .deposit(50 * ONE_NEAR)
                 .max_gas()
                 .args(proof.try_to_vec().unwrap())
                 .transact()
@@ -194,68 +197,59 @@ fn test_eth_token_transfer() {
         .unwrap()
         .is_success());
 
-    let alice_balance: String = std::str::from_utf8(
-        &rt.block_on(
-            worker.view(
-                &token_account_id.parse().unwrap(),
-                "ft_balance_of",
-                json!({"account_id": user.id().to_string()})
-                    .to_string()
-                    .into_bytes(),
-            ),
-        )
-            .unwrap()
-            .result,
-    ).unwrap().to_string();
-    assert_eq!(alice_balance, "\"1000\"");
+    let alice_balance: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({"account_id": user.id().to_string()}),
+    );
+    assert_eq!(alice_balance, "1000");
 
-    let total_supply: String = std::str::from_utf8(
-        &rt.block_on(worker.view(
-            &token_account_id.parse().unwrap(),
-            "ft_total_supply",
-            json!({}).to_string().into_bytes(),
-        )).unwrap().result,
-    ).unwrap().to_string();
-    assert_eq!(total_supply, "\"1000\"");
+    let total_supply: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_total_supply",
+        json!({}),
+    );
+    assert_eq!(total_supply, "1000");
 
-    assert!(&rt.block_on(
-        user.call(&worker, &token_account_id.parse().unwrap(), "withdraw")
-            .max_gas()
-            .deposit(1)
-            .args(
-                json!({
+    assert!(&rt
+        .block_on(
+            user.call(&worker, &token_account_id.parse().unwrap(), "withdraw")
+                .max_gas()
+                .deposit(1)
+                .args(
+                    json!({
                         "amount" : "100",
                         "recipient" : SENDER_ADDRESS.to_string()
                     })
                     .to_string()
                     .into_bytes(),
-            )
-            .transact(),
-    ).unwrap().is_success());
-
-    let alice_balance: String = std::str::from_utf8(
-        &rt.block_on(
-            worker.view(
-                &token_account_id.parse().unwrap(),
-                "ft_balance_of",
-                json!({"account_id": user.id().to_string()})
-                    .to_string()
-                    .into_bytes(),
-            ),
+                )
+                .transact(),
         )
-            .unwrap()
-            .result,
-    ).unwrap().to_string();
-    assert_eq!(alice_balance, "\"900\"");
+        .unwrap()
+        .is_success());
 
-    let total_supply: String = std::str::from_utf8(
-        &rt.block_on(worker.view(
-            &token_account_id.parse().unwrap(),
-            "ft_total_supply",
-            json!({}).to_string().into_bytes(),
-        )).unwrap().result,
-    ).unwrap().to_string();
-    assert_eq!(total_supply, "\"900\"");
+    let alice_balance: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({"account_id": user.id().to_string()}),
+    );
+    assert_eq!(alice_balance, "900");
+
+    let total_supply: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_total_supply",
+        json!({}),
+    );
+    assert_eq!(total_supply, "900");
 }
 
 #[test]
@@ -266,7 +260,7 @@ fn test_with_invalid_proof() {
     assert!(&rt
         .block_on(
             user.call(&worker, factory.id(), "deploy_bridge_token")
-                .deposit(35*ONE_NEAR)
+                .deposit(35 * ONE_NEAR)
                 .args(
                     json!({"address": DAI_ADDRESS.to_string()})
                         .to_string()
@@ -278,7 +272,13 @@ fn test_with_invalid_proof() {
         .unwrap()
         .is_success());
 
-    let token_account_id: String = get_bridge_token_account_id(DAI_ADDRESS, &rt, &factory, &worker);
+    let token_account_id: String = run_view_function(
+        &rt,
+        &factory.id().to_string(),
+        &worker,
+        "get_bridge_token_account_id",
+        json!({"address": DAI_ADDRESS.to_string()}),
+    );
 
     assert_eq!(
         token_account_id,
@@ -318,7 +318,7 @@ fn test_with_invalid_proof() {
     assert!(&rt
         .block_on(
             user.call(&worker, factory.id(), "deposit")
-                .deposit(50*ONE_NEAR)
+                .deposit(50 * ONE_NEAR)
                 .max_gas()
                 .args(proof.try_to_vec().unwrap())
                 .transact()
@@ -347,7 +347,7 @@ fn test_bridge_token_failures() {
     assert!(&rt
         .block_on(
             user.call(&worker, factory.id(), "deploy_bridge_token")
-                .deposit(35*ONE_NEAR)
+                .deposit(35 * ONE_NEAR)
                 .args(
                     json!({"address": DAI_ADDRESS.to_string()})
                         .to_string()
@@ -428,7 +428,7 @@ fn test_bridge_token_failures() {
     let other_user = rt
         .block_on(
             user.create_subaccount(&worker, "bob")
-                .initial_balance(50*ONE_NEAR)
+                .initial_balance(50 * ONE_NEAR)
                 .transact(),
         )
         .unwrap()
@@ -489,7 +489,7 @@ fn test_deploy_failures() {
     assert!(&rt
         .block_on(
             user.call(&worker, factory.id(), "deploy_bridge_token")
-                .deposit(35*ONE_NEAR)
+                .deposit(35 * ONE_NEAR)
                 .args(
                     json!({"address": DAI_ADDRESS.to_string()})
                         .to_string()
@@ -504,7 +504,7 @@ fn test_deploy_failures() {
     assert_error(
         &rt.block_on(
             user.call(&worker, factory.id(), "deploy_bridge_token")
-                .deposit(35*ONE_NEAR)
+                .deposit(35 * ONE_NEAR)
                 .args(json!({ "address": DAI_ADDRESS }).to_string().into_bytes())
                 .max_gas()
                 .transact(),
