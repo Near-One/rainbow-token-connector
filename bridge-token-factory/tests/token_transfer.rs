@@ -97,6 +97,25 @@ fn assert_error(result: &Result<CallExecutionDetails, anyhow::Error>, expected: 
     assert!(status.contains(expected), "{}", status);
 }
 
+fn get_bridge_token_account_id(address: &str, rt: &Runtime, factory: &Contract, worker: &Worker<Sandbox>) -> String {
+    let mut token_account_id = std::str::from_utf8(
+        &rt.block_on(
+            factory.view(
+                &worker,
+                "get_bridge_token_account_id",
+                json!({"address": address.to_string()})
+                    .to_string()
+                    .into_bytes(),
+            ),
+        ).unwrap()
+            .result,
+    ).unwrap().to_string();
+    token_account_id.pop();
+    token_account_id.remove(0);
+
+    token_account_id
+}
+
 #[test]
 fn test_eth_token_transfer() {
     let (user, factory, worker) = create_contract();
@@ -117,28 +136,12 @@ fn test_eth_token_transfer() {
         .unwrap()
         .is_success());
 
-    let mut token_account_id: String = std::str::from_utf8(
-        &rt.block_on(
-            factory.view(
-                &worker,
-                "get_bridge_token_account_id",
-                json!({"address": DAI_ADDRESS.to_string()})
-                    .to_string()
-                    .into_bytes(),
-            ),
-        )
-        .unwrap()
-        .result,
-    )
-    .unwrap()
-    .to_string();
+    let token_account_id: String = get_bridge_token_account_id(DAI_ADDRESS, &rt, &factory, &worker);
+
     assert_eq!(
         token_account_id,
-        format!("\"{}.{}\"", DAI_ADDRESS, factory.id())
+        format!("{}.{}", DAI_ADDRESS, factory.id())
     );
-    token_account_id = token_account_id[1..token_account_id.len() - 1]
-        .parse()
-        .unwrap();
 
     let alice_balance: String = std::str::from_utf8(
         &rt.block_on(
@@ -275,25 +278,11 @@ fn test_with_invalid_proof() {
         .unwrap()
         .is_success());
 
-    let token_account_id: String = std::str::from_utf8(
-        &rt.block_on(
-            factory.view(
-                &worker,
-                "get_bridge_token_account_id",
-                json!({"address": DAI_ADDRESS.to_string()})
-                    .to_string()
-                    .into_bytes(),
-            ),
-        )
-        .unwrap()
-        .result,
-    )
-    .unwrap()
-    .to_string();
+    let token_account_id: String = get_bridge_token_account_id(DAI_ADDRESS, &rt, &factory, &worker);
 
     assert_eq!(
         token_account_id,
-        format!("\"{}.{}\"", DAI_ADDRESS, factory.id())
+        format!("{}.{}", DAI_ADDRESS, factory.id())
     );
 
     let mut proof = Proof::default();
