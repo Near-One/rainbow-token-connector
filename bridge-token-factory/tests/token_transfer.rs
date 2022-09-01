@@ -11,7 +11,7 @@ const FACTORY: &str = "bridge";
 const LOCKER_ADDRESS: &str = "11111474e89094c44da98b954eedeac495271d0f";
 const DAI_ADDRESS: &str = "6b175474e89094c44da98b954eedeac495271d0f";
 const SENDER_ADDRESS: &str = "00005474e89094c44da98b954eedeac495271d0f";
-const ALICE: &str = "alice";
+const ALICE: &str = "alice.test.near";
 
 const FACTORY_WASM_PATH: &str = "../res/bridge_token_factory.wasm";
 const MOCK_PROVER_WASM_PATH: &str = "../res/mock_prover.wasm";
@@ -126,12 +126,12 @@ fn run_view_function(
 
 #[test]
 fn test_eth_token_transfer() {
-    let (user, factory, worker) = create_contract();
+    let (alice, factory, worker) = create_contract();
     let rt = Runtime::new().unwrap();
 
     assert!(&rt
         .block_on(
-            user.call(&worker, factory.id(), "deploy_bridge_token")
+            alice.call(&worker, factory.id(), "deploy_bridge_token")
                 .deposit(35 * ONE_NEAR)
                 .args(
                     json!({"address": DAI_ADDRESS.to_string()})
@@ -162,7 +162,7 @@ fn test_eth_token_transfer() {
         &token_account_id,
         &worker,
         "ft_balance_of",
-        json!({"account_id": user.id().to_string()}),
+        json!({"account_id": ALICE}),
     );
 
     assert_eq!(alice_balance, "0");
@@ -182,13 +182,13 @@ fn test_eth_token_transfer() {
         token: DAI_ADDRESS.to_string(),
         sender: SENDER_ADDRESS.to_string(),
         amount: 1_000,
-        recipient: user.id().to_string().parse().unwrap(),
+        recipient: ALICE.parse().unwrap(),
     }
     .to_log_entry_data();
 
     assert!(&rt
         .block_on(
-            user.call(&worker, factory.id(), "deposit")
+            alice.call(&worker, factory.id(), "deposit")
                 .deposit(ONE_NEAR)
                 .max_gas()
                 .args(proof.try_to_vec().unwrap())
@@ -202,7 +202,7 @@ fn test_eth_token_transfer() {
         &token_account_id,
         &worker,
         "ft_balance_of",
-        json!({"account_id": user.id().to_string()}),
+        json!({"account_id": ALICE}),
     );
     assert_eq!(alice_balance, "1000");
 
@@ -217,7 +217,7 @@ fn test_eth_token_transfer() {
 
     assert!(&rt
         .block_on(
-            user.call(&worker, &token_account_id.parse().unwrap(), "withdraw")
+            alice.call(&worker, &token_account_id.parse().unwrap(), "withdraw")
                 .max_gas()
                 .deposit(ONE_YOCTO)
                 .args(
@@ -238,7 +238,7 @@ fn test_eth_token_transfer() {
         &token_account_id,
         &worker,
         "ft_balance_of",
-        json!({"account_id": user.id().to_string()}),
+        json!({"account_id": ALICE}),
     );
     assert_eq!(alice_balance, "900");
 
