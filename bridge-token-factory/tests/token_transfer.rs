@@ -1,6 +1,6 @@
 use bridge_token_factory::{validate_eth_address, EthLockedEvent, Proof};
 use near_sdk::borsh::{self, BorshSerialize};
-use near_sdk::{AccountId, ONE_NEAR, ONE_YOCTO};
+use near_sdk::{AccountId, Balance, ONE_NEAR, ONE_YOCTO};
 use serde_json::json;
 use tokio::runtime::Runtime;
 use workspaces::prelude::*;
@@ -128,6 +128,8 @@ fn run_view_function(
 fn test_eth_token_transfer() {
     let (alice, factory, worker) = create_contract();
     let rt = Runtime::new().unwrap();
+    const INIT_ALICE_BALANCE: u64 = 1000;
+    const WITHDRAW_AMOUNT: u64 = 100;
 
     assert!(&rt
         .block_on(
@@ -181,7 +183,7 @@ fn test_eth_token_transfer() {
         locker_address: validate_eth_address(LOCKER_ADDRESS.to_string()),
         token: DAI_ADDRESS.to_string(),
         sender: SENDER_ADDRESS.to_string(),
-        amount: 1_000,
+        amount: Balance::from(INIT_ALICE_BALANCE),
         recipient: ALICE.parse().unwrap(),
     }
     .to_log_entry_data();
@@ -204,7 +206,7 @@ fn test_eth_token_transfer() {
         "ft_balance_of",
         json!({"account_id": ALICE}),
     );
-    assert_eq!(alice_balance, "1000");
+    assert_eq!(alice_balance, format!("{}", INIT_ALICE_BALANCE));
 
     let total_supply: String = run_view_function(
         &rt,
@@ -213,7 +215,7 @@ fn test_eth_token_transfer() {
         "ft_total_supply",
         json!({}),
     );
-    assert_eq!(total_supply, "1000");
+    assert_eq!(total_supply, format!("{}", INIT_ALICE_BALANCE));
 
     assert!(&rt
         .block_on(
@@ -222,7 +224,7 @@ fn test_eth_token_transfer() {
                 .deposit(ONE_YOCTO)
                 .args(
                     json!({
-                        "amount" : "100",
+                        "amount" : format!("{}", WITHDRAW_AMOUNT),
                         "recipient" : SENDER_ADDRESS.to_string()
                     })
                     .to_string()
@@ -240,7 +242,7 @@ fn test_eth_token_transfer() {
         "ft_balance_of",
         json!({"account_id": ALICE}),
     );
-    assert_eq!(alice_balance, "900");
+    assert_eq!(alice_balance, format!("{}", INIT_ALICE_BALANCE - WITHDRAW_AMOUNT));
 
     let total_supply: String = run_view_function(
         &rt,
@@ -249,7 +251,7 @@ fn test_eth_token_transfer() {
         "ft_total_supply",
         json!({}),
     );
-    assert_eq!(total_supply, "900");
+    assert_eq!(total_supply, format!("{}", INIT_ALICE_BALANCE - WITHDRAW_AMOUNT));
 }
 
 #[test]
