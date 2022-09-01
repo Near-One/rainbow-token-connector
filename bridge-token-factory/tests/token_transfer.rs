@@ -1,6 +1,6 @@
 use bridge_token_factory::{validate_eth_address, EthLockedEvent, Proof};
 use near_sdk::borsh::{self, BorshSerialize};
-use near_sdk::{AccountId, ONE_NEAR};
+use near_sdk::{AccountId, ONE_NEAR, ONE_YOCTO};
 use serde_json::json;
 use tokio::runtime::Runtime;
 use workspaces::prelude::*;
@@ -219,7 +219,7 @@ fn test_eth_token_transfer() {
         .block_on(
             user.call(&worker, &token_account_id.parse().unwrap(), "withdraw")
                 .max_gas()
-                .deposit(1)
+                .deposit(ONE_YOCTO)
                 .args(
                     json!({
                         "amount" : "100",
@@ -366,7 +366,7 @@ fn test_bridge_token_failures() {
         &rt.block_on(
             user.call(&worker, &token_account_id.parse().unwrap(), "withdraw")
                 .max_gas()
-                .deposit(1)
+                .deposit(ONE_YOCTO)
                 .args(
                     json!({
                         "amount" : "100",
@@ -419,7 +419,7 @@ fn test_bridge_token_failures() {
                     .to_string()
                     .into_bytes(),
                 )
-                .deposit(1)
+                .deposit(ONE_YOCTO)
                 .transact(),
         ),
         "The account doesn't have enough balance",
@@ -449,7 +449,7 @@ fn test_bridge_token_failures() {
                     .to_string()
                     .into_bytes(),
                 )
-                .deposit(1)
+                .deposit(ONE_YOCTO)
                 .transact(),
         ),
         "Only controller can call mint",
