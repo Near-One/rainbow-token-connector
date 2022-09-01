@@ -189,7 +189,7 @@ fn test_eth_token_transfer() {
     assert!(&rt
         .block_on(
             user.call(&worker, factory.id(), "deposit")
-                .deposit(50 * ONE_NEAR)
+                .deposit(ONE_NEAR)
                 .max_gas()
                 .args(proof.try_to_vec().unwrap())
                 .transact()
@@ -318,8 +318,8 @@ fn test_with_invalid_proof() {
     assert!(&rt
         .block_on(
             user.call(&worker, factory.id(), "deposit")
-                .deposit(50 * ONE_NEAR)
                 .max_gas()
+                .deposit(ONE_NEAR)
                 .args(proof.try_to_vec().unwrap())
                 .transact()
         )
