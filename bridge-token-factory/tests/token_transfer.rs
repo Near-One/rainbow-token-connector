@@ -1,7 +1,6 @@
 use bridge_token_factory::{validate_eth_address, EthLockedEvent, Proof};
 use near_sdk::borsh::{self, BorshSerialize};
-use near_sdk::AccountId;
-use near_units::*;
+use near_sdk::{AccountId, ONE_NEAR};
 use serde_json::json;
 use tokio::runtime::Runtime;
 use workspaces::prelude::*;
@@ -30,7 +29,7 @@ fn create_contract() -> (Account, Contract, Worker<Sandbox>) {
         .block_on(
             owner
                 .create_subaccount(&worker, FACTORY)
-                .initial_balance(parse_near!("200 N"))
+                .initial_balance(200*ONE_NEAR)
                 .transact(),
         )
         .unwrap()
@@ -47,7 +46,7 @@ fn create_contract() -> (Account, Contract, Worker<Sandbox>) {
         .block_on(
             owner
                 .create_subaccount(&worker, "alice")
-                .initial_balance(parse_near!("200 N"))
+                .initial_balance(200*ONE_NEAR)
                 .transact(),
         )
         .unwrap()
@@ -106,7 +105,7 @@ fn test_eth_token_transfer() {
     assert!(&rt
         .block_on(
             user.call(&worker, factory.id(), "deploy_bridge_token")
-                .deposit(parse_near!("35 N"))
+                .deposit(35*ONE_NEAR)
                 .args(
                     json!({"address": DAI_ADDRESS.to_string()})
                         .to_string()
@@ -184,7 +183,7 @@ fn test_eth_token_transfer() {
     assert!(&rt
         .block_on(
             user.call(&worker, factory.id(), "deposit")
-                .deposit(parse_near!("50 N"))
+                .deposit(50*ONE_NEAR)
                 .max_gas()
                 .args(proof.try_to_vec().unwrap())
                 .transact()
@@ -264,7 +263,7 @@ fn test_with_invalid_proof() {
     assert!(&rt
         .block_on(
             user.call(&worker, factory.id(), "deploy_bridge_token")
-                .deposit(parse_near!("35 N"))
+                .deposit(35*ONE_NEAR)
                 .args(
                     json!({"address": DAI_ADDRESS.to_string()})
                         .to_string()
@@ -330,7 +329,7 @@ fn test_with_invalid_proof() {
     assert!(&rt
         .block_on(
             user.call(&worker, factory.id(), "deposit")
-                .deposit(parse_near!("50 N"))
+                .deposit(50*ONE_NEAR)
                 .max_gas()
                 .args(proof.try_to_vec().unwrap())
                 .transact()
@@ -359,7 +358,7 @@ fn test_bridge_token_failures() {
     assert!(&rt
         .block_on(
             user.call(&worker, factory.id(), "deploy_bridge_token")
-                .deposit(parse_near!("35 N"))
+                .deposit(35*ONE_NEAR)
                 .args(
                     json!({"address": DAI_ADDRESS.to_string()})
                         .to_string()
@@ -412,7 +411,7 @@ fn test_bridge_token_failures() {
                 .to_string()
                 .into_bytes()
             )
-            .deposit(parse_near!("1 N"))
+            .deposit(ONE_NEAR)
             .transact()
         )
         .unwrap()
@@ -440,7 +439,7 @@ fn test_bridge_token_failures() {
     let other_user = rt
         .block_on(
             user.create_subaccount(&worker, "bob")
-                .initial_balance(parse_near!("50 N"))
+                .initial_balance(50*ONE_NEAR)
                 .transact(),
         )
         .unwrap()
@@ -501,7 +500,7 @@ fn test_deploy_failures() {
     assert!(&rt
         .block_on(
             user.call(&worker, factory.id(), "deploy_bridge_token")
-                .deposit(parse_near!("35 N"))
+                .deposit(35*ONE_NEAR)
                 .args(
                     json!({"address": DAI_ADDRESS.to_string()})
                         .to_string()
@@ -516,7 +515,7 @@ fn test_deploy_failures() {
     err_is(
         &rt.block_on(
             user.call(&worker, factory.id(), "deploy_bridge_token")
-                .deposit(parse_near!("35 N"))
+                .deposit(35*ONE_NEAR)
                 .args(json!({ "address": DAI_ADDRESS }).to_string().into_bytes())
                 .max_gas()
                 .transact(),
