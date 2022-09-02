@@ -34,41 +34,39 @@ fn real_data_locked_event_serialization() {
     }
 }
 
-fn rand_string(rng: &mut ThreadRng) -> String {
+fn generate_random_near_account_id(rng: &mut ThreadRng) -> String {
+    const CHARSET_WITHOUT_SEPARATORS: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789";
     const CHARSET: &[u8] = b"abcdefghijklmnopqrstuvwxyz0123456789._-";
     let string_len = rng.gen_range(2, 64);
+    let mut gen_rand_char = |use_separators: bool| -> char {
+        let charset = if use_separators {
+            CHARSET
+        } else {
+            CHARSET_WITHOUT_SEPARATORS
+        };
+        let idx = rng.gen_range(0, charset.len());
+        charset[idx] as char
+    };
+    let is_separator_char = |c: char| -> bool { matches!(c, '-' | '_' | '.') };
+    let mut is_last_char_separator = true;
+    let mut rand_str: String = (0..string_len)
+        .map(|_| {
+            let rand_char = gen_rand_char(!is_last_char_separator);
+            is_last_char_separator = is_separator_char(rand_char);
+            rand_char
+        })
+        .collect();
 
-    'main: loop {
-        let rand_str: String = (0..string_len)
-            .map(|_| {
-                let idx = rng.gen_range(0, CHARSET.len());
-                CHARSET[idx] as char
-            })
-            .collect();
-
-        let mut last_char_is_separator = true;
-
-        for c in rand_str.chars() {
-            let current_char_is_separator = match c {
-                '-' | '_' | '.' => true,
-                _ => false,
-            };
-
-            if current_char_is_separator && last_char_is_separator {
-                continue 'main;
-            }
-
-            last_char_is_separator = current_char_is_separator;
-        }
-
-        if !last_char_is_separator {
-            return rand_str;
-        }
+    // Make last element non-separator
+    if is_last_char_separator {
+        rand_str.pop();
+        rand_str.push(gen_rand_char(false));
     }
+    rand_str
 }
 
 fn generate_random_eth_locked_event(rng: &mut ThreadRng) -> EthLockedEvent {
-    let rand_str = rand_string(rng);
+    let rand_str = generate_random_near_account_id(rng);
 
     EthLockedEvent {
         locker_address: rng.gen::<[u8; 20]>(),
