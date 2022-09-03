@@ -3,8 +3,7 @@ use near_sdk::borsh::{self, BorshSerialize};
 use near_sdk::{AccountId, Balance, ONE_NEAR, ONE_YOCTO};
 use serde_json::json;
 use tokio::runtime::Runtime;
-use workspaces::prelude::*;
-use workspaces::result::CallExecutionDetails;
+use workspaces::result::ExecutionFinalResult;
 use workspaces::{network::Sandbox, Account, Contract, Worker};
 
 const FACTORY: &str = "bridge";
@@ -30,7 +29,7 @@ fn create_contract() -> (Account, Contract, Worker<Sandbox>) {
     let factory_account = rt
         .block_on(
             owner
-                .create_subaccount(&worker, FACTORY)
+                .create_subaccount(FACTORY)
                 .initial_balance(200 * ONE_NEAR)
                 .transact(),
         )
@@ -40,14 +39,14 @@ fn create_contract() -> (Account, Contract, Worker<Sandbox>) {
 
     let factory_wasm = std::fs::read(FACTORY_WASM_PATH).unwrap();
     let factory_contract: Contract = rt
-        .block_on(factory_account.deploy(&worker, &factory_wasm))
+        .block_on(factory_account.deploy(&factory_wasm))
         .unwrap()
         .result;
 
     let alice = rt
         .block_on(
             owner
-                .create_subaccount(&worker, "alice")
+                .create_subaccount("alice")
                 .initial_balance(200 * ONE_NEAR)
                 .transact(),
         )
@@ -55,9 +54,9 @@ fn create_contract() -> (Account, Contract, Worker<Sandbox>) {
         .into_result()
         .unwrap();
 
-    rt.block_on(
+    let _result = rt.block_on(
         alice
-            .call(&worker, factory_contract.id(), "new")
+            .call(factory_contract.id(), "new")
             .args(
                 json!({"prover_account": prover_id, "locker_address": LOCKER_ADDRESS.to_string()})
                     .to_string()
@@ -85,11 +84,11 @@ impl From<Proof> for AugmentedProof {
     }
 }
 
-fn assert_error(result: &Result<CallExecutionDetails, anyhow::Error>, expected: &str) {
+fn assert_error(result: &Result<ExecutionFinalResult, workspaces::error::Error>, expected: &str) {
     let status = match result {
         Ok(result) => {
-            assert!(!result.is_success(), "Expected error found {:?}", result);
-            format!("{:?}", result.outcome())
+            assert!(result.is_failure(), "Expected error found {:?}", result);
+            format!("{:?}", result.clone().into_result().err())
         }
         Err(err) => {
             format!("{:?}", err)
@@ -135,7 +134,8 @@ fn test_eth_token_transfer() {
 
     assert!(&rt
         .block_on(
-            alice.call(&worker, factory.id(), "deploy_bridge_token")
+            alice
+                .call(factory.id(), "deploy_bridge_token")
                 .deposit(35 * ONE_NEAR)
                 .args(
                     json!({"address": DAI_ADDRESS.to_string()})
@@ -166,7 +166,7 @@ fn test_eth_token_transfer() {
         &token_account_id,
         &worker,
         "ft_balance_of",
-        json!({"account_id": ALICE}),
+        json!({ "account_id": ALICE }),
     );
 
     assert_eq!(alice_balance, "0");
@@ -192,7 +192,8 @@ fn test_eth_token_transfer() {
 
     assert!(&rt
         .block_on(
-            alice.call(&worker, factory.id(), "deposit")
+            alice
+                .call(factory.id(), "deposit")
                 .deposit(DEFAULT_DEPOSIT)
                 .max_gas()
                 .args(proof.try_to_vec().unwrap())
@@ -206,7 +207,7 @@ fn test_eth_token_transfer() {
         &token_account_id,
         &worker,
         "ft_balance_of",
-        json!({"account_id": ALICE}),
+        json!({ "account_id": ALICE }),
     );
     assert_eq!(alice_balance, format!("{}", INIT_ALICE_BALANCE));
 
@@ -221,7 +222,8 @@ fn test_eth_token_transfer() {
 
     assert!(&rt
         .block_on(
-            alice.call(&worker, &token_account_id.parse().unwrap(), "withdraw")
+            alice
+                .call(&token_account_id.parse().unwrap(), "withdraw")
                 .max_gas()
                 .deposit(ONE_YOCTO)
                 .args(
@@ -242,9 +244,12 @@ fn test_eth_token_transfer() {
         &token_account_id,
         &worker,
         "ft_balance_of",
-        json!({"account_id": ALICE}),
+        json!({ "account_id": ALICE }),
     );
-    assert_eq!(alice_balance, format!("{}", INIT_ALICE_BALANCE - WITHDRAW_AMOUNT));
+    assert_eq!(
+        alice_balance,
+        format!("{}", INIT_ALICE_BALANCE - WITHDRAW_AMOUNT)
+    );
 
     let total_supply: String = run_view_function(
         &rt,
@@ -253,7 +258,10 @@ fn test_eth_token_transfer() {
         "ft_total_supply",
         json!({}),
     );
-    assert_eq!(total_supply, format!("{}", INIT_ALICE_BALANCE - WITHDRAW_AMOUNT));
+    assert_eq!(
+        total_supply,
+        format!("{}", INIT_ALICE_BALANCE - WITHDRAW_AMOUNT)
+    );
 }
 
 #[test]
@@ -263,7 +271,7 @@ fn test_with_invalid_proof() {
 
     assert!(&rt
         .block_on(
-            user.call(&worker, factory.id(), "deploy_bridge_token")
+            user.call(factory.id(), "deploy_bridge_token")
                 .deposit(35 * ONE_NEAR)
                 .args(
                     json!({"address": DAI_ADDRESS.to_string()})
@@ -306,7 +314,7 @@ fn test_with_invalid_proof() {
 
     assert_error(
         &rt.block_on(
-            user.call(&worker, factory.id(), "deposit")
+            user.call(factory.id(), "deposit")
                 .max_gas()
                 .args(proof.try_to_vec().unwrap())
                 .transact(),
@@ -321,7 +329,7 @@ fn test_with_invalid_proof() {
     // was made, but it failed because it had an invalid proof, so this one should succeed.
     assert!(&rt
         .block_on(
-            user.call(&worker, factory.id(), "deposit")
+            user.call(factory.id(), "deposit")
                 .max_gas()
                 .deposit(DEFAULT_DEPOSIT)
                 .args(proof.try_to_vec().unwrap())
@@ -334,7 +342,7 @@ fn test_with_invalid_proof() {
     // Previous call to deposit with the same event was successful.
     assert_error(
         &rt.block_on(
-            user.call(&worker, factory.id(), "deposit")
+            user.call(factory.id(), "deposit")
                 .max_gas()
                 .args(proof.try_to_vec().unwrap())
                 .transact(),
@@ -345,12 +353,12 @@ fn test_with_invalid_proof() {
 
 #[test]
 fn test_bridge_token_failures() {
-    let (user, factory, worker) = create_contract();
+    let (user, factory, _worker) = create_contract();
     let rt = Runtime::new().unwrap();
 
     assert!(&rt
         .block_on(
-            user.call(&worker, factory.id(), "deploy_bridge_token")
+            user.call(factory.id(), "deploy_bridge_token")
                 .deposit(35 * ONE_NEAR)
                 .args(
                     json!({"address": DAI_ADDRESS.to_string()})
@@ -368,7 +376,7 @@ fn test_bridge_token_failures() {
     // Fail to withdraw because the account is not registered (and have no coins)
     assert_error(
         &rt.block_on(
-            user.call(&worker, &token_account_id.parse().unwrap(), "withdraw")
+            user.call(&token_account_id.parse().unwrap(), "withdraw")
                 .max_gas()
                 .deposit(ONE_YOCTO)
                 .args(
@@ -390,22 +398,18 @@ fn test_bridge_token_failures() {
 
     assert!(&rt
         .block_on(
-            user.call(
-                &worker,
-                &token_account_id.parse().unwrap(),
-                "storage_deposit"
-            )
-            .max_gas()
-            .args(
-                json!({
-                    "account_id": account_id,
-                    "registration_only": registration_only
-                })
-                .to_string()
-                .into_bytes()
-            )
-            .deposit(DEFAULT_DEPOSIT)
-            .transact()
+            user.call(&token_account_id.parse().unwrap(), "storage_deposit")
+                .max_gas()
+                .args(
+                    json!({
+                        "account_id": account_id,
+                        "registration_only": registration_only
+                    })
+                    .to_string()
+                    .into_bytes()
+                )
+                .deposit(DEFAULT_DEPOSIT)
+                .transact()
         )
         .unwrap()
         .is_success());
@@ -413,7 +417,7 @@ fn test_bridge_token_failures() {
     // Fail to withdraw because the account has no enough balance
     assert_error(
         &rt.block_on(
-            user.call(&worker, &token_account_id.parse().unwrap(), "withdraw")
+            user.call(&token_account_id.parse().unwrap(), "withdraw")
                 .max_gas()
                 .args(
                     json!({
@@ -431,7 +435,7 @@ fn test_bridge_token_failures() {
 
     let other_user = rt
         .block_on(
-            user.create_subaccount(&worker, "bob")
+            user.create_subaccount("bob")
                 .initial_balance(50 * ONE_NEAR)
                 .transact(),
         )
@@ -443,7 +447,7 @@ fn test_bridge_token_failures() {
     assert_error(
         &rt.block_on(
             other_user
-                .call(&worker, &token_account_id.parse().unwrap(), "mint")
+                .call(&token_account_id.parse().unwrap(), "mint")
                 .max_gas()
                 .args(
                     json!({
@@ -462,13 +466,13 @@ fn test_bridge_token_failures() {
 
 #[test]
 fn test_deploy_failures() {
-    let (user, factory, worker) = create_contract();
+    let (user, factory, _worker) = create_contract();
     let rt = Runtime::new().unwrap();
 
     // Fails with not enough deposit.
     assert_error(
         &rt.block_on(
-            user.call(&worker, factory.id(), "deploy_bridge_token")
+            user.call(factory.id(), "deploy_bridge_token")
                 .deposit(0)
                 .args(json!({ "address": DAI_ADDRESS }).to_string().into_bytes())
                 .max_gas()
@@ -480,7 +484,7 @@ fn test_deploy_failures() {
     // Fails with address is invalid.
     assert_error(
         &rt.block_on(
-            user.call(&worker, factory.id(), "deploy_bridge_token")
+            user.call(factory.id(), "deploy_bridge_token")
                 .deposit(0)
                 .args(json!({"address": "not_a_hex"}).to_string().into_bytes())
                 .max_gas()
@@ -492,7 +496,7 @@ fn test_deploy_failures() {
     // Fails second time because already exists.
     assert!(&rt
         .block_on(
-            user.call(&worker, factory.id(), "deploy_bridge_token")
+            user.call(factory.id(), "deploy_bridge_token")
                 .deposit(35 * ONE_NEAR)
                 .args(
                     json!({"address": DAI_ADDRESS.to_string()})
@@ -507,7 +511,7 @@ fn test_deploy_failures() {
 
     assert_error(
         &rt.block_on(
-            user.call(&worker, factory.id(), "deploy_bridge_token")
+            user.call(factory.id(), "deploy_bridge_token")
                 .deposit(35 * ONE_NEAR)
                 .args(json!({ "address": DAI_ADDRESS }).to_string().into_bytes())
                 .max_gas()
