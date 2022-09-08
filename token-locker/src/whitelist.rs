@@ -64,4 +64,9 @@ impl Contract {
             WhitelistMode::Blocked => env::panic_str("The token is blocked"),
         }
     }
+
+    #[private]
+    pub fn set_whitelist_mode_enabled(&mut self, enabled: bool) {
+        self.is_whitelist_mode_enabled = enabled;
+    }
 }
