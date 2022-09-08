@@ -81,7 +81,7 @@ pub trait ExtContract {
         #[serializer(borsh)]
         verification_success: bool,
         #[serializer(borsh)] token: String,
-        #[serializer(borsh)] new_owner_id: AccountId,
+        #[serializer(borsh)] new_owner_id: String,
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] proof: Proof,
     ) -> Promise;
@@ -213,7 +213,7 @@ impl Contract {
         #[serializer(borsh)]
         verification_success: bool,
         #[serializer(borsh)] token: String,
-        #[serializer(borsh)] new_owner_id: AccountId,
+        #[serializer(borsh)] new_owner_id: String,
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] proof: Proof,
     ) -> Promise {
@@ -222,7 +222,7 @@ impl Contract {
 
         assert!(env::attached_deposit() >= required_deposit);
 
-        let Recipient { target, message } = parse_recipient(new_owner_id.into());
+        let Recipient { target, message } = parse_recipient(new_owner_id);
 
         env::log_str(
             format!(

@@ -85,7 +85,7 @@ pub trait ExtBridgeTokenFactory {
         #[serializer(borsh)]
         verification_success: bool,
         #[serializer(borsh)] token: String,
-        #[serializer(borsh)] new_owner_id: AccountId,
+        #[serializer(borsh)] new_owner_id: String,
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] proof: Proof,
     ) -> Promise;
