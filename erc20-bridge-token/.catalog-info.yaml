@@ -1,0 +1,23 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: erc20-bridge-token
+  title: ERC20 Bridge Token Factory
+  description: |-
+    Generic ERC20 Bridge Token Factory
+  tags:
+    - contract
+    - ethereum
+  links: []
+  annotations:
+    aurora.dev/security-tier: "1"
+spec:
+  owner: bridge-team
+  type: contract
+  lifecycle: production
+  system: bridge-connectors
+  deployedAt:
+    - contract:ethereum/mainnet/0xE904b6C176Bbd5f3c16cB32D672307002AC75Ccb
+  interactsWith: []
+  subcomponentOf: rainbow-token-connector
