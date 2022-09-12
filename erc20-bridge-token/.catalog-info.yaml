@@ -3,9 +3,9 @@ apiVersion: backstage.io/v1alpha1
 kind: Component
 metadata:
   name: erc20-bridge-token
-  title: ERC20 Bridge Token Factory
+  title: ERC20 Bridge Token Factory for NEP-141 connector
   description: |-
-    Generic ERC20 Bridge Token Factory
+    Generic ERC20 Bridge Token Factory for NEP-141 token connector
   tags:
     - contract
     - ethereum
