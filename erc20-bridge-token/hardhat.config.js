@@ -38,9 +38,10 @@ task('finish-deposit-ft', 'Deposit NEP-141 tokens on the Ethereum side')
     // await BridgeTokenFactory.deposit(proof.borshProof, proof.proofBlockHeight);
 
     const abi = [
-      "unlockToken(bytes, uint64)",
+      "function unlockToken(bytes, uint64)",
     ];
-    const lockerContract = new ethers.Contract(taskArgs.factory, abi);
+    const [signer] = await ethers.getSigners();
+    const lockerContract = new ethers.Contract(taskArgs.factory, abi, signer);
     await lockerContract.unlockToken(proof.borshProof, proof.proofBlockHeight);
   });
 
