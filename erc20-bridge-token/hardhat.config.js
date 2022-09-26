@@ -33,9 +33,15 @@ task('finish-deposit-ft', 'Deposit NEP-141 tokens on the Ethereum side')
       nearNetworkId: NEAR_NETWORK,
     });
 
-    const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
-    const BridgeTokenFactory = BridgeTokenFactoryContract.attach(taskArgs.factory);
-    await BridgeTokenFactory.deposit(proof.borshProof, proof.proofBlockHeight);
+    // const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
+    // const BridgeTokenFactory = BridgeTokenFactoryContract.attach(taskArgs.factory);
+    // await BridgeTokenFactory.deposit(proof.borshProof, proof.proofBlockHeight);
+
+    const abi = [
+      "unlockToken(bytes, uint64)",
+    ];
+    const lockerContract = new ethers.Contract(taskArgs.factory, abi);
+    await lockerContract.unlockToken(proof.borshProof, proof.proofBlockHeight);
   });
 
 task('set-metadata-ft', 'Set metadata for NEP-141 tokens on the Ethereum side')
