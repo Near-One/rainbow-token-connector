@@ -189,9 +189,14 @@ impl Contract {
             hex::encode(&self.eth_factory_address),
         );
 
+        let Recipient {
+            target: recipient_account_id,
+            message: _,
+        } = parse_recipient(event.recipient);
+
         ext_token::ext(event.token.clone().try_into().unwrap())
             .with_static_gas(STORAGE_BALANCE_CALL_GAS)
-            .storage_balance_of(Some(event.recipient.clone()))
+            .storage_balance_of(Some(recipient_account_id.clone()))
             .then(
                 ext_self::ext(env::current_account_id())
                     .with_static_gas(
@@ -200,7 +205,12 @@ impl Contract {
                             + FT_TRANSFER_CALL_GAS,
                     )
                     .with_attached_deposit(env::attached_deposit())
-                    .storage_balance_callback(proof, event.token, event.recipient, event.amount),
+                    .storage_balance_callback(
+                        proof,
+                        event.token,
+                        recipient_account_id,
+                        event.amount,
+                    ),
             )
     }
 
@@ -236,7 +246,7 @@ impl Contract {
                 ext_self::ext(env::current_account_id())
                     .with_attached_deposit(env::attached_deposit())
                     .with_static_gas(FINISH_WITHDRAW_GAS + FT_TRANSFER_CALL_GAS)
-                    .finish_withdraw(token, recipient, amount, proof_1),
+                    .finish_withdraw(token, recipient.to_string(), amount, proof_1),
             )
     }
 
