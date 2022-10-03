@@ -425,7 +425,7 @@ describe('BridgeToken', () => {
       amount: amountToTransfer,
       recipient: ethers.utils.arrayify(user.address),
     }).toString('base64');
-    lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'G'.repeat(44);
+    lockResultProof.outcome_proof.outcome.receipt_ids[0] = generateRandomBase58(64);
 
     await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckToken);
     expect(
@@ -437,6 +437,15 @@ describe('BridgeToken', () => {
 
     await expect(
       BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
+    )
+      .to
+      .be
+      .revertedWith('Pausable: paused');
+
+    lockResultProof.outcome_proof.outcome.receipt_ids[0] = generateRandomBase58(64);
+    BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight)
+    await expect(
+      BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight)
     )
       .to
       .be
