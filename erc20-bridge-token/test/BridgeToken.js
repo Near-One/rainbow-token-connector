@@ -338,6 +338,35 @@ describe('BridgeToken', () => {
       .revertedWith('Pausable: paused');
   })
 
+  it('cant withdraw token when selective token paused', async function () {
+    const { tokenProxyAddress } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
+    await setMetadata(nearTokenId, tokenProxyAddress);
+
+    const amountToTransfer = 100;
+    const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
+    lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
+      prefix: RESULT_PREFIX_LOCK,
+      token: nearTokenId,
+      amount: amountToTransfer,
+      recipient: ethers.utils.arrayify(user.address),
+    }).toString('base64');
+    lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'F'.repeat(44);
+
+    await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckToken);
+    expect(
+      await BridgeTokenFactory.getTokenWhitelistMode(nearTokenId)
+    ).to.be.equal(WhitelistMode.CheckToken);
+
+    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
+    await BridgeTokenFactory.pauseToken(nearTokenId);
+    await expect(
+      BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
+    )
+      .to
+      .be
+      .revertedWith('Pausable: paused');
+  })
+
   it('can deposit and withdraw after unpausing', async function () {
     const { tokenProxyAddress, token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await setMetadata(nearTokenId, tokenProxyAddress);
@@ -379,6 +408,41 @@ describe('BridgeToken', () => {
       .emit(BridgeTokenFactory, 'Paused')
       .withArgs(adminAccount.address, PauseMode.UnpausedAll);
 
+
+    await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
+    expect((await token.balanceOf(user.address)).toString()).to.be.equal('0')
+  })
+
+  it('can deposit and withdraw after selective token unpausing', async function () {
+    const { tokenProxyAddress, token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
+    await setMetadata(nearTokenId, tokenProxyAddress);
+
+    const amountToTransfer = 100;
+    const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
+    lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
+      prefix: RESULT_PREFIX_LOCK,
+      token: nearTokenId,
+      amount: amountToTransfer,
+      recipient: ethers.utils.arrayify(user.address),
+    }).toString('base64');
+    lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'G'.repeat(44);
+
+    await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckToken);
+    expect(
+      await BridgeTokenFactory.getTokenWhitelistMode(nearTokenId)
+    ).to.be.equal(WhitelistMode.CheckToken);
+
+    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
+    await BridgeTokenFactory.pauseToken(nearTokenId);
+
+    await expect(
+      BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
+    )
+      .to
+      .be
+      .revertedWith('Pausable: paused');
+
+    await BridgeTokenFactory.unpauseToken(nearTokenId);
 
     await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
     expect((await token.balanceOf(user.address)).toString()).to.be.equal('0')

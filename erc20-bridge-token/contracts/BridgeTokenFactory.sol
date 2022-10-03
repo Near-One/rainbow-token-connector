@@ -154,6 +154,14 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
         emit Withdraw(token, msg.sender, amount, recipient, tokenEthAddress);
     }
 
+    function pauseToken(string memory token) external onlyRole(ADMIN_PAUSE_ROLE) {
+        BridgeToken(_nearToEthToken[token]).pause();
+    }
+
+    function unpauseToken(string memory token) external onlyRole(ADMIN_PAUSE_ROLE) {
+        BridgeToken(_nearToEthToken[token]).unpause();
+    }
+
     function pause(uint flags) external onlyRole(ADMIN_PAUSE_ROLE) {
         _pause(flags);
     }
