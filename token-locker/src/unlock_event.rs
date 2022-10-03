@@ -1,7 +1,7 @@
 use bridge_common::prover::{EthAddress, EthEvent, EthEventParams};
 use ethabi::{ParamType, Token};
 use hex::ToHex;
-use near_sdk::{AccountId, Balance};
+use near_sdk::Balance;
 
 /// Data that was emitted by the Ethereum Unlocked event.
 #[derive(Debug, Eq, PartialEq)]
@@ -10,7 +10,7 @@ pub struct EthUnlockedEvent {
     pub token: String,
     pub sender: String,
     pub amount: Balance,
-    pub recipient: AccountId,
+    pub recipient: String,
     pub token_eth_address: EthAddress,
 }
 
@@ -45,7 +45,7 @@ impl EthUnlockedEvent {
             token,
             sender,
             amount,
-            recipient: recipient.parse().unwrap(),
+            recipient,
             token_eth_address,
         }
     }
