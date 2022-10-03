@@ -443,7 +443,7 @@ describe('BridgeToken', () => {
       .revertedWith('Pausable: paused');
 
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = generateRandomBase58(64);
-    BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight)
+
     await expect(
       BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight)
     )
