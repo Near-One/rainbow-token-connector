@@ -338,7 +338,7 @@ describe('BridgeToken', () => {
       .revertedWith('Pausable: paused');
   })
 
-  it('cant withdraw token when selective token paused', async function () {
+  it('can not withdraw tokens when the specific token contract is paused', async function () {
     const { tokenProxyAddress } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await setMetadata(nearTokenId, tokenProxyAddress);
 
@@ -413,7 +413,7 @@ describe('BridgeToken', () => {
     expect((await token.balanceOf(user.address)).toString()).to.be.equal('0')
   })
 
-  it('can deposit and withdraw after selective token unpausing', async function () {
+  it('can deposit and withdraw tokens after the specific token contract is unpaused', async function () {
     const { tokenProxyAddress, token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await setMetadata(nearTokenId, tokenProxyAddress);
 
