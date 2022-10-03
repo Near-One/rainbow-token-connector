@@ -9,3 +9,4 @@ spec:
     - ./bridge-token/.catalog-info.yaml
     - ./bridge-token-factory/.catalog-info.yaml
     - ./erc20-connector/.catalog-info.yaml
+    - ./erc20-bridge-token/.catalog-info.yaml

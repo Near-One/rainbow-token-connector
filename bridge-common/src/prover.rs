@@ -25,6 +25,9 @@ pub const FT_TRANSFER_CALL_GAS: Gas = Gas(Gas::ONE_TERA.0 * 80);
 /// Gas to call ft_transfer
 pub const FT_TRANSFER_GAS: Gas = Gas(Gas::ONE_TERA.0 * 20);
 
+/// Gas to call storage_balance
+pub const STORAGE_BALANCE_CALL_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
+
 pub fn validate_eth_address(address: String) -> EthAddress {
     let data = hex::decode(address).expect("address should be a valid hex string.");
     assert_eq!(data.len(), 20, "address should be 20 bytes long");

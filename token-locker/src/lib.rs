@@ -2,6 +2,7 @@ use std::convert::TryInto;
 
 use admin_controlled::{AdminControlled, Mask};
 use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
+use near_contract_standards::storage_management::StorageBalance;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::UnorderedSet;
 use near_sdk::json_types::U128;
@@ -12,7 +13,7 @@ use near_sdk::{
 
 use bridge_common::prover::{
     ext_prover, validate_eth_address, EthAddress, Proof, FT_TRANSFER_CALL_GAS, FT_TRANSFER_GAS,
-    NO_DEPOSIT, PAUSE_DEPOSIT, VERIFY_LOG_ENTRY_GAS,
+    NO_DEPOSIT, PAUSE_DEPOSIT, STORAGE_BALANCE_CALL_GAS, VERIFY_LOG_ENTRY_GAS,
 };
 use bridge_common::{parse_recipient, result_types, Recipient};
 use near_sdk_inner::collections::UnorderedMap;
@@ -37,6 +38,9 @@ const FT_GET_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 10);
 
 /// Gas for emitting metadata info.
 const FT_FINISH_LOG_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 30);
+
+/// Gas to call storage balance callback method.
+const FT_STORAGE_BALANCE_CALLBACK_GAS: Gas = Gas(Gas::ONE_TERA.0 * 10);
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {
@@ -92,6 +96,15 @@ pub trait ExtContract {
         #[callback] metadata: FungibleTokenMetadata,
         token_id: AccountId,
     ) -> result_types::Metadata;
+
+    fn storage_balance_callback(
+        &self,
+        #[callback] storage_balance: Option<StorageBalance>,
+        #[serializer(borsh)] proof: Proof,
+        #[serializer(borsh)] token: String,
+        #[serializer(borsh)] recipient: AccountId,
+        #[serializer(borsh)] amount: Balance,
+    );
 }
 
 #[ext_contract(ext_token)]
@@ -112,6 +125,8 @@ pub trait ExtToken {
     ) -> PromiseOrValue<U128>;
 
     fn ft_metadata(&self) -> FungibleTokenMetadata;
+
+    fn storage_balance_of(&mut self, account_id: Option<AccountId>) -> Option<StorageBalance>;
 }
 
 #[near_bindgen]
@@ -173,6 +188,37 @@ impl Contract {
             hex::encode(&event.eth_factory_address),
             hex::encode(&self.eth_factory_address),
         );
+
+        ext_token::ext(event.token.clone().try_into().unwrap())
+            .with_static_gas(STORAGE_BALANCE_CALL_GAS)
+            .storage_balance_of(Some(event.recipient.clone()))
+            .then(
+                ext_self::ext(env::current_account_id())
+                    .with_static_gas(
+                        FT_STORAGE_BALANCE_CALLBACK_GAS
+                            + FINISH_WITHDRAW_GAS
+                            + FT_TRANSFER_CALL_GAS,
+                    )
+                    .with_attached_deposit(env::attached_deposit())
+                    .storage_balance_callback(proof, event.token, event.recipient, event.amount),
+            )
+    }
+
+    #[private]
+    pub fn storage_balance_callback(
+        &self,
+        #[callback] storage_balance: Option<StorageBalance>,
+        #[serializer(borsh)] proof: Proof,
+        #[serializer(borsh)] token: String,
+        #[serializer(borsh)] recipient: AccountId,
+        #[serializer(borsh)] amount: Balance,
+    ) -> Promise {
+        assert!(
+            storage_balance.is_some(),
+            "The account {} is not registered",
+            recipient
+        );
+
         let proof_1 = proof.clone();
         ext_prover::ext(self.prover_account.clone())
             .with_static_gas(VERIFY_LOG_ENTRY_GAS)
@@ -190,7 +236,7 @@ impl Contract {
                 ext_self::ext(env::current_account_id())
                     .with_attached_deposit(env::attached_deposit())
                     .with_static_gas(FINISH_WITHDRAW_GAS + FT_TRANSFER_CALL_GAS)
-                    .finish_withdraw(event.token, event.recipient, event.amount, proof_1),
+                    .finish_withdraw(token, recipient, amount, proof_1),
             )
     }
 
