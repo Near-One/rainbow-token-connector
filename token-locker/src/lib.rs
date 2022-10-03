@@ -338,7 +338,7 @@ mod tests {
             .to_hex()
     }
 
-    fn create_proof(locker: String, token: String) -> Proof {
+    fn create_proof(locker: String, token: String, recipient: String) -> Proof {
         let event_data = EthUnlockedEvent {
             eth_factory_address: locker
                 .from_hex::<Vec<_>>()
@@ -350,7 +350,7 @@ mod tests {
             token,
             sender: "00005474e89094c44da98b954eedeac495271d0f".to_string(),
             amount: 1000,
-            recipient: "123".parse().unwrap(),
+            recipient,
             token_eth_address: validate_eth_address(
                 "0123456789abcdefdeadbeef0123456789abcdef".to_string(),
             ),
@@ -379,7 +379,36 @@ mod tests {
             validate_eth_address(ethereum_address_from_id(0)),
         );
 
-        let proof = create_proof(token_locker(), accounts(1).into());
+        let proof = create_proof(token_locker(), accounts(1).into(), "bob.near".to_string());
+        set_env!(attached_deposit: env::storage_byte_cost() * 1000);
+        contract.withdraw(proof.clone());
+        contract.finish_withdraw(
+            true,
+            accounts(1).into(),
+            accounts(2).into(),
+            1_000_000,
+            proof,
+        );
+    }
+
+    #[test]
+    fn test_lock_unlock_token_with_custom_recipient_message() {
+        set_env!(predecessor_account_id: accounts(0));
+        let mut contract = Contract::new(prover(), token_locker());
+        set_env!(predecessor_account_id: accounts(1));
+        contract.set_token_whitelist_mode(accounts(1), WhitelistMode::CheckToken);
+        contract.ft_on_transfer(accounts(2), U128(1_000_000), ethereum_address_from_id(0));
+        contract.finish_deposit(
+            accounts(1).into(),
+            1_000_000,
+            validate_eth_address(ethereum_address_from_id(0)),
+        );
+
+        let proof = create_proof(
+            token_locker(),
+            accounts(1).into(),
+            "bob.near:some message".to_string(),
+        );
         set_env!(attached_deposit: env::storage_byte_cost() * 1000);
         contract.withdraw(proof.clone());
         contract.finish_withdraw(
