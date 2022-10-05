@@ -135,8 +135,10 @@ pub trait ExtContract {
     );
 }
 
+/// Interface for the ERC20 Bridge Tokens
 #[ext_contract(ext_token)]
 pub trait ExtToken {
+    /// Transfer tokens to receiver NEAR account
     fn ft_transfer(
         &mut self,
         receiver_id: AccountId,
@@ -144,6 +146,7 @@ pub trait ExtToken {
         memo: Option<String>,
     ) -> PromiseOrValue<U128>;
 
+    /// Transfer tokens to receiver NEAR account with specific message
     fn ft_transfer_call(
         &mut self,
         receiver_id: AccountId,
@@ -152,8 +155,10 @@ pub trait ExtToken {
         msg: String,
     ) -> PromiseOrValue<U128>;
 
+    /// Get the information about token (name, symbols etc)
     fn ft_metadata(&self) -> FungibleTokenMetadata;
 
+    /// Get the storage balance for the specific account
     fn storage_balance_of(&mut self, account_id: Option<AccountId>) -> Option<StorageBalance>;
 }
 
