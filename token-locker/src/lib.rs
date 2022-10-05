@@ -81,11 +81,14 @@ pub trait ExtContract {
     fn finish_deposit(
         &self,
         /// Token NEAR address
-        #[serializer(borsh)] token: AccountId,
+        #[serializer(borsh)]
+        token: AccountId,
         /// Amount of tokens to transfer
-        #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)]
+        amount: Balance,
         /// The Ethereum address of the tokens recipient
-        #[serializer(borsh)] recipient: EthAddress,
+        #[serializer(borsh)]
+        recipient: EthAddress,
     ) -> result_types::Lock;
 
     /// The method which called on the last step of the `withdraw` procedure (unlocking tokens)
@@ -98,13 +101,17 @@ pub trait ExtContract {
         #[serializer(borsh)]
         verification_success: bool,
         /// Account Id of the token on NEAR
-        #[serializer(borsh)] token: String,
+        #[serializer(borsh)]
+        token: String,
         /// Account Id of the token recipient on NEAR
-        #[serializer(borsh)] new_owner_id: String,
+        #[serializer(borsh)]
+        new_owner_id: String,
         /// The amount of the burned tokens
-        #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)]
+        amount: Balance,
         /// The proof of the Ethereum `burn` event
-        #[serializer(borsh)] proof: Proof,
+        #[serializer(borsh)]
+        proof: Proof,
     ) -> Promise;
 
     /// The last step of logging token metadata (the token name, symbols etc).
@@ -113,7 +120,8 @@ pub trait ExtContract {
     fn finish_log_metadata(
         &self,
         /// The information about token (name, symbols etc)
-        #[callback] metadata: FungibleTokenMetadata,
+        #[callback]
+        metadata: FungibleTokenMetadata,
         /// NEAR account id of the token
         token_id: AccountId,
     ) -> result_types::Metadata;
@@ -123,15 +131,20 @@ pub trait ExtContract {
     fn storage_balance_callback(
         &self,
         /// The result of checking token Storage Balance ot the recipient
-        #[callback] storage_balance: Option<StorageBalance>,
+        #[callback]
+        storage_balance: Option<StorageBalance>,
         /// The proof of the Ethereum `burn` event.
-        #[serializer(borsh)] proof: Proof,
+        #[serializer(borsh)]
+        proof: Proof,
         /// The NEAR account id of the token
-        #[serializer(borsh)] token: String,
+        #[serializer(borsh)]
+        token: String,
         /// The NEAR account id of the token recipient
-        #[serializer(borsh)] recipient: AccountId,
+        #[serializer(borsh)]
+        recipient: AccountId,
         /// The amount of burned tokens
-        #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)]
+        amount: Balance,
     );
 }
 
