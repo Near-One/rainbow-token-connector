@@ -363,6 +363,7 @@ impl Contract {
         required_deposit
     }
 
+    /// Update Ethereum Address of the Bridge Token Factory
     #[private]
     pub fn update_factory_address(&mut self, factory_address: String) {
         self.eth_factory_address = validate_eth_address(factory_address);
