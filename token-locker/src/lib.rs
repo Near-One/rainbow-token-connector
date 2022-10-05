@@ -49,14 +49,19 @@ enum StorageKey {
     WhitelistAccounts,
 }
 
+/// Contract for Bridge Token-Locker which responsible for
+/// (1) locking tokens on NEAR side
+/// (2) unlocking tokens in case corresponding tokens were burned on Ethereum side
+/// Only way to unlock locked tokens is to mint corresponded tokens on Ethereum side and after to burn them.
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Contract {
-    /// The account of the prover that we can use to prove.
+    /// The account of the prover that we can use
+    /// to prove the authenticity of events generated on Ethereum side.
     pub prover_account: AccountId,
     /// Ethereum address of the token factory contract, in hex.
     pub eth_factory_address: EthAddress,
-    /// Hashes of the events that were already used.
+    /// Hashes of the Ethereum `Withdraw` events that were already used for unlock tokens.
     pub used_events: UnorderedSet<Vec<u8>>,
     /// Mask determining all paused functions
     paused: Mask,
