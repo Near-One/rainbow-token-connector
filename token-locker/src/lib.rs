@@ -324,8 +324,10 @@ impl Contract {
         #[serializer(borsh)] proof: Proof,
     ) -> Promise {
         assert!(verification_success, "Failed to verify the proof");
-        let required_deposit = self.record_proof(&proof);
 
+        // The deposit required to cover the cost
+        // of additional storage of used proof
+        let required_deposit = self.record_proof(&proof);
         assert!(env::attached_deposit() >= required_deposit);
 
         let Recipient { target, message } = parse_recipient(new_owner_id);
