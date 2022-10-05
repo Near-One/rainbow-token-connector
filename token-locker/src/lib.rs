@@ -350,7 +350,7 @@ impl Contract {
         }
     }
 
-    /// Checks whether the provided proof is already used.
+    /// Checks whether the provided proof of Ethereum `burn` event is already used for unlocking tokens
     pub fn is_used_proof(&self, #[serializer(borsh)] proof: Proof) -> bool {
         self.used_events.contains(&proof.get_key())
     }
