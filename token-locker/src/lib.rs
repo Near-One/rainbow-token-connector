@@ -164,9 +164,13 @@ pub trait ExtToken {
 
 #[near_bindgen]
 impl Contract {
+    /// The Bridge Token-Locker initialization.
+    ///
+    /// # Arguments
+    ///
+    /// * `prover_account`: NEAR account of the Near Prover contract which check the correctness of the Ethereum Events;
+    /// * `factory_address`: Ethereum address of the token factory contract, in hex.
     #[init]
-    /// `prover_account`: NEAR account of the Near Prover contract;
-    /// `factory_address`: Ethereum address of the token factory contract, in hex.
     pub fn new(prover_account: AccountId, factory_address: String) -> Self {
         Self {
             prover_account,
