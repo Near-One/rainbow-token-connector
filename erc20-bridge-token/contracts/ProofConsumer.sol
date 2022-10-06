@@ -69,7 +69,7 @@ contract ProofConsumer is Ownable, IProofConsumer {
             .receipt_ids[0];
         require(
             !usedProofs[receiptId],
-            "The burn event proof cannot be reused"
+            "The lock/burn event proof cannot be reused"
         );
         usedProofs[receiptId] = true;
 
@@ -81,17 +81,17 @@ contract ProofConsumer is Ownable, IProofConsumer {
                     .outcome
                     .executor_id
             ) == keccak256(nearTokenLocker),
-            "Can only unlock tokens/set metadata from the linked proof produced on Near blockchain"
+            "Can only mint/unlock tokens/set metadata from the linked proof produced on Near blockchain"
         );
 
         result = fullOutcomeProof.outcome_proof.outcome_with_id.outcome.status;
         require(
             !result.failed,
-            "Can't use failed execution outcome for unlocking the tokens or set metadata"
+            "Can't use failed execution outcome for minting/unlocking the tokens or set metadata"
         );
         require(
             !result.unknown,
-            "Can't use unknown execution outcome for unlocking the tokens or set metadata"
+            "Can't use unknown execution outcome for minting/unlocking the tokens or set metadata"
         );
     }
 }
