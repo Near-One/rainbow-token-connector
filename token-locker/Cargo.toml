@@ -21,11 +21,12 @@ overflow-checks = true
 near-sdk = "4.0.0"
 near-contract-standards = "4.0.0"
 eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "67966a151122815039f07b02065ab3a2bba09804" }
-admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "67966a151122815039f07b02065ab3a2bba09804" }
 tiny-keccak = "1.4.0"
 ethabi = "12.0.0"
 hex = "0.4.2"
 bridge-common = { path = "../bridge-common" }
+near-plugins = { git = "https://github.com/aurora-is-near/near-plugins", rev = "5579de43c28984d00fa9aebc0a8e755258bba6c2" }
+near-plugins-derive = { git = "https://github.com/aurora-is-near/near-plugins", rev = "5579de43c28984d00fa9aebc0a8e755258bba6c2" }
 
 [dev-dependencies]
 uint = { version = "0.8.3", default-features = false }

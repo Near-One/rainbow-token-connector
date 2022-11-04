@@ -1,6 +1,5 @@
 use std::convert::From;
 
-use admin_controlled::Mask;
 use eth_types::*;
 use ethabi::param_type::Writer;
 use ethabi::{Event, EventParam, Hash, Log, ParamType, RawLog, Token};
@@ -13,8 +12,6 @@ use tiny_keccak::Keccak;
 pub type EthAddress = [u8; 20];
 
 pub const NO_DEPOSIT: Balance = 0;
-
-pub const PAUSE_DEPOSIT: Mask = 1 << 1;
 
 /// Gas to call verify_log_entry on prover.
 pub const VERIFY_LOG_ENTRY_GAS: Gas = Gas(Gas::ONE_TERA.0 * 50);

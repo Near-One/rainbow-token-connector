@@ -1,23 +1,23 @@
+use near_plugins::Ownable;
+use near_plugins::Pausable;
+use near_plugins_derive::pause;
 use std::convert::TryInto;
 
-use admin_controlled::{AdminControlled, Mask};
 use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 use near_contract_standards::storage_management::StorageBalance;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
-use near_sdk::collections::UnorderedSet;
+use near_sdk::collections::{UnorderedMap, UnorderedSet};
 use near_sdk::json_types::U128;
 use near_sdk::{
-    env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault, Promise,
-    PromiseOrValue,
+    env, ext_contract, near_bindgen, AccountId, Balance, BorshStorageKey, Gas, PanicOnDefault,
+    Promise, PromiseOrValue,
 };
 
 use bridge_common::prover::{
     ext_prover, validate_eth_address, EthAddress, Proof, FT_TRANSFER_CALL_GAS, FT_TRANSFER_GAS,
-    NO_DEPOSIT, PAUSE_DEPOSIT, STORAGE_BALANCE_CALL_GAS, VERIFY_LOG_ENTRY_GAS,
+    NO_DEPOSIT, STORAGE_BALANCE_CALL_GAS, VERIFY_LOG_ENTRY_GAS,
 };
 use bridge_common::{parse_recipient, result_types, Recipient};
-use near_sdk_inner::collections::UnorderedMap;
-use near_sdk_inner::BorshStorageKey;
 use whitelist::WhitelistMode;
 
 use crate::unlock_event::EthUnlockedEvent;
@@ -42,6 +42,8 @@ const FT_FINISH_LOG_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 30);
 /// Gas to call storage balance callback method.
 const FT_STORAGE_BALANCE_CALLBACK_GAS: Gas = Gas(Gas::ONE_TERA.0 * 10);
 
+pub type Mask = u128;
+
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {
     UsedEvents,
@@ -50,7 +52,7 @@ enum StorageKey {
 }
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Ownable, Pausable)]
 pub struct Contract {
     /// The account of the prover that we can use to prove.
     pub prover_account: AccountId,
@@ -59,6 +61,7 @@ pub struct Contract {
     /// Hashes of the events that were already used.
     pub used_events: UnorderedSet<Vec<u8>>,
     /// Mask determining all paused functions
+    #[deprecated]
     paused: Mask,
     /// Mapping whitelisted tokens to their mode
     pub whitelist_tokens: UnorderedMap<AccountId, WhitelistMode>,
@@ -135,7 +138,8 @@ impl Contract {
     /// `prover_account`: NEAR account of the Near Prover contract;
     /// `factory_address`: Ethereum address of the token factory contract, in hex.
     pub fn new(prover_account: AccountId, factory_address: String) -> Self {
-        Self {
+        #[allow(deprecated)]
+        let mut contract = Self {
             prover_account,
             used_events: UnorderedSet::new(StorageKey::UsedEvents),
             eth_factory_address: validate_eth_address(factory_address),
@@ -143,7 +147,10 @@ impl Contract {
             whitelist_tokens: UnorderedMap::new(StorageKey::WhitelistTokens),
             whitelist_accounts: UnorderedSet::new(StorageKey::WhitelistAccounts),
             is_whitelist_mode_enabled: true,
-        }
+        };
+
+        contract.owner_set(Some(near_sdk::env::predecessor_account_id()));
+        contract
     }
 
     /// Logs into the result of this transaction a Metadata for given token.
@@ -178,8 +185,8 @@ impl Contract {
     /// Withdraw funds from NEAR Token Locker.
     /// Receives proof of burning tokens on the other side. Validates it and releases funds.
     #[payable]
+    #[pause]
     pub fn withdraw(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
-        self.check_not_paused(PAUSE_DEPOSIT);
         let event = EthUnlockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
             event.eth_factory_address,
@@ -332,8 +339,6 @@ impl Contract {
     }
 }
 
-admin_controlled::impl_admin_controlled!(Contract, paused);
-
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
@@ -342,13 +347,15 @@ mod tests {
 
     use near_contract_standards::fungible_token::receiver::FungibleTokenReceiver;
     use near_sdk::env::sha256;
-    use near_sdk::test_utils::{accounts, VMContextBuilder};
+    use near_sdk::test_utils::VMContextBuilder;
     use near_sdk::testing_env;
     use uint::rustc_hex::{FromHex, ToHex};
 
     use super::*;
 
-    const UNPAUSE_ALL: Mask = 0;
+    pub fn accounts(id: usize) -> AccountId {
+        AccountId::new_unchecked(near_sdk::test_utils::accounts(id).to_string() + ".near")
+    }
 
     macro_rules! inner_set_env {
         ($builder:ident) => {
@@ -373,11 +380,11 @@ mod tests {
     }
 
     fn prover() -> AccountId {
-        "prover".parse().unwrap()
+        "prover.near".parse().unwrap()
     }
 
     fn bridge_token_factory() -> AccountId {
-        "bridge".parse().unwrap()
+        "bridge.near".parse().unwrap()
     }
 
     fn token_locker() -> String {
@@ -478,22 +485,21 @@ mod tests {
 
     #[test]
     fn test_only_admin_can_pause() {
-        set_env!(predecessor_account_id: accounts(0));
-        let mut contract = Contract::new(prover(), token_locker());
-
-        // Admin can pause
         set_env!(
             current_account_id: bridge_token_factory(),
             predecessor_account_id: bridge_token_factory(),
         );
-        contract.set_paused(0b1111);
+        let mut contract = Contract::new(prover(), token_locker());
+
+        // Admin can pause
+        contract.pa_pause_feature("deposit".to_string());
 
         // Admin can unpause.
         set_env!(
             current_account_id: bridge_token_factory(),
             predecessor_account_id: bridge_token_factory(),
         );
-        contract.set_paused(UNPAUSE_ALL);
+        contract.pa_unpause_feature("deposit".to_string());
 
         // Alice can't pause
         set_env!(
@@ -502,7 +508,7 @@ mod tests {
         );
 
         panic::catch_unwind(move || {
-            contract.set_paused(0);
+            contract.pa_pause_feature("deposit".to_string());
         })
         .unwrap_err();
     }
