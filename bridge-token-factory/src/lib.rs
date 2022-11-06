@@ -1,16 +1,17 @@
-use admin_controlled::{AdminControlled, Mask};
+use near_plugins::{Ownable, Pausable};
+use near_plugins_derive::pause;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap, UnorderedSet};
 use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::{
-    env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault, Promise, PublicKey,
+    env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault, Promise,
+    PromiseOrValue, PublicKey, ONE_NEAR,
 };
 
 pub use bridge_common::prover::{validate_eth_address, Proof};
 use bridge_common::{parse_recipient, prover::*, result_types, Recipient};
 pub use lock_event::EthLockedEvent;
 pub use log_metadata_event::TokenMetadataEvent;
-use near_sdk_inner::{PromiseOrValue, ONE_NEAR};
 
 mod lock_event;
 mod log_metadata_event;
@@ -54,11 +55,10 @@ const METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY: &[u8] = b"aM_CONNECTOR";
 /// The prefix is made specially short since it becomes more expensive with larger prefixes.
 const TOKEN_TIMESTAMP_MAP_PREFIX: &[u8] = b"aTT";
 
-const PAUSE_DEPLOY_TOKEN: Mask = 1 << 0;
-const PAUSE_DEPOSIT: Mask = 1 << 1;
+pub type Mask = u128;
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Ownable, Pausable)]
 pub struct BridgeTokenFactory {
     /// The account of the prover that we can use to prove
     pub prover_account: AccountId,
@@ -73,6 +73,7 @@ pub struct BridgeTokenFactory {
     /// Balance required to register a new account in the BridgeToken
     pub bridge_token_storage_deposit_required: Balance,
     /// Mask determining all paused functions
+    #[deprecated]
     paused: Mask,
 }
 
@@ -144,7 +145,8 @@ impl BridgeTokenFactory {
     #[init]
     pub fn new(prover_account: AccountId, locker_address: String) -> Self {
         assert!(!env::state_exists(), "Already initialized");
-        Self {
+        #[allow(deprecated)]
+        let mut contract = Self {
             prover_account,
             locker_address: validate_eth_address(locker_address),
             tokens: UnorderedSet::new(b"t".to_vec()),
@@ -155,7 +157,10 @@ impl BridgeTokenFactory {
                     .account_storage_usage as Balance
                     * env::storage_byte_cost(),
             paused: Mask::default(),
-        }
+        };
+
+        contract.owner_set(Some(near_sdk::env::predecessor_account_id()));
+        contract
     }
 
     pub fn update_metadata(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
@@ -216,8 +221,8 @@ impl BridgeTokenFactory {
     /// Deposit from Ethereum to NEAR based on the proof of the locked tokens.
     /// Must attach enough NEAR funds to cover for storage of the proof.
     #[payable]
+    #[pause]
     pub fn deposit(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
-        self.check_not_paused(PAUSE_DEPOSIT);
         let event = EthLockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
             event.locker_address,
@@ -383,8 +388,8 @@ impl BridgeTokenFactory {
     }
 
     #[payable]
+    #[pause(except(owner, self))]
     pub fn deploy_bridge_token(&mut self, address: String) -> Promise {
-        self.check_not_paused(PAUSE_DEPLOY_TOKEN);
         let address = address.to_lowercase();
         let _ = validate_eth_address(address.clone());
         assert!(
@@ -518,8 +523,6 @@ impl BridgeTokenFactory {
     }
 }
 
-admin_controlled::impl_admin_controlled!(BridgeTokenFactory, paused);
-
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
@@ -532,8 +535,6 @@ mod tests {
     use uint::rustc_hex::{FromHex, ToHex};
 
     use super::*;
-
-    const UNPAUSE_ALL: Mask = 0;
 
     macro_rules! inner_set_env {
         ($builder:ident) => {
@@ -700,7 +701,10 @@ mod tests {
 
     #[test]
     fn deploy_bridge_token_paused() {
-        set_env!(predecessor_account_id: alice());
+        set_env!(
+            current_account_id: bridge_token_factory(),
+            predecessor_account_id: bridge_token_factory(),
+        );
 
         // User alice can deploy a new bridge token
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
@@ -717,7 +721,7 @@ mod tests {
             predecessor_account_id: bridge_token_factory(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
-        contract.set_paused(PAUSE_DEPLOY_TOKEN);
+        contract.pa_pause_feature("deploy_bridge_token".to_string());
 
         set_env!(
             current_account_id: bridge_token_factory(),
@@ -741,7 +745,10 @@ mod tests {
 
     #[test]
     fn only_admin_can_pause() {
-        set_env!(predecessor_account_id: alice());
+        set_env!(
+            current_account_id: bridge_token_factory(),
+            predecessor_account_id: bridge_token_factory(),
+        );
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
 
         // Admin can pause
@@ -749,7 +756,7 @@ mod tests {
             current_account_id: bridge_token_factory(),
             predecessor_account_id: bridge_token_factory(),
         );
-        contract.set_paused(0b1111);
+        contract.pa_pause_feature("deposit".to_string());
 
         // Alice can't pause
         set_env!(
@@ -758,14 +765,17 @@ mod tests {
         );
 
         panic::catch_unwind(move || {
-            contract.set_paused(0);
+            contract.pa_pause_feature("deposit".to_string());
         })
         .unwrap_err();
     }
 
     #[test]
     fn deposit_paused() {
-        set_env!(predecessor_account_id: alice());
+        set_env!(
+            current_account_id: bridge_token_factory(),
+            predecessor_account_id: bridge_token_factory(),
+        );
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
 
         set_env!(
@@ -785,7 +795,7 @@ mod tests {
             predecessor_account_id: bridge_token_factory(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
-        contract.set_paused(PAUSE_DEPOSIT);
+        contract.pa_pause_feature("deposit".to_string());
 
         set_env!(
             current_account_id: bridge_token_factory(),
@@ -803,7 +813,10 @@ mod tests {
     /// Check after all is paused deposit is not available
     #[test]
     fn all_paused() {
-        set_env!(predecessor_account_id: alice());
+        set_env!(
+            current_account_id: bridge_token_factory(),
+            predecessor_account_id: bridge_token_factory(),
+        );
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
 
         set_env!(
@@ -823,7 +836,7 @@ mod tests {
             predecessor_account_id: bridge_token_factory(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
-        contract.set_paused(PAUSE_DEPLOY_TOKEN | PAUSE_DEPOSIT);
+        contract.pa_pause_feature("ALL".to_string());
 
         set_env!(
             current_account_id: bridge_token_factory(),
@@ -841,7 +854,10 @@ mod tests {
     /// Check after all is paused and unpaused deposit works
     #[test]
     fn no_paused() {
-        set_env!(predecessor_account_id: alice());
+        set_env!(
+            current_account_id: bridge_token_factory(),
+            predecessor_account_id: bridge_token_factory(),
+        );
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
 
         set_env!(
@@ -862,8 +878,8 @@ mod tests {
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
 
-        contract.set_paused(PAUSE_DEPLOY_TOKEN | PAUSE_DEPOSIT);
-        contract.set_paused(UNPAUSE_ALL);
+        contract.pa_pause_feature("ALL".to_string());
+        contract.pa_unpause_feature("ALL".to_string());
 
         set_env!(
             current_account_id: bridge_token_factory(),

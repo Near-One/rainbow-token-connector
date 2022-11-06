@@ -396,7 +396,6 @@ dependencies = [
 name = "bridge-token-factory"
 version = "0.1.5"
 dependencies = [
- "admin-controlled",
  "anyhow",
  "bridge-common",
  "bridge-token",
@@ -404,6 +403,8 @@ dependencies = [
  "ethabi",
  "hex 0.4.3",
  "near-contract-standards",
+ "near-plugins",
+ "near-plugins-derive",
  "near-sdk",
  "rand 0.7.3",
  "serde",
@@ -1720,6 +1721,29 @@ dependencies = [
  "strum",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "near-plugins"
+version = "0.1.0"
+source = "git+https://github.com/aurora-is-near/near-plugins?rev=5579de43c28984d00fa9aebc0a8e755258bba6c2#5579de43c28984d00fa9aebc0a8e755258bba6c2"
+dependencies = [
+ "bitflags",
+ "near-plugins-derive",
+ "near-sdk",
+ "serde",
+]
+
+[[package]]
+name = "near-plugins-derive"
+version = "0.1.0"
+source = "git+https://github.com/aurora-is-near/near-plugins?rev=5579de43c28984d00fa9aebc0a8e755258bba6c2#5579de43c28984d00fa9aebc0a8e755258bba6c2"
+dependencies = [
+ "darling",
+ "proc-macro-crate 0.1.5",
+ "proc-macro2",
+ "quote",
+ "syn",
 ]
 
 [[package]]

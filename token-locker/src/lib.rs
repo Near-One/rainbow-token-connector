@@ -1,5 +1,4 @@
-use near_plugins::Ownable;
-use near_plugins::Pausable;
+use near_plugins::{Pausable, Ownable};
 use near_plugins_derive::pause;
 use std::convert::TryInto;
 

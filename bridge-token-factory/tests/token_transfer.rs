@@ -55,7 +55,7 @@ fn create_contract() -> (Account, Contract, Worker<Sandbox>) {
         .unwrap();
 
     let _result = rt.block_on(
-        alice
+        factory_account
             .call(factory_contract.id(), "new")
             .args(
                 json!({"prover_account": prover_id, "locker_address": LOCKER_ADDRESS.to_string()})
