@@ -387,8 +387,9 @@ dependencies = [
 name = "bridge-token"
 version = "0.1.0"
 dependencies = [
- "admin-controlled",
  "near-contract-standards",
+ "near-plugins",
+ "near-plugins-derive",
  "near-sdk",
 ]
 

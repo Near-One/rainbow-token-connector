@@ -1,8 +1,9 @@
-use admin_controlled::Mask;
 use near_contract_standards::fungible_token::metadata::{
     FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC,
 };
 use near_contract_standards::fungible_token::FungibleToken;
+use near_plugins::{Ownable, Pausable};
+use near_plugins_derive::pause;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::{
@@ -14,7 +15,7 @@ use near_sdk::{
 const FINISH_WITHDRAW_GAS: Gas = Gas(Gas::ONE_TERA.0 * 50);
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Ownable, Pausable)]
 pub struct BridgeToken {
     controller: AccountId,
     token: FungibleToken,
@@ -23,12 +24,13 @@ pub struct BridgeToken {
     reference: String,
     reference_hash: Base64VecU8,
     decimals: u8,
+    #[deprecated]
     paused: Mask,
     #[cfg(feature = "migrate_icon")]
     icon: Option<String>,
 }
 
-const PAUSE_WITHDRAW: Mask = 1 << 0;
+pub type Mask = u128;
 
 #[ext_contract(ext_bridge_token_factory)]
 pub trait ExtBridgeTokenFactory {
@@ -45,7 +47,8 @@ impl BridgeToken {
     #[init]
     pub fn new() -> Self {
         assert!(!env::state_exists(), "Already initialized");
-        Self {
+        #[allow(deprecated)]
+        let mut contract = Self {
             controller: env::predecessor_account_id(),
             token: FungibleToken::new(b"t".to_vec()),
             name: String::default(),
@@ -56,7 +59,10 @@ impl BridgeToken {
             paused: Mask::default(),
             #[cfg(feature = "migrate_icon")]
             icon: None,
-        }
+        };
+
+        contract.owner_set(Some(near_sdk::env::predecessor_account_id()));
+        contract
     }
 
     pub fn set_metadata(
@@ -97,9 +103,8 @@ impl BridgeToken {
     }
 
     #[payable]
+    #[pause(except(owner, self))]
     pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
-        self.check_not_paused(PAUSE_WITHDRAW);
-
         assert_one_yocto();
         Promise::new(env::predecessor_account_id()).transfer(1);
 
@@ -143,8 +148,6 @@ impl FungibleTokenMetadataProvider for BridgeToken {
     }
 }
 
-admin_controlled::impl_admin_controlled!(BridgeToken, paused);
-
 // Migration
 
 #[cfg(feature = "migrate_icon")]
@@ -163,6 +166,7 @@ pub struct BridgeTokenV0 {
 #[cfg(feature = "migrate_icon")]
 impl From<BridgeTokenV0> for BridgeToken {
     fn from(obj: BridgeTokenV0) -> Self {
+        #[allow(deprecated)]
         Self {
             controller: obj.controller,
             token: obj.token,
