@@ -221,7 +221,7 @@ impl BridgeTokenFactory {
     /// Deposit from Ethereum to NEAR based on the proof of the locked tokens.
     /// Must attach enough NEAR funds to cover for storage of the proof.
     #[payable]
-    #[pause]
+    #[pause(except(owner, self))]
     pub fn deposit(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
         let event = EthLockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(

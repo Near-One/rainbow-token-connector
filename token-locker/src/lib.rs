@@ -184,7 +184,7 @@ impl Contract {
     /// Withdraw funds from NEAR Token Locker.
     /// Receives proof of burning tokens on the other side. Validates it and releases funds.
     #[payable]
-    #[pause]
+    #[pause(except(owner, self))]
     pub fn withdraw(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
         let event = EthUnlockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(

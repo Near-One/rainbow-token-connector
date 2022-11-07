@@ -6,7 +6,7 @@ use crate::*;
 impl FungibleTokenReceiver for Contract {
     /// Callback on receiving tokens by this contract.
     /// msg: `Ethereum` address to receive the tokens on.
-    #[pause(name = "deposit")]
+    #[pause(name = "deposit", except(owner, self))]
     fn ft_on_transfer(
         &mut self,
         sender_id: AccountId,
