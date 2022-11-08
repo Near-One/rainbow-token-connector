@@ -48,7 +48,7 @@ impl BridgeToken {
     pub fn new() -> Self {
         assert!(!env::state_exists(), "Already initialized");
         #[allow(deprecated)]
-        let mut contract = Self {
+        let contract = Self {
             controller: env::predecessor_account_id(),
             token: FungibleToken::new(b"t".to_vec()),
             name: String::default(),
@@ -61,7 +61,11 @@ impl BridgeToken {
             icon: None,
         };
 
-        contract.owner_set(Some(near_sdk::env::predecessor_account_id()));
+        ::near_sdk::env::storage_write(
+            &contract.owner_storage_key(),
+            env::predecessor_account_id().as_bytes(),
+        );
+
         contract
     }
 
