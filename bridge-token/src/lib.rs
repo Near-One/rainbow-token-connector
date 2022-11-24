@@ -7,8 +7,8 @@ use near_plugins_derive::pause;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::{
-    assert_one_yocto, env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault,
-    Promise, PromiseOrValue, StorageUsage,
+    assert_one_yocto, env, ext_contract, near_bindgen, require, AccountId, Balance, Gas,
+    PanicOnDefault, Promise, PromiseOrValue, StorageUsage,
 };
 
 /// Gas to call finish withdraw method on factory.
@@ -46,7 +46,17 @@ pub trait ExtBridgeTokenFactory {
 impl BridgeToken {
     #[init]
     pub fn new() -> Self {
-        assert!(!env::state_exists(), "Already initialized");
+        let current_account_id = env::current_account_id();
+        let (_eth_address, factory_account) = current_account_id
+            .as_str()
+            .split_once(".")
+            .unwrap_or_else(|| env::panic_str("Invalid token address"));
+
+        require!(
+            env::predecessor_account_id().as_str() == factory_account,
+            "Only the factory account can init this contract"
+        );
+
         #[allow(deprecated)]
         let contract = Self {
             controller: env::predecessor_account_id(),
