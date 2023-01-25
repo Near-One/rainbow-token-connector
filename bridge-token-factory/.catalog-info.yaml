@@ -18,5 +18,6 @@ spec:
   system: bridge-connectors
   deployedAt:
     - contract:near/mainnet/factory.bridge.near
-  interactsWith: []
+  interactsWith:
+    - metadata-controller:near/mainnet/metadata.factory.bridge.near
   subcomponentOf: rainbow-token-connector
