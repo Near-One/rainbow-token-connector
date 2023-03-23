@@ -20,13 +20,11 @@ overflow-checks = true
 [dependencies]
 near-sdk = "4.0.0"
 near-contract-standards = "4.0.0"
-eth-types =  { git = "https://github.com/near/rainbow-bridge", rev = "67966a151122815039f07b02065ab3a2bba09804" }
 ethabi = "12.0.0"
 bridge-common = { path = "../bridge-common", default-features = false }
 hex = "0.4.2"
 bridge-token = { path = "../bridge-token" }
-near-plugins = { git = "https://github.com/aurora-is-near/near-plugins", rev = "5579de43c28984d00fa9aebc0a8e755258bba6c2" }
-near-plugins-derive = { git = "https://github.com/aurora-is-near/near-plugins", rev = "5579de43c28984d00fa9aebc0a8e755258bba6c2" }
+near-plugins = { git = "https://github.com/aurora-is-near/near-plugins", rev = "93e1a30d79e72d51c4349ba71d454865c76ac690" }
 
 [dev-dependencies]
 uint = { version = "0.8.3", default-features = false }
@@ -36,7 +34,3 @@ serde_json = "*"
 workspaces = "0.5.0"
 tokio = { version = "1.1", features = ["rt", "macros"] }
 anyhow = "*"
-
-[patch]
-[patch.crates-io]
-eth2_hashing = { git = "https://github.com/near/rainbow-bridge", rev = "67966a151122815039f07b02065ab3a2bba09804" }

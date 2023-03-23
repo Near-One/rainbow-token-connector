@@ -9,14 +9,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fe438c63458706e03479442743baae6c88256498e6431708f6dfc520a26515d3"
 
 [[package]]
-name = "admin-controlled"
-version = "0.1.0"
-source = "git+https://github.com/near/rainbow-bridge?rev=67966a151122815039f07b02065ab3a2bba09804#67966a151122815039f07b02065ab3a2bba09804"
-dependencies = [
- "near-sdk",
-]
-
-[[package]]
 name = "ahash"
 version = "0.7.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -176,8 +168,7 @@ dependencies = [
 name = "bridge-common"
 version = "0.1.0"
 dependencies = [
- "admin-controlled",
- "eth-types",
+ "eth-types 0.1.0 (git+https://github.com/near/rainbow-bridge?rev=4b24cbd5a6e098fd8a9cd24fbb194fa8e0fc51e4)",
  "ethabi",
  "hex",
  "near-sdk",
@@ -422,6 +413,22 @@ name = "either"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e78d4f1cc4ae33bbfc157ed5d5a5ef3bc29227303d595861deb238fcec4e9457"
+
+[[package]]
+name = "eth-types"
+version = "0.1.0"
+source = "git+https://github.com/near/rainbow-bridge?rev=4b24cbd5a6e098fd8a9cd24fbb194fa8e0fc51e4#4b24cbd5a6e098fd8a9cd24fbb194fa8e0fc51e4"
+dependencies = [
+ "borsh",
+ "derive_more",
+ "ethereum-types",
+ "hex",
+ "near-sdk",
+ "rlp",
+ "rlp-derive",
+ "serde",
+ "serde-big-array",
+]
 
 [[package]]
 name = "eth-types"
@@ -1097,7 +1104,7 @@ name = "rainbow-bridge-near-token-locker"
 version = "0.1.0"
 dependencies = [
  "bridge-common",
- "eth-types",
+ "eth-types 0.1.0 (git+https://github.com/near/rainbow-bridge?rev=67966a151122815039f07b02065ab3a2bba09804)",
  "ethabi",
  "hex",
  "near-contract-standards",

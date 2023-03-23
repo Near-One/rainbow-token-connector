@@ -2,8 +2,6 @@ use near_contract_standards::fungible_token::metadata::{
     FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC,
 };
 use near_contract_standards::fungible_token::FungibleToken;
-use near_plugins::{Ownable, Pausable};
-use near_plugins_derive::pause;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::{
@@ -15,7 +13,7 @@ use near_sdk::{
 const FINISH_WITHDRAW_GAS: Gas = Gas(Gas::ONE_TERA.0 * 50);
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Ownable, Pausable)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct BridgeToken {
     controller: AccountId,
     token: FungibleToken,
@@ -24,7 +22,6 @@ pub struct BridgeToken {
     reference: String,
     reference_hash: Base64VecU8,
     decimals: u8,
-    #[deprecated]
     paused: Mask,
     #[cfg(feature = "migrate_icon")]
     icon: Option<String>,
@@ -57,8 +54,7 @@ impl BridgeToken {
             "Only the factory account can init this contract"
         );
 
-        #[allow(deprecated)]
-        let contract = Self {
+        Self {
             controller: env::predecessor_account_id(),
             token: FungibleToken::new(b"t".to_vec()),
             name: String::default(),
@@ -66,17 +62,10 @@ impl BridgeToken {
             reference: String::default(),
             reference_hash: Base64VecU8(vec![]),
             decimals: 0,
-            paused: Mask::default(),
+            paused: 0,
             #[cfg(feature = "migrate_icon")]
             icon: None,
-        };
-
-        ::near_sdk::env::storage_write(
-            &contract.owner_storage_key(),
-            env::predecessor_account_id().as_bytes(),
-        );
-
-        contract
+        }
     }
 
     pub fn set_metadata(
@@ -89,7 +78,7 @@ impl BridgeToken {
         icon: Option<String>,
     ) {
         // Only owner can change the metadata
-        assert!(self.controller_or_self());
+        require!(self.controller_or_self());
 
         name.map(|name| self.name = name);
         symbol.map(|symbol| self.symbol = symbol);
@@ -116,9 +105,8 @@ impl BridgeToken {
         self.token.internal_deposit(&account_id, amount.into());
     }
 
-    #[payable]
-    #[pause(except(owner, self))]
     pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
+        require!(!self.is_paused());
         assert_one_yocto();
         Promise::new(env::predecessor_account_id()).transfer(1);
 
@@ -138,6 +126,15 @@ impl BridgeToken {
     pub fn controller_or_self(&self) -> bool {
         let caller = env::predecessor_account_id();
         caller == self.controller || caller == env::current_account_id()
+    }
+
+    pub fn is_paused(&self) -> bool {
+        self.paused != 0 && !self.controller_or_self()
+    }
+
+    pub fn set_paused(&mut self, paused: bool) {
+        require!(self.controller_or_self());
+        self.paused = if paused { 1 } else { 0 };
     }
 }
 
@@ -201,7 +198,7 @@ impl BridgeToken {
     /// Adding icon as suggested here: https://nomicon.io/Standards/FungibleToken/Metadata.html
     /// This function can only be called from the factory or from the contract itself.
     #[init(ignore_state)]
-    pub fn migrate_nep_148_add_icon() -> Self {
+    pub fn migrate() -> Self {
         let old_state: BridgeTokenV0 = env::state_read()
             .expect("State is not compatible with BridgeTokenV0. Migration has not been applied.");
         let new_state: BridgeToken = old_state.into();

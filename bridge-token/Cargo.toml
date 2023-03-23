@@ -20,8 +20,6 @@ overflow-checks = true
 [dependencies]
 near-sdk = "4.0.0"
 near-contract-standards = "4.0.0"
-near-plugins = { git = "https://github.com/aurora-is-near/near-plugins", rev = "5579de43c28984d00fa9aebc0a8e755258bba6c2" }
-near-plugins-derive = { git = "https://github.com/aurora-is-near/near-plugins", rev = "5579de43c28984d00fa9aebc0a8e755258bba6c2" }
 
 [features]
 default = ["migrate_icon"]

@@ -1,8 +1,11 @@
-use near_plugins::{Ownable, Pausable};
-use near_plugins_derive::pause;
+use near_plugins::{
+    access_control, access_control_any, pause, AccessControlRole, AccessControllable, Pausable,
+    Upgradable,
+};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap, UnorderedSet};
 use near_sdk::json_types::{Base64VecU8, U128};
+use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
     env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault, Promise,
     PromiseOrValue, PublicKey, ONE_NEAR,
@@ -44,6 +47,9 @@ const OUTER_SET_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 15);
 /// Amount of gas used by bridge token to set the metadata.
 const SET_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 
+/// Amount of gas used by bridge token to pause withdraw.
+const SET_PAUSED_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
+
 /// Controller storage key.
 const CONTROLLER_STORAGE_KEY: &[u8] = b"aCONTROLLER";
 
@@ -57,8 +63,31 @@ const TOKEN_TIMESTAMP_MAP_PREFIX: &[u8] = b"aTT";
 
 pub type Mask = u128;
 
+#[derive(AccessControlRole, Deserialize, Serialize, Copy, Clone)]
+#[serde(crate = "near_sdk::serde")]
+pub enum Role {
+    PauseManager,
+    UpgradableManager,
+    UpgradableCodeStager,
+    UpgradableCodeDeployer,
+    UpgradableDurationManager,
+    ConfigManager,
+    UnrestrictedDeposit,
+    UnrestrictedDeployBridgeToken,
+    MetadataManager,
+}
+
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Ownable, Pausable)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Pausable, Upgradable)]
+#[access_control(role_type(Role))]
+#[pausable(manager_roles(Role::PauseManager))]
+#[upgradable(access_control_roles(
+    code_stagers(Role::UpgradableCodeStager, Role::UpgradableManager),
+    code_deployers(Role::UpgradableCodeDeployer, Role::UpgradableManager),
+    duration_initializers(Role::UpgradableDurationManager, Role::UpgradableManager),
+    duration_update_stagers(Role::UpgradableDurationManager, Role::UpgradableManager),
+    duration_update_appliers(Role::UpgradableDurationManager, Role::UpgradableManager),
+))]
 pub struct BridgeTokenFactory {
     /// The account of the prover that we can use to prove
     pub prover_account: AccountId,
@@ -105,11 +134,6 @@ pub trait ExtBridgeTokenFactory {
     ) -> Promise;
 }
 
-#[ext_contract(ext_fungible_token)]
-pub trait FungibleToken {
-    fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
-}
-
 #[ext_contract(ext_bridge_token)]
 pub trait ExtBridgeToken {
     fn mint(&self, account_id: AccountId, amount: U128);
@@ -131,6 +155,8 @@ pub trait ExtBridgeToken {
         decimals: Option<u8>,
         icon: Option<String>,
     );
+
+    fn set_paused(&mut self, is_paused: bool);
 }
 
 pub fn assert_self() {
@@ -159,7 +185,7 @@ impl BridgeTokenFactory {
             paused: Mask::default(),
         };
 
-        contract.owner_set(Some(near_sdk::env::predecessor_account_id()));
+        contract.acl_init_super_admin(near_sdk::env::predecessor_account_id());
         contract
     }
 
@@ -221,7 +247,7 @@ impl BridgeTokenFactory {
     /// Deposit from Ethereum to NEAR based on the proof of the locked tokens.
     /// Must attach enough NEAR funds to cover for storage of the proof.
     #[payable]
-    #[pause(except(owner, self))]
+    #[pause(except(roles(Role::UnrestrictedDeposit)))]
     pub fn deposit(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
         let event = EthLockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
@@ -388,7 +414,7 @@ impl BridgeTokenFactory {
     }
 
     #[payable]
-    #[pause(except(owner, self))]
+    #[pause(except(roles(Role::UnrestrictedDeployBridgeToken)))]
     pub fn deploy_bridge_token(&mut self, address: String) -> Promise {
         let address = address.to_lowercase();
         let _ = validate_eth_address(address.clone());
@@ -417,6 +443,13 @@ impl BridgeTokenFactory {
                 NO_DEPOSIT,
                 BRIDGE_TOKEN_NEW,
             )
+    }
+
+    #[access_control_any(roles(Role::PauseManager))]
+    pub fn set_paused_withdraw(&mut self, token: String, paused: bool) -> Promise {
+        ext_bridge_token::ext(self.get_bridge_token_account_id(token))
+            .with_static_gas(SET_PAUSED_GAS)
+            .set_paused(paused)
     }
 
     pub fn get_bridge_token_account_id(&self, address: String) -> AccountId {
@@ -457,7 +490,8 @@ impl BridgeTokenFactory {
         required_deposit
     }
 
-    /// Admin method to set metadata with admin/controller access
+    /// Admin method to set metadata
+    #[access_control_any(roles(Role::MetadataManager))]
     pub fn set_metadata(
         &mut self,
         address: String,
@@ -468,7 +502,6 @@ impl BridgeTokenFactory {
         decimals: Option<u8>,
         icon: Option<String>,
     ) -> Promise {
-        assert!(self.controller_or_self());
         ext_bridge_token::ext(self.get_bridge_token_account_id(address))
             .with_static_gas(env::prepaid_gas() - OUTER_SET_METADATA_GAS)
             .with_attached_deposit(env::attached_deposit())
@@ -491,21 +524,6 @@ impl BridgeTokenFactory {
         })
     }
 
-    pub fn set_controller(&mut self, controller: AccountId) {
-        assert!(self.controller_or_self());
-        assert!(env::is_valid_account_id(controller.as_bytes()));
-        env::storage_write(CONTROLLER_STORAGE_KEY, controller.as_bytes());
-    }
-
-    pub fn controller_or_self(&self) -> bool {
-        let caller = env::predecessor_account_id();
-        caller == env::current_account_id()
-            || self
-                .controller()
-                .map(|controller| controller == caller)
-                .unwrap_or(false)
-    }
-
     /// Ethereum Metadata Connector. This is the address where the contract that emits metadata from tokens
     /// on ethereum is deployed. Address is encoded as hex.
     pub fn metadata_connector(&self) -> Option<String> {
@@ -513,8 +531,8 @@ impl BridgeTokenFactory {
             .map(|value| String::from_utf8(value).expect("Invalid metadata connector address"))
     }
 
+    #[access_control_any(roles(Role::ConfigManager))]
     pub fn set_metadata_connector(&mut self, metadata_connector: String) {
-        assert!(self.controller_or_self());
         validate_eth_address(metadata_connector.clone());
         env::storage_write(
             METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY,
