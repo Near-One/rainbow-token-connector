@@ -1,5 +1,7 @@
-use near_plugins::{Pausable, Ownable};
-use near_plugins_derive::pause;
+use near_plugins::{
+    access_control, access_control_any, pause, AccessControlRole, AccessControllable, Pausable,
+    Upgradable,
+};
 use std::convert::TryInto;
 
 use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
@@ -7,6 +9,7 @@ use near_contract_standards::storage_management::StorageBalance;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap, UnorderedSet};
 use near_sdk::json_types::U128;
+use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
     env, ext_contract, near_bindgen, AccountId, Balance, BorshStorageKey, Gas, PanicOnDefault,
     Promise, PromiseOrValue,
@@ -50,8 +53,30 @@ enum StorageKey {
     WhitelistAccounts,
 }
 
+#[derive(AccessControlRole, Deserialize, Serialize, Copy, Clone)]
+#[serde(crate = "near_sdk::serde")]
+pub enum Role {
+    PauseManager,
+    UpgradableManager,
+    UpgradableCodeStager,
+    UpgradableCodeDeployer,
+    UpgradableDurationManager,
+    ConfigManager,
+    UnrestrictedDeposit,
+    UnrestrictedWithdraw,
+}
+
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Ownable, Pausable)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Pausable, Upgradable)]
+#[access_control(role_type(Role))]
+#[pausable(manager_roles(Role::PauseManager))]
+#[upgradable(access_control_roles(
+    code_stagers(Role::UpgradableCodeStager, Role::UpgradableManager),
+    code_deployers(Role::UpgradableCodeDeployer, Role::UpgradableManager),
+    duration_initializers(Role::UpgradableDurationManager, Role::UpgradableManager),
+    duration_update_stagers(Role::UpgradableDurationManager, Role::UpgradableManager),
+    duration_update_appliers(Role::UpgradableDurationManager, Role::UpgradableManager),
+))]
 pub struct Contract {
     /// The account of the prover that we can use to prove.
     pub prover_account: AccountId,
@@ -148,7 +173,7 @@ impl Contract {
             is_whitelist_mode_enabled: true,
         };
 
-        contract.owner_set(Some(near_sdk::env::predecessor_account_id()));
+        contract.acl_init_super_admin(near_sdk::env::predecessor_account_id());
         contract
     }
 
@@ -184,7 +209,7 @@ impl Contract {
     /// Withdraw funds from NEAR Token Locker.
     /// Receives proof of burning tokens on the other side. Validates it and releases funds.
     #[payable]
-    #[pause(except(owner, self))]
+    #[pause(except(roles(Role::UnrestrictedWithdraw)))]
     pub fn withdraw(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
         let event = EthUnlockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
@@ -332,7 +357,7 @@ impl Contract {
         required_deposit
     }
 
-    #[private]
+    #[access_control_any(roles(Role::ConfigManager))]
     pub fn update_factory_address(&mut self, factory_address: String) {
         self.eth_factory_address = validate_eth_address(factory_address);
     }
