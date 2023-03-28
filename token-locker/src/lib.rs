@@ -415,6 +415,10 @@ mod tests {
         "6b175474e89094c44da98b954eedeac495271d0f".to_string()
     }
 
+    fn pause_manager() -> AccountId {
+        "pause_manager".parse().unwrap()
+    }
+
     /// Generate a valid ethereum address.
     fn ethereum_address_from_id(id: u8) -> String {
         let mut buffer = vec![id];
@@ -508,21 +512,25 @@ mod tests {
     }
 
     #[test]
-    fn test_only_admin_can_pause() {
+    fn test_only_pause_manager_can_pause() {
         set_env!(
             current_account_id: bridge_token_factory(),
             predecessor_account_id: bridge_token_factory(),
         );
         let mut contract = Contract::new(prover(), token_locker());
+        assert!(contract
+            .acl_grant_role("PauseManager".to_owned(), pause_manager())
+            .unwrap());
 
-        // Admin can pause
-        contract.pa_pause_feature("deposit".to_string());
-
-        // Admin can unpause.
         set_env!(
             current_account_id: bridge_token_factory(),
-            predecessor_account_id: bridge_token_factory(),
+            predecessor_account_id: pause_manager(),
         );
+
+        // Pause manager can pause
+        contract.pa_pause_feature("deposit".to_string());
+
+        // Pause manager can unpause.
         contract.pa_unpause_feature("deposit".to_string());
 
         // Alice can't pause
