@@ -62,7 +62,7 @@ impl BridgeToken {
             reference: String::default(),
             reference_hash: Base64VecU8(vec![]),
             decimals: 0,
-            paused: 0,
+            paused: Mask::default(),
             #[cfg(feature = "migrate_icon")]
             icon: None,
         }
