@@ -105,6 +105,7 @@ impl BridgeToken {
         self.token.internal_deposit(&account_id, amount.into());
     }
 
+    #[payable]
     pub fn withdraw(&mut self, amount: U128, recipient: String) -> Promise {
         require!(!self.is_paused());
         assert_one_yocto();

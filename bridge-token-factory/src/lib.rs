@@ -588,6 +588,10 @@ mod tests {
         "bridge".parse().unwrap()
     }
 
+    fn pause_manager() -> AccountId {
+        "pause_manager".parse().unwrap()
+    }
+
     fn token_locker() -> String {
         "6b175474e89094c44da98b954eedeac495271d0f".to_string()
     }
@@ -726,6 +730,16 @@ mod tests {
 
         // User alice can deploy a new bridge token
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
+        assert!(contract
+            .acl_grant_role("PauseManager".to_owned(), pause_manager())
+            .unwrap());
+        let unrestricted_deploy_account: AccountId = "unrestricted_account".parse().unwrap();
+        assert!(contract
+            .acl_grant_role(
+                "UnrestrictedDeployBridgeToken".to_owned(),
+                unrestricted_deploy_account.clone()
+            )
+            .unwrap());
         set_env!(
             current_account_id: bridge_token_factory(),
             predecessor_account_id: alice(),
@@ -733,20 +747,20 @@ mod tests {
         );
         contract.deploy_bridge_token(ethereum_address_from_id(0));
 
-        // Admin pause deployment of new token
+        // Pause manager pause deployment of new token
         set_env!(
             current_account_id: bridge_token_factory(),
-            predecessor_account_id: bridge_token_factory(),
+            predecessor_account_id: pause_manager(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
         contract.pa_pause_feature("deploy_bridge_token".to_string());
 
         set_env!(
             current_account_id: bridge_token_factory(),
-            predecessor_account_id: bridge_token_factory(),
+            predecessor_account_id: unrestricted_deploy_account,
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
-        // Admin can still deploy new tokens after paused
+        // Account with role `UnrestrictedDeployBridgeToken` can still deploy new tokens after paused
         contract.deploy_bridge_token(ethereum_address_from_id(1));
 
         // User alice can't deploy a new bridge token when it is paused
@@ -762,19 +776,22 @@ mod tests {
     }
 
     #[test]
-    fn only_admin_can_pause() {
+    fn only_pause_manager_can_pause() {
         set_env!(
             current_account_id: bridge_token_factory(),
             predecessor_account_id: bridge_token_factory(),
         );
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
+        assert!(contract
+            .acl_grant_role("PauseManager".to_owned(), pause_manager())
+            .unwrap());
 
-        // Admin can pause
+        // Pause manager can pause
         set_env!(
-            current_account_id: bridge_token_factory(),
-            predecessor_account_id: bridge_token_factory(),
+            current_account_id: pause_manager(),
+            predecessor_account_id: pause_manager(),
         );
-        contract.pa_pause_feature("deposit".to_string());
+        assert!(contract.pa_pause_feature("deposit".to_string()));
 
         // Alice can't pause
         set_env!(
@@ -795,6 +812,9 @@ mod tests {
             predecessor_account_id: bridge_token_factory(),
         );
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
+        assert!(contract
+            .acl_grant_role("PauseManager".to_owned(), pause_manager())
+            .unwrap());
 
         set_env!(
             current_account_id: bridge_token_factory(),
@@ -810,7 +830,7 @@ mod tests {
         // Pause deposit
         set_env!(
             current_account_id: bridge_token_factory(),
-            predecessor_account_id: bridge_token_factory(),
+            predecessor_account_id: pause_manager(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
         contract.pa_pause_feature("deposit".to_string());
@@ -836,6 +856,9 @@ mod tests {
             predecessor_account_id: bridge_token_factory(),
         );
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
+        assert!(contract
+            .acl_grant_role("PauseManager".to_owned(), pause_manager())
+            .unwrap());
 
         set_env!(
             current_account_id: bridge_token_factory(),
@@ -851,7 +874,7 @@ mod tests {
         // Pause everything
         set_env!(
             current_account_id: bridge_token_factory(),
-            predecessor_account_id: bridge_token_factory(),
+            predecessor_account_id: pause_manager(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
         contract.pa_pause_feature("ALL".to_string());
@@ -877,6 +900,9 @@ mod tests {
             predecessor_account_id: bridge_token_factory(),
         );
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
+        assert!(contract
+            .acl_grant_role("PauseManager".to_owned(), pause_manager())
+            .unwrap());
 
         set_env!(
             current_account_id: bridge_token_factory(),
@@ -892,7 +918,7 @@ mod tests {
         // Pause everything
         set_env!(
             current_account_id: bridge_token_factory(),
-            predecessor_account_id: bridge_token_factory(),
+            predecessor_account_id: pause_manager(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
 
