@@ -5,7 +5,7 @@
     "license": "MIT",
     "dependencies": {
         "@openzeppelin/cli": "^2.8.1",
-        "@openzeppelin/contracts": "^4.7",
+        "@openzeppelin/contracts": "^4.8",
         "@openzeppelin/contracts-upgradeable": "^4.5.2",
         "dotenv": "^16.0.1",
         "hardhat-contract-sizer": "^2.5.1",
