@@ -6,7 +6,7 @@
     "dependencies": {
         "@openzeppelin/cli": "^2.8.1",
         "@openzeppelin/contracts": "^4.7",
-        "@openzeppelin/contracts-upgradeable": "^4.5.2",
+        "@openzeppelin/contracts-upgradeable": "^4.8.3",
         "dotenv": "^16.0.1",
         "hardhat-contract-sizer": "^2.5.1",
         "rainbow-bridge-lib": "https://gitpkg.now.sh/aurora-is-near/rainbow-bridge/utils?327ff937bda3e3a99386fe488994f3c8e35f8aa0",
