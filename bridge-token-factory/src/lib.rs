@@ -447,7 +447,7 @@ impl BridgeTokenFactory {
             )
     }
 
-    #[pause(except(roles(Role::UpgradableCodeDeployer)))]
+    #[access_control_any(roles(Role::UpgradableCodeDeployer))]
     pub fn upgrade_bridge_token(&mut self, address: String) -> Promise {
         ext_bridge_token::ext(self.get_bridge_token_account_id(address))
             .with_static_gas(env::prepaid_gas() - env::used_gas())
