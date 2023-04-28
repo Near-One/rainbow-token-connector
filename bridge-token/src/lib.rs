@@ -11,6 +11,9 @@ use near_sdk::{
 
 /// Gas to call finish withdraw method on factory.
 const FINISH_WITHDRAW_GAS: Gas = Gas(Gas::ONE_TERA.0 * 50);
+const MIGRATE_GAS: Gas = Gas(Gas::ONE_TERA.0 * 100);
+const NO_DEPOSIT: Balance = 0;
+const NO_ARGS: Vec<u8> = vec![];
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -136,6 +139,27 @@ impl BridgeToken {
     pub fn set_paused(&mut self, paused: bool) {
         require!(self.controller_or_self());
         self.paused = if paused { 1 } else { 0 };
+    }
+
+    pub fn upgrade_and_migrate(&self) -> Promise {
+        require!(
+            self.controller_or_self(),
+            "Only the controller or self can update the code"
+        );
+
+        // Receive the code directly from the input to avoid the
+        // GAS overhead of deserializing parameters
+        let code = env::input().expect("Error: No input").to_vec();
+
+        // Deploy the contract on self
+        Promise::new(env::current_account_id())
+            .deploy_contract(code)
+            .function_call("migrate".to_string(), NO_ARGS, NO_DEPOSIT, MIGRATE_GAS)
+            .as_return()
+    }
+
+    pub fn version() -> String {
+        env!("CARGO_PKG_VERSION").to_owned()
     }
 }
 

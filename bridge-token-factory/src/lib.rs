@@ -157,6 +157,8 @@ pub trait ExtBridgeToken {
     );
 
     fn set_paused(&mut self, is_paused: bool);
+
+    fn upgrade_and_migrate(&mut self, code: &[u8]);
 }
 
 pub fn assert_self() {
@@ -445,9 +447,16 @@ impl BridgeTokenFactory {
             )
     }
 
+    #[pause(except(roles(Role::UpgradableCodeDeployer)))]
+    pub fn upgrade_bridge_token(&mut self, address: String) -> Promise {
+        ext_bridge_token::ext(self.get_bridge_token_account_id(address))
+            .with_static_gas(env::prepaid_gas() - env::used_gas())
+            .upgrade_and_migrate(BRIDGE_TOKEN_BINARY)
+    }
+
     #[access_control_any(roles(Role::PauseManager))]
-    pub fn set_paused_withdraw(&mut self, token: String, paused: bool) -> Promise {
-        ext_bridge_token::ext(self.get_bridge_token_account_id(token))
+    pub fn set_paused_withdraw(&mut self, address: String, paused: bool) -> Promise {
+        ext_bridge_token::ext(self.get_bridge_token_account_id(address))
             .with_static_gas(SET_PAUSED_GAS)
             .set_paused(paused)
     }
@@ -538,6 +547,10 @@ impl BridgeTokenFactory {
             METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY,
             metadata_connector.as_bytes(),
         );
+    }
+
+    pub fn version() -> String {
+        env!("CARGO_PKG_VERSION").to_owned()
     }
 }
 
