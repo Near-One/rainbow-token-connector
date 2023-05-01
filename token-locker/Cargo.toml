@@ -1,6 +1,6 @@
 [package]
 name = "rainbow-bridge-near-token-locker"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Pagoda <hello@pagoda.co>"]
 edition = "2021"
 publish = false

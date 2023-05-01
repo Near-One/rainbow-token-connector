@@ -1126,7 +1126,7 @@ checksum = "643f8f41a8ebc4c5dc4515c82bb8abd397b527fc20fd681b7c011c2aee5d44fb"
 
 [[package]]
 name = "rainbow-bridge-near-token-locker"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "bridge-common",
  "eth-types 0.1.0 (git+https://github.com/near/rainbow-bridge?rev=67966a151122815039f07b02065ab3a2bba09804)",
