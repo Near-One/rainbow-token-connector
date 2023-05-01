@@ -158,7 +158,7 @@ impl BridgeToken {
             .as_return()
     }
 
-    pub fn version() -> String {
+    pub fn version(&self) -> String {
         env!("CARGO_PKG_VERSION").to_owned()
     }
 }
