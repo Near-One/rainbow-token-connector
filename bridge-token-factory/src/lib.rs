@@ -63,6 +63,8 @@ const METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY: &[u8] = b"aM_CONNECTOR";
 /// The prefix is made specially short since it becomes more expensive with larger prefixes.
 const TOKEN_TIMESTAMP_MAP_PREFIX: &[u8] = b"aTT";
 
+const FEE_DECIMAL_PRECISION: u128 = 1000000;
+
 pub type Mask = u128;
 
 #[derive(AccessControlRole, Deserialize, Serialize, Copy, Clone)]
@@ -95,15 +97,15 @@ pub struct WithdrawTokenBounds {
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Debug)]
 pub struct DepositFeePercentage {
-    eth_to_near: f64,
-    eth_to_aurora: f64,
+    eth_to_near: u128,
+    eth_to_aurora: u128,
 }
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Debug)]
 pub struct WithdrawFeePercentage {
-    near_to_eth: f64,
-    aurora_to_eth: f64,
+    near_to_eth: u128,
+    aurora_to_eth: u128,
 }
 
 #[derive(BorshSerialize, BorshStorageKey)]
@@ -426,12 +428,13 @@ impl BridgeTokenFactory {
         }
     }
 
+    //this should be added as per: 10% -> 0.1 = 0.1*10^6
     #[access_control_any(roles(Role::FeeSetter))]
     pub fn set_deposit_fee_percentage(
         &mut self,
         token: &String,
-        eth_to_near: f64,
-        eth_to_aurora: f64,
+        eth_to_near: u128,
+        eth_to_aurora: u128,
     ) -> DepositFeePercentage {
         self.deposit_fee_percentage.insert(
             token,
@@ -466,12 +469,13 @@ impl BridgeTokenFactory {
         }
     }
 
+    //this should be added as per: 10% -> 0.1 = 0.1*10^6
     #[access_control_any(roles(Role::FeeSetter))]
     pub fn set_withdraw_fee_percentage(
         &mut self,
         token: &String,
-        near_to_eth: f64,
-        aurora_to_eth: f64,
+        near_to_eth: u128,
+        aurora_to_eth: u128,
     ) -> WithdrawFeePercentage {
         self.withdraw_fee_percentage.insert(
             token,
@@ -520,7 +524,7 @@ impl BridgeTokenFactory {
         //TODO: Need to call below method in deposit function and get values in callback
         let deposit_fee_percentage = self
             .get_deposit_token_fee_percentage(&token)
-            .unwrap_or_else(|| env::panic_str("Fee percentage not present for this token"));
+            .unwrap_or(DepositFeePercentage{eth_to_aurora: 0, eth_to_near: 0});
 
         let amount_to_transfer: u128;
 
@@ -528,25 +532,23 @@ impl BridgeTokenFactory {
             Some(token_bounds) => {
                 match message.clone() {
                     Some(_message) => {
-                        let fee_amount = (amount as f64 * deposit_fee_percentage.eth_to_aurora) / 10000 as f64;
-                        let fee_amount_ui = fee_amount as u128;
-                        if fee_amount_ui < token_bounds.lower_bound {
+                        let fee_amount = (amount* deposit_fee_percentage.eth_to_aurora) / FEE_DECIMAL_PRECISION;
+                        if fee_amount < token_bounds.lower_bound {
                             amount_to_transfer = amount - token_bounds.lower_bound;
-                        } else if fee_amount_ui > token_bounds.upper_bound {
+                        } else if fee_amount > token_bounds.upper_bound {
                             amount_to_transfer = amount - token_bounds.upper_bound;
                         } else {
-                            amount_to_transfer = amount - fee_amount_ui;
+                            amount_to_transfer = amount - fee_amount;
                         }
                     }
                     None => {
-                        let fee_amount = (amount as f64 * deposit_fee_percentage.eth_to_near) / 10000 as f64; // 0.01 for ETH -> NEAR
-                        let fee_amount_ui = fee_amount as u128;
-                        if fee_amount_ui < token_bounds.lower_bound {
+                        let fee_amount = (amount * deposit_fee_percentage.eth_to_near) / FEE_DECIMAL_PRECISION; // 0.01 for ETH -> NEAR
+                        if fee_amount < token_bounds.lower_bound {
                             amount_to_transfer = amount - token_bounds.lower_bound;
-                        } else if fee_amount_ui > token_bounds.upper_bound {
+                        } else if fee_amount > token_bounds.upper_bound {
                             amount_to_transfer = amount - token_bounds.upper_bound;
                         } else {
-                            amount_to_transfer = amount - fee_amount_ui;
+                            amount_to_transfer = amount - fee_amount;
                         }
                     }
                 }
@@ -930,7 +932,7 @@ mod tests {
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
         set_env!(predecessor_account_id: fee_setter());
         let deposit_fee_percentage =
-            contract.set_deposit_fee_percentage(&token_address, 0.05, 0.02);
+            contract.set_deposit_fee_percentage(&token_address, 50000, 20000); //0.05% and 0.02%
         let expected_fee_percentage = contract
             .get_deposit_token_fee_percentage(&token_address)
             .unwrap();
@@ -952,7 +954,7 @@ mod tests {
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
         set_env!(predecessor_account_id: fee_setter());
         let withdraw_fee_percentage =
-            contract.set_withdraw_fee_percentage(&token_address, 0.09, 0.04);
+            contract.set_withdraw_fee_percentage(&token_address, 90000, 40000); //0.09% and 0.04%
         let expected_fee_percentage = contract
             .get_withdraw_token_fee_percentage(&token_address)
             .unwrap();
@@ -974,7 +976,7 @@ mod tests {
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
         set_env!(predecessor_account_id: bob());
         let deposit_fee_percentage =
-            contract.set_deposit_fee_percentage(&token_address, 0.05, 0.02);
+            contract.set_deposit_fee_percentage(&token_address, 50000, 20000); //0.05% and 0.02%
         let fee_percentage = contract
             .get_deposit_token_fee_percentage(&token_address)
             .unwrap();
