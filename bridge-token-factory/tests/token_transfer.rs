@@ -12,6 +12,8 @@ const SENDER_ADDRESS: &str = "00005474e89094c44da98b954eedeac495271d0f";
 const ALICE: &str = "alice.test.near";
 
 const FACTORY_WASM_PATH: &str = "../res/bridge_token_factory.wasm";
+const FACTORY_WASM_PATH_V_0_1_6: &str = "res/bridge_token_factory_v0.1.6.wasm";
+const BRIDGE_TOKEN_WASM_PATH: &str = "../res/bridge_token.wasm";
 const MOCK_PROVER_WASM_PATH: &str = "../res/mock_prover.wasm";
 
 const DEFAULT_DEPOSIT: u128 = ONE_NEAR;
@@ -477,4 +479,195 @@ async fn test_deploy_failures() {
             .await,
         "BridgeToken contract already exists.",
     );
+}
+
+#[tokio::test]
+async fn test_upgrade() {
+    let (alice, factory, worker) = create_contract(FACTORY_WASM_PATH_V_0_1_6).await;
+    const INIT_ALICE_BALANCE: u64 = 1000;
+    const WITHDRAW_AMOUNT: u64 = 100;
+
+    let token_account = Account::from_secret_key(
+        format!("{}.{}", DAI_ADDRESS, factory.id()).parse().unwrap(),
+        factory.as_account().secret_key().clone(),
+        &worker,
+    );
+
+    assert!(alice
+        .call(factory.id(), "deploy_bridge_token")
+        .deposit(35 * ONE_NEAR)
+        .args(
+            json!({"address": DAI_ADDRESS.to_string()})
+                .to_string()
+                .into_bytes()
+        )
+        .max_gas()
+        .transact()
+        .await
+        .unwrap()
+        .is_success());
+
+    let token_account_id: String = factory
+        .view(
+            "get_bridge_token_account_id",
+            json!({"address": DAI_ADDRESS.to_string()})
+                .to_string()
+                .into_bytes(),
+        )
+        .await
+        .unwrap()
+        .json()
+        .unwrap();
+
+    assert_eq!(token_account_id, token_account.id().to_string());
+
+    // Deploy new version
+    let factory = factory
+        .as_account()
+        .deploy(&(std::fs::read(FACTORY_WASM_PATH).unwrap()))
+        .await
+        .unwrap()
+        .result;
+
+    let token_account_id: String = factory
+        .view(
+            "get_bridge_token_account_id",
+            json!({"address": DAI_ADDRESS.to_string()})
+                .to_string()
+                .into_bytes(),
+        )
+        .await
+        .unwrap()
+        .json()
+        .unwrap();
+
+    assert_eq!(token_account_id, token_account.id().to_string());
+
+    // Verify the factory version
+    let factory_version: String = factory
+        .view("version", "".as_bytes().to_vec())
+        .await
+        .unwrap()
+        .json()
+        .unwrap();
+    assert_eq!(factory_version, "0.2.0");
+
+    // Set alice as super admin
+    let result = factory
+        .call("acl_init_super_admin")
+        .args(
+            json!({
+               "account_id": alice.id().to_string()
+            })
+            .to_string()
+            .into_bytes(),
+        )
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+
+    let result: bool = result.json().unwrap();
+    assert!(result);
+
+    // Grant alice the `UpgradableManager` role
+    let result = alice
+        .call(factory.id(), "acl_grant_role")
+        .args(
+            json!({
+               "role": "UpgradableManager",
+               "account_id": alice.id().to_string()
+            })
+            .to_string()
+            .into_bytes(),
+        )
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+    let result: bool = result.json().unwrap();
+    assert!(result);
+
+    // Upgrade the bridge token directly because self-upgrade is not supported in version `0.1.6`
+    let token_contract = token_account
+        .deploy(&std::fs::read(BRIDGE_TOKEN_WASM_PATH).unwrap())
+        .await
+        .unwrap()
+        .result;
+
+    // Verify the bridge token version
+    let token_version: String = worker
+        .view(token_account.id(), "version", vec![])
+        .await
+        .unwrap()
+        .json()
+        .unwrap();
+    assert_eq!(token_version, "0.2.0");
+
+    // Upgrade the bridge token over factory (redeploy the same version)
+    let result = alice
+        .call(factory.id(), "upgrade_bridge_token")
+        .args(
+            json!({"address": DAI_ADDRESS.to_string()})
+                .to_string()
+                .into_bytes(),
+        )
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+    assert!(result.is_success());
+
+    // Verify the bridge token version
+    let token_version: String = worker
+        .view(token_account.id(), "version", vec![])
+        .await
+        .unwrap()
+        .json()
+        .unwrap();
+    assert_eq!(token_version, "0.2.0");
+
+    // Grant alice the `PauseManager` role
+    let result = alice
+        .call(factory.id(), "acl_grant_role")
+        .args(
+            json!({
+               "role": "PauseManager",
+               "account_id": alice.id().to_string()
+            })
+            .to_string()
+            .into_bytes(),
+        )
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+    let result: bool = result.json().unwrap();
+    assert!(result);
+
+    // Pause bridge token withdraw
+    let result = alice
+        .call(factory.id(), "set_paused_withdraw")
+        .args(
+            json!({"address": DAI_ADDRESS.to_string(), "paused": true})
+                .to_string()
+                .into_bytes(),
+        )
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+    println!("{:?}", result);
+    assert!(result.is_success());
+
+    // Verify bridge token is paused
+    let is_paused: bool = alice
+        .call(token_account.id(), "is_paused")
+        .max_gas()
+        .transact()
+        .await
+        .unwrap()
+        .json()
+        .unwrap();
+    assert!(is_paused);
 }
