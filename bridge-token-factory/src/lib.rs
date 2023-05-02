@@ -82,28 +82,28 @@ pub enum Role {
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Debug)]
 pub struct DepositTokenBounds {
-    pub lower_bound: u128,
-    pub upper_bound: u128,
+    lower_bound: u128,
+    upper_bound: u128,
 }
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Debug)]
 pub struct WithdrawTokenBounds {
-    pub lower_bound: u128,
-    pub upper_bound: u128,
+    lower_bound: u128,
+    upper_bound: u128,
 }
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Debug)]
 pub struct DepositFeePercentage {
-    pub eth_to_near: f64,
-    pub aurora_to_eth: f64,
+    eth_to_near: f64,
+    eth_to_aurora: f64,
 }
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Debug)]
 pub struct WithdrawFeePercentage {
-    pub eth_to_near: f64,
-    pub aurora_to_eth: f64,
+    near_to_eth: f64,
+    aurora_to_eth: f64,
 }
 
 #[derive(BorshSerialize, BorshStorageKey)]
@@ -431,18 +431,18 @@ impl BridgeTokenFactory {
         &mut self,
         token: &String,
         eth_to_near: f64,
-        aurora_to_eth: f64,
+        eth_to_aurora: f64,
     ) -> DepositFeePercentage {
         self.deposit_fee_percentage.insert(
             token,
             &DepositFeePercentage {
                 eth_to_near,
-                aurora_to_eth,
+                eth_to_aurora,
             },
         );
         DepositFeePercentage {
             eth_to_near,
-            aurora_to_eth,
+            eth_to_aurora,
         }
     }
 
@@ -470,18 +470,18 @@ impl BridgeTokenFactory {
     pub fn set_withdraw_fee_percentage(
         &mut self,
         token: &String,
-        eth_to_near: f64,
+        near_to_eth: f64,
         aurora_to_eth: f64,
     ) -> WithdrawFeePercentage {
         self.withdraw_fee_percentage.insert(
             token,
             &WithdrawFeePercentage {
-                eth_to_near,
+                near_to_eth,
                 aurora_to_eth,
             },
         );
         WithdrawFeePercentage {
-            eth_to_near,
+            near_to_eth,
             aurora_to_eth,
         }
     }
@@ -528,23 +528,25 @@ impl BridgeTokenFactory {
             Some(token_bounds) => {
                 match message.clone() {
                     Some(_message) => {
-                        let fee_amount = (amount * 5) / 10000; // 0.05% for Aurora -> ETH
-                        if fee_amount < token_bounds.lower_bound {
+                        let fee_amount = (amount as f64 * deposit_fee_percentage.eth_to_aurora) / 10000 as f64;
+                        let fee_amount_ui = fee_amount as u128;
+                        if fee_amount_ui < token_bounds.lower_bound {
                             amount_to_transfer = amount - token_bounds.lower_bound;
-                        } else if fee_amount > token_bounds.upper_bound {
+                        } else if fee_amount_ui > token_bounds.upper_bound {
                             amount_to_transfer = amount - token_bounds.upper_bound;
                         } else {
-                            amount_to_transfer = amount - fee_amount;
+                            amount_to_transfer = amount - fee_amount_ui;
                         }
                     }
                     None => {
-                        let fee_amount = (amount * 10) / 10000; // 0.01 for ETH -> NEAR
-                        if fee_amount < token_bounds.lower_bound {
+                        let fee_amount = (amount as f64 * deposit_fee_percentage.eth_to_near) / 10000 as f64; // 0.01 for ETH -> NEAR
+                        let fee_amount_ui = fee_amount as u128;
+                        if fee_amount_ui < token_bounds.lower_bound {
                             amount_to_transfer = amount - token_bounds.lower_bound;
-                        } else if fee_amount > token_bounds.upper_bound {
+                        } else if fee_amount_ui > token_bounds.upper_bound {
                             amount_to_transfer = amount - token_bounds.upper_bound;
                         } else {
-                            amount_to_transfer = amount - fee_amount;
+                            amount_to_transfer = amount - fee_amount_ui;
                         }
                     }
                 }
@@ -873,7 +875,7 @@ mod tests {
         set_env!(predecessor_account_id: alice(), current_account_id: alice());
         let token_address = ethereum_address_from_id(2);
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
-        set_env!(predecessor_account_id: bob() // bob has no role to set fee-bounds);
+        set_env!(predecessor_account_id: bob()); // bob has no role to set fee-bounds);
         contract.set_deposit_fee_bound(&token_address, 100, 200);
     }
 
@@ -933,7 +935,7 @@ mod tests {
             .get_deposit_token_fee_percentage(&token_address)
             .unwrap();
         assert_eq!(
-            deposit_fee_percentage.aurora_to_eth, expected_fee_percentage.aurora_to_eth,
+            deposit_fee_percentage.eth_to_aurora, expected_fee_percentage.eth_to_aurora,
             "Aurora -> Eth fee percentage not matched for deposit"
         );
         assert_eq!(
@@ -959,7 +961,7 @@ mod tests {
             "Aurora -> Eth fee percentage not matched for withdraw"
         );
         assert_eq!(
-            withdraw_fee_percentage.eth_to_near, expected_fee_percentage.eth_to_near,
+            withdraw_fee_percentage.near_to_eth, expected_fee_percentage.near_to_eth,
             "Eth -> Near fee percentage not matched for withdraw"
         );
     }
@@ -977,7 +979,7 @@ mod tests {
             .get_deposit_token_fee_percentage(&token_address)
             .unwrap();
         assert_eq!(
-            deposit_fee_percentage.aurora_to_eth, fee_percentage.aurora_to_eth,
+            deposit_fee_percentage.eth_to_aurora, fee_percentage.eth_to_aurora,
             "Aurora -> Eth fee percentage not matched"
         );
         assert_eq!(
