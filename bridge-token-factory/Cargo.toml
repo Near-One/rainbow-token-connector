@@ -25,11 +25,11 @@ bridge-common = { path = "../bridge-common", default-features = false }
 hex = "0.4.2"
 bridge-token = { path = "../bridge-token" }
 near-plugins = { git = "https://github.com/aurora-is-near/near-plugins", rev = "93e1a30d79e72d51c4349ba71d454865c76ac690" }
+serde = { version = "*", features = ["derive"] }
 
 [dev-dependencies]
 uint = { version = "0.8.3", default-features = false }
 rand = "0.7.3"
-serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 workspaces = "0.5.0"
 tokio = { version = "1.1", features = ["rt", "macros"] }

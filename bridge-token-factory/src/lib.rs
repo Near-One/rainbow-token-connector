@@ -19,12 +19,10 @@ pub use log_metadata_event::TokenMetadataEvent;
 mod lock_event;
 mod log_metadata_event;
 
-// const BRIDGE_TOKEN_BINARY: &'static [u8] = include_bytes!(std::env!(
-//     "BRIDGE_TOKEN",
-//     "Set BRIDGE_TOKEN to be the path of the bridge token binary"
-// ));
-
-const BRIDGE_TOKEN_BINARY: &'static [u8] = &[0];
+const BRIDGE_TOKEN_BINARY: &'static [u8] = include_bytes!(std::env!(
+    "BRIDGE_TOKEN",
+    "Set BRIDGE_TOKEN to be the path of the bridge token binary"
+));
 
 /// Initial balance for the BridgeToken contract to cover storage and related.
 const BRIDGE_TOKEN_INIT_BALANCE: Balance = ONE_NEAR * 3; // 3e24yN, 3N
@@ -81,28 +79,34 @@ pub enum Role {
     MetadataManager,
     FeeSetter,
 }
-#[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Debug)]
+
+#[derive(
+    Default, BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq,
+)]
 pub struct DepositTokenBounds {
     lower_bound: u128,
     upper_bound: u128,
 }
-#[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Debug)]
+
+#[derive(
+    Default, BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq,
+)]
 pub struct WithdrawTokenBounds {
     lower_bound: u128,
     upper_bound: u128,
 }
 
-#[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Debug)]
+#[derive(
+    Default, BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq,
+)]
 pub struct DepositFeePercentage {
     eth_to_near: u128,
     eth_to_aurora: u128,
 }
 
-#[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Debug)]
+#[derive(
+    Default, BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq,
+)]
 pub struct WithdrawFeePercentage {
     near_to_eth: u128,
     aurora_to_eth: u128,
