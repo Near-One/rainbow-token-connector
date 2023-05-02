@@ -114,7 +114,10 @@ pub struct WithdrawFeePercentage {
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {
-    TokenAddress,
+    DepositBounds,
+    DepositFeePercentage,
+    WithdrawBounds,
+    WithdrawFeePercentage
 }
 
 #[near_bindgen]
@@ -226,10 +229,10 @@ impl BridgeTokenFactory {
             prover_account,
             locker_address: validate_eth_address(locker_address),
             tokens: UnorderedSet::new(b"t".to_vec()),
-            deposit_fee_bound: UnorderedMap::new(StorageKey::TokenAddress),
-            withdraw_fee_bound: UnorderedMap::new(StorageKey::TokenAddress),
-            deposit_fee_percentage: UnorderedMap::new(StorageKey::TokenAddress),
-            withdraw_fee_percentage: UnorderedMap::new(StorageKey::TokenAddress),
+            deposit_fee_bound: UnorderedMap::new(StorageKey::DepositBounds),
+            withdraw_fee_bound: UnorderedMap::new(StorageKey::WithdrawBounds),
+            deposit_fee_percentage: UnorderedMap::new(StorageKey::DepositFeePercentage),
+            withdraw_fee_percentage: UnorderedMap::new(StorageKey::WithdrawFeePercentage),
             used_events: UnorderedSet::new(b"u".to_vec()),
             owner_pk: env::signer_account_pk(),
             bridge_token_storage_deposit_required:
