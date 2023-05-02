@@ -50,6 +50,9 @@ const SET_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 /// Amount of gas used by bridge token to pause withdraw.
 const SET_PAUSED_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 
+/// Amount of gas used upgrade and migrate bridge token.
+const UPGRADE_TOKEN_GAS: Gas = Gas(Gas::ONE_TERA.0 * 200);
+
 /// Controller storage key.
 const CONTROLLER_STORAGE_KEY: &[u8] = b"aCONTROLLER";
 
@@ -156,9 +159,7 @@ pub trait ExtBridgeToken {
         icon: Option<String>,
     );
 
-    fn set_paused(&mut self, is_paused: bool);
-
-    fn upgrade_and_migrate(&mut self, code: &[u8]);
+    fn set_paused(&mut self, paused: bool);
 }
 
 pub fn assert_self() {
@@ -447,11 +448,14 @@ impl BridgeTokenFactory {
             )
     }
 
-    #[access_control_any(roles(Role::UpgradableCodeDeployer))]
-    pub fn upgrade_bridge_token(&mut self, address: String) -> Promise {
-        ext_bridge_token::ext(self.get_bridge_token_account_id(address))
-            .with_static_gas(env::prepaid_gas() - env::used_gas())
-            .upgrade_and_migrate(BRIDGE_TOKEN_BINARY)
+    #[access_control_any(roles(Role::UpgradableCodeDeployer, Role::UpgradableManager))]
+    pub fn upgrade_bridge_token(&self, address: String) -> Promise {
+        Promise::new(self.get_bridge_token_account_id(address)).function_call(
+            "upgrade_and_migrate".to_string(),
+            BRIDGE_TOKEN_BINARY.into(),
+            0,
+            UPGRADE_TOKEN_GAS,
+        )
     }
 
     #[access_control_any(roles(Role::PauseManager))]
