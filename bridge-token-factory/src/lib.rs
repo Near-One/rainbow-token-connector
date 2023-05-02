@@ -528,7 +528,6 @@ impl BridgeTokenFactory {
         ));
 
         let deposit_fee_bound = self.get_deposit_token_fee_bound(&token);
-        //TODO: Need to call below method in deposit function and get values in callback
         let deposit_fee_percentage = self
             .get_deposit_token_fee_percentage(&token)
             .unwrap_or(DepositFeePercentage{eth_to_aurora: 0, eth_to_near: 0});
@@ -590,6 +589,7 @@ impl BridgeTokenFactory {
     #[result_serializer(borsh)]
     pub fn finish_withdraw(
         &mut self,
+        #[serializer(borsh)] withdrawer: AccountId,
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] recipient: String,
     ) -> result_types::Withdraw {
@@ -606,7 +606,42 @@ impl BridgeTokenFactory {
         );
         let token_address = validate_eth_address(parts[0].to_string());
         let recipient_address = validate_eth_address(recipient);
-        result_types::Withdraw::new(amount, token_address, recipient_address)
+
+        let withdraw_fee_bound = self.get_withdraw_token_fee_bound(&parts[0].to_string());
+        let withdraw_fee_percentage = self
+            .get_withdraw_token_fee_percentage(&parts[0].to_string())
+            .unwrap_or(WithdrawFeePercentage { near_to_eth: 0, aurora_to_eth: 0 });
+
+        let amount_to_transfer: u128;
+
+        match withdraw_fee_bound {
+            Some(token_bounds) => {
+                //TODO: have this as constant
+                if withdrawer.as_str() == "aurora" {
+                    let fee_amount = (amount* withdraw_fee_percentage.aurora_to_eth) / FEE_DECIMAL_PRECISION;
+                    if fee_amount < token_bounds.lower_bound {
+                        amount_to_transfer = amount - token_bounds.lower_bound;
+                    } else if fee_amount > token_bounds.upper_bound {
+                        amount_to_transfer = amount - token_bounds.upper_bound;
+                    } else {
+                        amount_to_transfer = amount - fee_amount;
+                    }
+                } else {
+                    let fee_amount = (amount * withdraw_fee_percentage.near_to_eth) / FEE_DECIMAL_PRECISION; // 0.01 for ETH -> NEAR
+                    if fee_amount < token_bounds.lower_bound {
+                        amount_to_transfer = amount - token_bounds.lower_bound;
+                    } else if fee_amount > token_bounds.upper_bound {
+                        amount_to_transfer = amount - token_bounds.upper_bound;
+                    } else {
+                        amount_to_transfer = amount - fee_amount;
+                    }
+                }
+            }
+            None => {
+                amount_to_transfer = amount;
+            }
+        }
+        result_types::Withdraw::new(amount_to_transfer, token_address, recipient_address)
     }
 
     #[payable]
