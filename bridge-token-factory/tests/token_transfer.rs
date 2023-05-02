@@ -1,3 +1,5 @@
+use std::env::args;
+
 use bridge_token_factory::{validate_eth_address, EthLockedEvent, Proof};
 use near_sdk::borsh::{self, BorshSerialize};
 use near_sdk::{AccountId, Balance, ONE_NEAR, ONE_YOCTO};
@@ -66,6 +68,23 @@ fn create_contract() -> (Account, Contract, Worker<Sandbox>) {
     )
     .unwrap();
 
+    let _grant_fee_setter_call = rt
+        .block_on(
+            factory_account
+                .call(factory_contract.id(), "acl_grant_role")
+                .args(
+                    json!({"role": "FeeSetter".to_string(), "account_id": alice.id()})
+                        .to_string()
+                        .into_bytes(),
+                )
+                .transact(),
+        )
+        .unwrap();
+    assert!(
+        _grant_fee_setter_call.is_success(),
+        "fee setter grant role failed"
+    );
+
     (alice, factory_contract, worker)
 }
 
@@ -125,8 +144,27 @@ fn run_view_function(
     remove_quotes(&mut res)
 }
 
+fn get_fee_amount(
+    amount: u128,
+    fee_percentage: u128,
+    lower_bound: u128,
+    upper_bound: u128,
+) -> u128 {
+    const FEE_DECIMAL_PRECISION: u128 = 100_00_00;
+    let mut fee_amount = (amount * fee_percentage) / FEE_DECIMAL_PRECISION;
+    if fee_amount < lower_bound {
+        fee_amount = lower_bound;
+        return fee_amount;
+    } else if fee_amount > upper_bound {
+        fee_amount = upper_bound;
+        return fee_amount;
+    } else {
+        return fee_amount;
+    }
+}
+
 #[test]
-fn test_eth_token_transfer() {
+fn test_token_transfer_without_fee_bound_and_fee_percentage() {
     let (alice, factory, worker) = create_contract();
     let rt = Runtime::new().unwrap();
     const INIT_ALICE_BALANCE: u64 = 1000;
@@ -261,6 +299,596 @@ fn test_eth_token_transfer() {
     assert_eq!(
         total_supply,
         format!("{}", INIT_ALICE_BALANCE - WITHDRAW_AMOUNT)
+    );
+}
+
+#[test]
+fn test_token_transfer_with_fee_less_than_lower_bound() {
+    let (alice, factory, worker) = create_contract();
+    let rt = Runtime::new().unwrap();
+    const INIT_ALICE_BALANCE: u64 = 1000;
+    const WITHDRAW_AMOUNT: u64 = 100;
+
+    assert!(&rt
+        .block_on(
+            alice
+                .call(factory.id(), "deploy_bridge_token")
+                .deposit(35 * ONE_NEAR)
+                .args(
+                    json!({"address": DAI_ADDRESS.to_string()})
+                        .to_string()
+                        .into_bytes()
+                )
+                .max_gas()
+                .transact()
+        )
+        .unwrap()
+        .is_success());
+
+    let token_account_id: String = run_view_function(
+        &rt,
+        &factory.id().to_string(),
+        &worker,
+        "get_bridge_token_account_id",
+        json!({"address": DAI_ADDRESS.to_string()}),
+    );
+
+    assert_eq!(
+        token_account_id,
+        format!("{}.{}", DAI_ADDRESS, factory.id())
+    );
+
+    let alice_balance: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": ALICE }),
+    );
+
+    assert_eq!(alice_balance, "0");
+
+    let total_supply: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_total_supply",
+        json!({}),
+    );
+    assert_eq!(total_supply, "0");
+
+    let mut proof = Proof::default();
+    proof.log_entry_data = EthLockedEvent {
+        locker_address: validate_eth_address(LOCKER_ADDRESS.to_string()),
+        token: DAI_ADDRESS.to_string(),
+        sender: SENDER_ADDRESS.to_string(),
+        amount: Balance::from(INIT_ALICE_BALANCE),
+        recipient: ALICE.parse().unwrap(),
+    }
+    .to_log_entry_data();
+
+    let fee_setter_call = &rt
+    .block_on(
+        alice
+            .call(factory.id(), "set_deposit_fee_bound")
+            .args(
+                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": 200, "lower_bound": 100})
+                    .to_string()
+                    .into_bytes()
+            )
+            .max_gas()
+            .transact()
+    )
+    .unwrap();
+    assert!(fee_setter_call.is_success(), "Fee setter called failed");
+
+    let fee_percentage_setter_call = &rt
+    .block_on(
+        alice
+            .call(factory.id(), "set_deposit_fee_percentage")
+            .args(
+                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": 50000, "eth_to_aurora": 40000})
+                    .to_string()
+                    .into_bytes()
+            )
+            .max_gas()
+            .transact()
+    )
+    .unwrap();
+
+    assert!(
+        fee_percentage_setter_call.is_success(),
+        "Fee percentage setter called failed"
+    );
+
+    let fee_bounds = run_view_function(
+        &rt,
+        &factory.id().to_string(),
+        &worker,
+        "get_deposit_token_fee_bound",
+        json!({"token": DAI_ADDRESS.to_string()}),
+    );
+
+    let fee_percentage_bounds = run_view_function(
+        &rt,
+        &factory.id().to_string(),
+        &worker,
+        "get_deposit_token_fee_percentage",
+        json!({"token": DAI_ADDRESS.to_string()}),
+    );
+
+    println!("FEE BOUND {}", fee_bounds);
+    println!("FEE PERCENTAGE BOUND {}", fee_percentage_bounds);
+
+    let deposit_call = &rt
+        .block_on(
+            alice
+                .call(factory.id(), "deposit")
+                .deposit(DEFAULT_DEPOSIT)
+                .max_gas()
+                .args(proof.try_to_vec().unwrap())
+                .transact(),
+        )
+        .unwrap();
+    if deposit_call.is_failure() {
+        println!("\n\n\n Deposit error {:?}\n\n", deposit_call.failures());
+    }
+    let fee_amount = get_fee_amount(u128::from(INIT_ALICE_BALANCE), 50000u128, 100u128, 200u128);
+    let transfer_amount = INIT_ALICE_BALANCE as u128 - fee_amount;
+
+    let alice_balance: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": ALICE }),
+    );
+    assert_eq!(alice_balance, format!("{}", transfer_amount));
+
+    let total_supply: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_total_supply",
+        json!({}),
+    );
+    assert_eq!(total_supply, format!("{}", transfer_amount));
+
+    assert!(&rt
+        .block_on(
+            alice
+                .call(&token_account_id.parse().unwrap(), "withdraw")
+                .max_gas()
+                .deposit(ONE_YOCTO)
+                .args(
+                    json!({
+                        "amount" : format!("{}", WITHDRAW_AMOUNT),
+                        "recipient" : SENDER_ADDRESS.to_string()
+                    })
+                    .to_string()
+                    .into_bytes(),
+                )
+                .transact(),
+        )
+        .unwrap()
+        .is_success());
+
+    let alice_balance: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": ALICE }),
+    );
+    assert_eq!(
+        alice_balance,
+        format!("{}", transfer_amount - u128::from(WITHDRAW_AMOUNT))
+    );
+
+    let total_supply: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_total_supply",
+        json!({}),
+    );
+    assert_eq!(
+        total_supply,
+        format!("{}", transfer_amount - u128::from(WITHDRAW_AMOUNT))
+    );
+}
+
+#[test]
+fn test_token_transfer_with_fee_more_than_upper_bound() {
+    let (alice, factory, worker) = create_contract();
+    let rt = Runtime::new().unwrap();
+    const INIT_ALICE_BALANCE: u64 = 1000;
+    const WITHDRAW_AMOUNT: u64 = 100;
+
+    assert!(&rt
+        .block_on(
+            alice
+                .call(factory.id(), "deploy_bridge_token")
+                .deposit(35 * ONE_NEAR)
+                .args(
+                    json!({"address": DAI_ADDRESS.to_string()})
+                        .to_string()
+                        .into_bytes()
+                )
+                .max_gas()
+                .transact()
+        )
+        .unwrap()
+        .is_success());
+
+    let token_account_id: String = run_view_function(
+        &rt,
+        &factory.id().to_string(),
+        &worker,
+        "get_bridge_token_account_id",
+        json!({"address": DAI_ADDRESS.to_string()}),
+    );
+
+    assert_eq!(
+        token_account_id,
+        format!("{}.{}", DAI_ADDRESS, factory.id())
+    );
+
+    let alice_balance: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": ALICE }),
+    );
+
+    assert_eq!(alice_balance, "0");
+
+    let total_supply: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_total_supply",
+        json!({}),
+    );
+    assert_eq!(total_supply, "0");
+
+    let mut proof = Proof::default();
+    proof.log_entry_data = EthLockedEvent {
+        locker_address: validate_eth_address(LOCKER_ADDRESS.to_string()),
+        token: DAI_ADDRESS.to_string(),
+        sender: SENDER_ADDRESS.to_string(),
+        amount: Balance::from(INIT_ALICE_BALANCE),
+        recipient: ALICE.parse().unwrap(),
+    }
+    .to_log_entry_data();
+
+    let fee_setter_call = &rt
+    .block_on(
+        alice
+            .call(factory.id(), "set_deposit_fee_bound")
+            .args(
+                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": 200, "lower_bound": 100})
+                    .to_string()
+                    .into_bytes()
+            )
+            .max_gas()
+            .transact()
+    )
+    .unwrap();
+    assert!(fee_setter_call.is_success(), "Fee setter called failed");
+
+    let fee_percentage_setter_call = &rt
+    .block_on(
+        alice
+            .call(factory.id(), "set_deposit_fee_percentage")
+            .args(
+                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": 400000, "eth_to_aurora": 40000})
+                    .to_string()
+                    .into_bytes()
+            )
+            .max_gas()
+            .transact()
+    )
+    .unwrap();
+
+    assert!(
+        fee_percentage_setter_call.is_success(),
+        "Fee percentage setter called failed"
+    );
+
+    let fee_bounds = run_view_function(
+        &rt,
+        &factory.id().to_string(),
+        &worker,
+        "get_deposit_token_fee_bound",
+        json!({"token": DAI_ADDRESS.to_string()}),
+    );
+
+    let fee_percentage_bounds = run_view_function(
+        &rt,
+        &factory.id().to_string(),
+        &worker,
+        "get_deposit_token_fee_percentage",
+        json!({"token": DAI_ADDRESS.to_string()}),
+    );
+
+    println!("FEE BOUND {}", fee_bounds);
+    println!("FEE PERCENTAGE BOUND {}", fee_percentage_bounds);
+
+    let deposit_call = &rt
+        .block_on(
+            alice
+                .call(factory.id(), "deposit")
+                .deposit(DEFAULT_DEPOSIT)
+                .max_gas()
+                .args(proof.try_to_vec().unwrap())
+                .transact(),
+        )
+        .unwrap();
+    if deposit_call.is_failure() {
+        println!("\n\n\n Deposit error {:?}\n\n", deposit_call.failures());
+    }
+    let fee_amount = get_fee_amount(u128::from(INIT_ALICE_BALANCE), 400000u128, 100u128, 200u128);
+    println!("Fee amount {}", fee_amount);
+    let transfer_amount = INIT_ALICE_BALANCE as u128 - fee_amount;
+
+    let alice_balance: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": ALICE }),
+    );
+    assert_eq!(alice_balance, format!("{}", transfer_amount));
+
+    let total_supply: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_total_supply",
+        json!({}),
+    );
+    assert_eq!(total_supply, format!("{}", transfer_amount));
+
+    assert!(&rt
+        .block_on(
+            alice
+                .call(&token_account_id.parse().unwrap(), "withdraw")
+                .max_gas()
+                .deposit(ONE_YOCTO)
+                .args(
+                    json!({
+                        "amount" : format!("{}", WITHDRAW_AMOUNT),
+                        "recipient" : SENDER_ADDRESS.to_string()
+                    })
+                    .to_string()
+                    .into_bytes(),
+                )
+                .transact(),
+        )
+        .unwrap()
+        .is_success());
+
+    let alice_balance: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": ALICE }),
+    );
+    assert_eq!(
+        alice_balance,
+        format!("{}", transfer_amount - u128::from(WITHDRAW_AMOUNT))
+    );
+
+    let total_supply: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_total_supply",
+        json!({}),
+    );
+    assert_eq!(
+        total_supply,
+        format!("{}", transfer_amount - u128::from(WITHDRAW_AMOUNT))
+    );
+}
+
+#[test]
+fn test_token_transfer_with_fee_in_bound_range() {
+    let (alice, factory, worker) = create_contract();
+    let rt = Runtime::new().unwrap();
+    const INIT_ALICE_BALANCE: u64 = 1000;
+    const WITHDRAW_AMOUNT: u64 = 100;
+
+    assert!(&rt
+        .block_on(
+            alice
+                .call(factory.id(), "deploy_bridge_token")
+                .deposit(35 * ONE_NEAR)
+                .args(
+                    json!({"address": DAI_ADDRESS.to_string()})
+                        .to_string()
+                        .into_bytes()
+                )
+                .max_gas()
+                .transact()
+        )
+        .unwrap()
+        .is_success());
+
+    let token_account_id: String = run_view_function(
+        &rt,
+        &factory.id().to_string(),
+        &worker,
+        "get_bridge_token_account_id",
+        json!({"address": DAI_ADDRESS.to_string()}),
+    );
+
+    assert_eq!(
+        token_account_id,
+        format!("{}.{}", DAI_ADDRESS, factory.id())
+    );
+
+    let alice_balance: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": ALICE }),
+    );
+
+    assert_eq!(alice_balance, "0");
+
+    let total_supply: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_total_supply",
+        json!({}),
+    );
+    assert_eq!(total_supply, "0");
+
+    let mut proof = Proof::default();
+    proof.log_entry_data = EthLockedEvent {
+        locker_address: validate_eth_address(LOCKER_ADDRESS.to_string()),
+        token: DAI_ADDRESS.to_string(),
+        sender: SENDER_ADDRESS.to_string(),
+        amount: Balance::from(INIT_ALICE_BALANCE),
+        recipient: ALICE.parse().unwrap(),
+    }
+    .to_log_entry_data();
+
+    let fee_setter_call = &rt
+    .block_on(
+        alice
+            .call(factory.id(), "set_deposit_fee_bound")
+            .args(
+                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": 500, "lower_bound": 100})
+                    .to_string()
+                    .into_bytes()
+            )
+            .max_gas()
+            .transact()
+    )
+    .unwrap();
+    assert!(fee_setter_call.is_success(), "Fee setter called failed");
+
+    let fee_percentage_setter_call = &rt
+    .block_on(
+        alice
+            .call(factory.id(), "set_deposit_fee_percentage")
+            .args(
+                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": 400000, "eth_to_aurora": 40000})
+                    .to_string()
+                    .into_bytes()
+            )
+            .max_gas()
+            .transact()
+    )
+    .unwrap();
+
+    assert!(
+        fee_percentage_setter_call.is_success(),
+        "Fee percentage setter called failed"
+    );
+
+    let fee_bounds = run_view_function(
+        &rt,
+        &factory.id().to_string(),
+        &worker,
+        "get_deposit_token_fee_bound",
+        json!({"token": DAI_ADDRESS.to_string()}),
+    );
+
+    let fee_percentage_bounds = run_view_function(
+        &rt,
+        &factory.id().to_string(),
+        &worker,
+        "get_deposit_token_fee_percentage",
+        json!({"token": DAI_ADDRESS.to_string()}),
+    );
+
+    println!("FEE BOUND {}", fee_bounds);
+    println!("FEE PERCENTAGE BOUND {}", fee_percentage_bounds);
+
+    let deposit_call = &rt
+        .block_on(
+            alice
+                .call(factory.id(), "deposit")
+                .deposit(DEFAULT_DEPOSIT)
+                .max_gas()
+                .args(proof.try_to_vec().unwrap())
+                .transact(),
+        )
+        .unwrap();
+    if deposit_call.is_failure() {
+        println!("\n\n\n Deposit error {:?}\n\n", deposit_call.failures());
+    }
+    let fee_amount = get_fee_amount(u128::from(INIT_ALICE_BALANCE), 400000u128, 100u128, 500u128);
+    println!("Fee amount {}", fee_amount);
+    let transfer_amount = INIT_ALICE_BALANCE as u128 - fee_amount;
+
+    let alice_balance: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": ALICE }),
+    );
+    assert_eq!(alice_balance, format!("{}", transfer_amount));
+
+    let total_supply: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_total_supply",
+        json!({}),
+    );
+    assert_eq!(total_supply, format!("{}", transfer_amount));
+
+    assert!(&rt
+        .block_on(
+            alice
+                .call(&token_account_id.parse().unwrap(), "withdraw")
+                .max_gas()
+                .deposit(ONE_YOCTO)
+                .args(
+                    json!({
+                        "amount" : format!("{}", WITHDRAW_AMOUNT),
+                        "recipient" : SENDER_ADDRESS.to_string()
+                    })
+                    .to_string()
+                    .into_bytes(),
+                )
+                .transact(),
+        )
+        .unwrap()
+        .is_success());
+
+    let alice_balance: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": ALICE }),
+    );
+    assert_eq!(
+        alice_balance,
+        format!("{}", transfer_amount - u128::from(WITHDRAW_AMOUNT))
+    );
+
+    let total_supply: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_total_supply",
+        json!({}),
+    );
+    assert_eq!(
+        total_supply,
+        format!("{}", transfer_amount - u128::from(WITHDRAW_AMOUNT))
     );
 }
 
