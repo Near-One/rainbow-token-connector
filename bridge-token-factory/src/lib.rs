@@ -533,37 +533,29 @@ impl BridgeTokenFactory {
             .unwrap_or(DepositFeePercentage{eth_to_aurora: 0, eth_to_near: 0});
 
         let amount_to_transfer: u128;
-        let mut fee_amount: u128 = 0;
+        let mut fee_amount: u128;
 
         match deposit_fee_bound {
             Some(token_bounds) => {
                 match message.clone() {
                     Some(_message) => {
                         fee_amount = (amount* deposit_fee_percentage.eth_to_aurora) / FEE_DECIMAL_PRECISION;
-                        if fee_amount < token_bounds.lower_bound {
-                            amount_to_transfer = amount - token_bounds.lower_bound;
-                        } else if fee_amount > token_bounds.upper_bound {
-                            amount_to_transfer = amount - token_bounds.upper_bound;
-                        } else {
-                            amount_to_transfer = amount - fee_amount;
-                        }
                     }
                     None => {
                         fee_amount = (amount * deposit_fee_percentage.eth_to_near) / FEE_DECIMAL_PRECISION; // 0.01 for ETH -> NEAR
-                        if fee_amount < token_bounds.lower_bound {
-                            amount_to_transfer = amount - token_bounds.lower_bound;
-                        } else if fee_amount > token_bounds.upper_bound {
-                            amount_to_transfer = amount - token_bounds.upper_bound;
-                        } else {
-                            amount_to_transfer = amount - fee_amount;
-                        }
                     }
+                }
+                if fee_amount < token_bounds.lower_bound {
+                    fee_amount = token_bounds.lower_bound;
+                } else if fee_amount > token_bounds.upper_bound {
+                    fee_amount = token_bounds.upper_bound;
                 }
             }
             None => {
-                amount_to_transfer = amount;
+                fee_amount = 0;
             }
         }
+        amount_to_transfer = amount - fee_amount;
 
         match message {
             Some(message) => ext_bridge_token::ext(self.get_bridge_token_account_id(token.clone()))
@@ -620,35 +612,29 @@ impl BridgeTokenFactory {
             .unwrap_or(WithdrawFeePercentage { near_to_eth: 0, aurora_to_eth: 0 });
 
         let amount_to_transfer: u128;
-        let mut fee_amount: u128 = 0;
+        let mut fee_amount: u128;
 
         match withdraw_fee_bound {
             Some(token_bounds) => {
                 //TODO: have this as constant
                 if withdrawer.as_str() == "aurora" {
                     fee_amount = (amount* withdraw_fee_percentage.aurora_to_eth) / FEE_DECIMAL_PRECISION;
-                    if fee_amount < token_bounds.lower_bound {
-                        amount_to_transfer = amount - token_bounds.lower_bound;
-                    } else if fee_amount > token_bounds.upper_bound {
-                        amount_to_transfer = amount - token_bounds.upper_bound;
-                    } else {
-                        amount_to_transfer = amount - fee_amount;
-                    }
                 } else {
                     fee_amount = (amount * withdraw_fee_percentage.near_to_eth) / FEE_DECIMAL_PRECISION; // 0.01 for ETH -> NEAR
-                    if fee_amount < token_bounds.lower_bound {
-                        amount_to_transfer = amount - token_bounds.lower_bound;
-                    } else if fee_amount > token_bounds.upper_bound {
-                        amount_to_transfer = amount - token_bounds.upper_bound;
-                    } else {
-                        amount_to_transfer = amount - fee_amount;
-                    }
+                }
+
+                if fee_amount < token_bounds.lower_bound { //bound checks
+                    fee_amount = token_bounds.lower_bound;
+                } else if fee_amount > token_bounds.upper_bound {
+                    fee_amount = token_bounds.upper_bound;
                 }
             }
             None => {
-                amount_to_transfer = amount;
+                fee_amount = 0;
             }
         }
+
+        amount_to_transfer = amount - fee_amount;
 
         if fee_amount != 0{
             ext_bridge_token::ext(token)
