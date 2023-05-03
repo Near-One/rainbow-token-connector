@@ -568,17 +568,23 @@ impl BridgeTokenFactory {
             Some(message) => ext_bridge_token::ext(self.get_bridge_token_account_id(token.clone()))
                 .with_static_gas(MINT_GAS)
                 .with_attached_deposit(env::attached_deposit() - required_deposit)
-                .mint(env::current_account_id(), amount_to_transfer.into())
+                .mint(env::current_account_id(), amount.into())
                 .then(
                     ext_bridge_token::ext(self.get_bridge_token_account_id(token))
                         .with_static_gas(FT_TRANSFER_CALL_GAS)
                         .with_attached_deposit(1)
                         .ft_transfer_call(target, amount_to_transfer.into(), None, message),
                 ),
-            None => ext_bridge_token::ext(self.get_bridge_token_account_id(token))
+            None => ext_bridge_token::ext(self.get_bridge_token_account_id(token.clone()))
                 .with_static_gas(MINT_GAS)
                 .with_attached_deposit(env::attached_deposit() - required_deposit)
-                .mint(target, amount_to_transfer.into()),
+                .mint(env::current_account_id(), amount.into())
+                .then(
+                    ext_bridge_token::ext(self.get_bridge_token_account_id(token))
+                        .with_static_gas(FT_TRANSFER_CALL_GAS)
+                        .with_attached_deposit(1)
+                        .ft_transfer_call(target, amount_to_transfer.into(), None, "".to_string()),
+                )
         }
     }
 
@@ -613,12 +619,13 @@ impl BridgeTokenFactory {
             .unwrap_or(WithdrawFeePercentage { near_to_eth: 0, aurora_to_eth: 0 });
 
         let amount_to_transfer: u128;
+        let mut fee_amount: u128 = 0;
 
         match withdraw_fee_bound {
             Some(token_bounds) => {
                 //TODO: have this as constant
                 if withdrawer.as_str() == "aurora" {
-                    let fee_amount = (amount* withdraw_fee_percentage.aurora_to_eth) / FEE_DECIMAL_PRECISION;
+                    fee_amount = (amount* withdraw_fee_percentage.aurora_to_eth) / FEE_DECIMAL_PRECISION;
                     if fee_amount < token_bounds.lower_bound {
                         amount_to_transfer = amount - token_bounds.lower_bound;
                     } else if fee_amount > token_bounds.upper_bound {
@@ -627,7 +634,7 @@ impl BridgeTokenFactory {
                         amount_to_transfer = amount - fee_amount;
                     }
                 } else {
-                    let fee_amount = (amount * withdraw_fee_percentage.near_to_eth) / FEE_DECIMAL_PRECISION; // 0.01 for ETH -> NEAR
+                    fee_amount = (amount * withdraw_fee_percentage.near_to_eth) / FEE_DECIMAL_PRECISION; // 0.01 for ETH -> NEAR
                     if fee_amount < token_bounds.lower_bound {
                         amount_to_transfer = amount - token_bounds.lower_bound;
                     } else if fee_amount > token_bounds.upper_bound {
@@ -641,6 +648,14 @@ impl BridgeTokenFactory {
                 amount_to_transfer = amount;
             }
         }
+
+        if fee_amount != 0{
+            ext_bridge_token::ext(token)
+                    .with_static_gas(MINT_GAS)
+                    .with_attached_deposit(env::attached_deposit())
+                    .mint(env::current_account_id(), fee_amount.into());
+        }
+
         result_types::Withdraw::new(amount_to_transfer, token_address, recipient_address)
     }
 
