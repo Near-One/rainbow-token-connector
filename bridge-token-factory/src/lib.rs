@@ -62,6 +62,7 @@ const METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY: &[u8] = b"aM_CONNECTOR";
 const TOKEN_TIMESTAMP_MAP_PREFIX: &[u8] = b"aTT";
 
 const FEE_DECIMAL_PRECISION: u128 = 1000000;
+const AURORA_ID: &str = "aurora";
 
 pub type Mask = u128;
 
@@ -617,7 +618,7 @@ impl BridgeTokenFactory {
         match withdraw_fee_bound {
             Some(token_bounds) => {
                 //TODO: have this as constant
-                if withdrawer.as_str() == "aurora" {
+                if withdrawer.as_str() == AURORA_ID {
                     fee_amount = (amount* withdraw_fee_percentage.aurora_to_eth) / FEE_DECIMAL_PRECISION;
                 } else {
                     fee_amount = (amount * withdraw_fee_percentage.near_to_eth) / FEE_DECIMAL_PRECISION; // 0.01 for ETH -> NEAR
