@@ -533,12 +533,13 @@ impl BridgeTokenFactory {
             .unwrap_or(DepositFeePercentage{eth_to_aurora: 0, eth_to_near: 0});
 
         let amount_to_transfer: u128;
+        let mut fee_amount: u128 = 0;
 
         match deposit_fee_bound {
             Some(token_bounds) => {
                 match message.clone() {
                     Some(_message) => {
-                        let fee_amount = (amount* deposit_fee_percentage.eth_to_aurora) / FEE_DECIMAL_PRECISION;
+                        fee_amount = (amount* deposit_fee_percentage.eth_to_aurora) / FEE_DECIMAL_PRECISION;
                         if fee_amount < token_bounds.lower_bound {
                             amount_to_transfer = amount - token_bounds.lower_bound;
                         } else if fee_amount > token_bounds.upper_bound {
@@ -548,7 +549,7 @@ impl BridgeTokenFactory {
                         }
                     }
                     None => {
-                        let fee_amount = (amount * deposit_fee_percentage.eth_to_near) / FEE_DECIMAL_PRECISION; // 0.01 for ETH -> NEAR
+                        fee_amount = (amount * deposit_fee_percentage.eth_to_near) / FEE_DECIMAL_PRECISION; // 0.01 for ETH -> NEAR
                         if fee_amount < token_bounds.lower_bound {
                             amount_to_transfer = amount - token_bounds.lower_bound;
                         } else if fee_amount > token_bounds.upper_bound {
@@ -578,12 +579,12 @@ impl BridgeTokenFactory {
             None => ext_bridge_token::ext(self.get_bridge_token_account_id(token.clone()))
                 .with_static_gas(MINT_GAS)
                 .with_attached_deposit(env::attached_deposit() - required_deposit)
-                .mint(env::current_account_id(), amount.into())
+                .mint(target, amount_to_transfer.into())
                 .then(
-                    ext_bridge_token::ext(self.get_bridge_token_account_id(token))
-                        .with_static_gas(FT_TRANSFER_CALL_GAS)
-                        .with_attached_deposit(1)
-                        .ft_transfer_call(target, amount_to_transfer.into(), None, "".to_string()),
+                    ext_bridge_token::ext(self.get_bridge_token_account_id(token.clone()))
+                        .with_static_gas(MINT_GAS)
+                        .with_attached_deposit(env::attached_deposit() - required_deposit)
+                        .mint(env::current_account_id(), fee_amount.into()),
                 )
         }
     }
