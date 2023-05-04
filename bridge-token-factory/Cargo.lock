@@ -376,7 +376,7 @@ dependencies = [
 
 [[package]]
 name = "bridge-token"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "near-contract-standards",
  "near-sdk",
@@ -384,7 +384,7 @@ dependencies = [
 
 [[package]]
 name = "bridge-token-factory"
-version = "0.1.5"
+version = "0.2.0"
 dependencies = [
  "anyhow",
  "bridge-common",

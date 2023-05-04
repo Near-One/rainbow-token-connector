@@ -4,6 +4,7 @@ use near_contract_standards::fungible_token::metadata::{
 use near_contract_standards::fungible_token::FungibleToken;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{Base64VecU8, U128};
+use near_sdk::serde_json::json;
 use near_sdk::{
     assert_one_yocto, env, ext_contract, near_bindgen, require, AccountId, Balance, Gas,
     PanicOnDefault, Promise, PromiseOrValue, StorageUsage,
@@ -13,7 +14,7 @@ use near_sdk::{
 const FINISH_WITHDRAW_GAS: Gas = Gas(Gas::ONE_TERA.0 * 50);
 const MIGRATE_GAS: Gas = Gas(Gas::ONE_TERA.0 * 100);
 const NO_DEPOSIT: Balance = 0;
-const NO_ARGS: Vec<u8> = vec![];
+const CURRENT_STATE_VERSION: u32 = 1;
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -155,11 +156,18 @@ impl BridgeToken {
         // Deploy the contract on self
         Promise::new(env::current_account_id())
             .deploy_contract(code)
-            .function_call("migrate".to_string(), NO_ARGS, NO_DEPOSIT, MIGRATE_GAS)
+            .function_call(
+                "migrate".to_string(),
+                json!({ "from_version": CURRENT_STATE_VERSION })
+                    .to_string()
+                    .into_bytes(),
+                NO_DEPOSIT,
+                MIGRATE_GAS,
+            )
             .as_return()
     }
 
-    pub fn version() -> String {
+    pub fn version(&self) -> String {
         env!("CARGO_PKG_VERSION").to_owned()
     }
 }
@@ -224,11 +232,14 @@ impl BridgeToken {
     /// Adding icon as suggested here: https://nomicon.io/Standards/FungibleToken/Metadata.html
     /// This function can only be called from the factory or from the contract itself.
     #[init(ignore_state)]
-    pub fn migrate() -> Self {
-        let old_state: BridgeTokenV0 = env::state_read()
-            .expect("State is not compatible with BridgeTokenV0. Migration has not been applied.");
-        let new_state: BridgeToken = old_state.into();
-        assert!(new_state.controller_or_self());
-        new_state
+    pub fn migrate(from_version: u32) -> Self {
+        if from_version == 0 {
+            let old_state: BridgeTokenV0 = env::state_read().expect("Contract isn't initialized");
+            let new_state: BridgeToken = old_state.into();
+            assert!(new_state.controller_or_self());
+            new_state
+        } else {
+            env::state_read().unwrap()
+        }
     }
 }

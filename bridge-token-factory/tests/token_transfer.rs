@@ -670,4 +670,8 @@ async fn test_upgrade() {
         .json()
         .unwrap();
     assert!(is_paused);
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> add-near-plugins
