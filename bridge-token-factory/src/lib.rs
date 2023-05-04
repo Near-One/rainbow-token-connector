@@ -79,6 +79,7 @@ pub enum Role {
     UnrestrictedDeployBridgeToken,
     MetadataManager,
     FeeSetter,
+    FeeClaimer,
 }
 
 #[derive(
@@ -416,6 +417,7 @@ impl BridgeTokenFactory {
         self.withdraw_fee_percentage.get(token)
     }
 
+    //token here should be ethereum address
     #[access_control_any(roles(Role::FeeSetter))]
     pub fn set_deposit_fee_bound(
         &mut self,
@@ -423,6 +425,7 @@ impl BridgeTokenFactory {
         upper_bound: u128,
         lower_bound: u128,
     ) -> DepositTokenBounds {
+        let _ = validate_eth_address(token.clone());
         self.deposit_fee_bound.insert(
             token,
             &DepositTokenBounds {
@@ -444,6 +447,7 @@ impl BridgeTokenFactory {
         eth_to_near: u128,
         eth_to_aurora: u128,
     ) -> DepositFeePercentage {
+        let _ = validate_eth_address(token.clone());
         self.deposit_fee_percentage.insert(
             token,
             &DepositFeePercentage {
@@ -464,6 +468,7 @@ impl BridgeTokenFactory {
         upper_bound: u128,
         lower_bound: u128,
     ) -> WithdrawTokenBounds {
+        let _ = validate_eth_address(token.clone());
         self.withdraw_fee_bound.insert(
             token,
             &WithdrawTokenBounds {
@@ -485,6 +490,7 @@ impl BridgeTokenFactory {
         near_to_eth: u128,
         aurora_to_eth: u128,
     ) -> WithdrawFeePercentage {
+        let _ = validate_eth_address(token.clone());
         self.withdraw_fee_percentage.insert(
             token,
             &WithdrawFeePercentage {
@@ -580,7 +586,7 @@ impl BridgeTokenFactory {
                 .with_attached_deposit(env::attached_deposit() - required_deposit)
                 .mint(target, amount_to_transfer.into())
                 .then(
-                    ext_bridge_token::ext(self.get_bridge_token_account_id(token.clone()))
+                    ext_bridge_token::ext(self.get_bridge_token_account_id(token))
                         .with_static_gas(MINT_GAS)
                         .with_attached_deposit(env::attached_deposit() - required_deposit)
                         .mint(env::current_account_id(), fee_amount.into()),
@@ -626,7 +632,6 @@ impl BridgeTokenFactory {
 
         match withdraw_fee_bound {
             Some(token_bounds) => {
-                //TODO: have this as constant
                 if withdrawer.as_str() == AURORA_ID {
                     fee_amount =
                         (amount * withdraw_fee_percentage.aurora_to_eth) / FEE_DECIMAL_PRECISION;
@@ -658,6 +663,14 @@ impl BridgeTokenFactory {
         }
 
         result_types::Withdraw::new(amount_to_transfer, token_address, recipient_address)
+    }
+
+    #[access_control_any(roles(Role::FeeClaimer))]
+    pub fn claim_fee(&self, token: AccountId, amount: Balance) {
+        ext_bridge_token::ext(token)
+            .with_static_gas(FT_TRANSFER_CALL_GAS)
+            .with_attached_deposit(1)
+            .ft_transfer_call(env::predecessor_account_id(), amount.into(), None, "".to_string());
     }
 
     #[payable]
