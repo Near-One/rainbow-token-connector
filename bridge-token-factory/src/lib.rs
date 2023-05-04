@@ -209,6 +209,8 @@ pub trait ExtBridgeToken {
         icon: Option<String>,
     );
 
+    fn ft_transfer(&mut self, receiver_id: AccountId, amount: U128, memo: Option<String>);
+
     fn set_paused(&mut self, is_paused: bool);
 
     fn upgrade_and_migrate(&mut self, code: &[u8]);
@@ -668,9 +670,9 @@ impl BridgeTokenFactory {
     #[access_control_any(roles(Role::FeeClaimer))]
     pub fn claim_fee(&self, token: AccountId, amount: Balance) {
         ext_bridge_token::ext(token)
-            .with_static_gas(FT_TRANSFER_CALL_GAS)
+            .with_static_gas(FT_TRANSFER_GAS)
             .with_attached_deposit(1)
-            .ft_transfer_call(env::predecessor_account_id(), amount.into(), None, "".to_string());
+            .ft_transfer(env::predecessor_account_id(), amount.into(), None);
     }
 
     #[payable]

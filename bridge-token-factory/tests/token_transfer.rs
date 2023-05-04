@@ -17,7 +17,7 @@ const MOCK_PROVER_WASM_PATH: &str = "../res/mock_prover.wasm";
 
 const DEFAULT_DEPOSIT: u128 = ONE_NEAR;
 
-fn create_contract() -> (Account, Contract, Worker<Sandbox>) {
+fn create_contract() -> (Account, Contract, Account, Worker<Sandbox>) {
     let rt = Runtime::new().unwrap();
 
     let worker: Worker<Sandbox> = rt.block_on(workspaces::sandbox()).unwrap();
@@ -83,7 +83,7 @@ fn create_contract() -> (Account, Contract, Worker<Sandbox>) {
         "fee setter grant role failed"
     );
 
-    (alice, factory_contract, worker)
+    (alice, factory_contract, factory_account, worker)
 }
 
 #[derive(BorshSerialize)]
@@ -163,7 +163,7 @@ fn get_fee_amount(
 
 #[test]
 fn test_token_transfer_with_deposit_and_withdraw_fee() {
-    let (alice, factory, worker) = create_contract();
+    let (alice, factory, _, worker) = create_contract();
     let rt = Runtime::new().unwrap();
     const INIT_ALICE_BALANCE: u64 = 1000;
     const WITHDRAW_AMOUNT: u64 = 100;
@@ -385,7 +385,7 @@ fn test_token_transfer_with_deposit_and_withdraw_fee() {
 
 #[test]
 fn test_token_deposit_without_fee_bound_and_fee_percentage() {
-    let (alice, factory, worker) = create_contract();
+    let (alice, factory, _, worker) = create_contract();
     let rt = Runtime::new().unwrap();
     const INIT_ALICE_BALANCE: u64 = 1000;
 
@@ -480,7 +480,7 @@ fn test_token_deposit_without_fee_bound_and_fee_percentage() {
 
 #[test]
 fn test_token_deposit_with_fee_less_than_lower_bound() {
-    let (alice, factory, worker) = create_contract();
+    let (alice, factory, _, worker) = create_contract();
     let rt = Runtime::new().unwrap();
     const INIT_ALICE_BALANCE: u64 = 1000;
 
@@ -616,7 +616,7 @@ fn test_token_deposit_with_fee_less_than_lower_bound() {
 
 #[test]
 fn test_token_deposit_with_fee_more_than_upper_bound() {
-    let (alice, factory, worker) = create_contract();
+    let (alice, factory, _, worker) = create_contract();
     let rt = Runtime::new().unwrap();
     const INIT_ALICE_BALANCE: u64 = 1000;
 
@@ -749,7 +749,7 @@ fn test_token_deposit_with_fee_more_than_upper_bound() {
 
 #[test]
 fn test_token_deposit_with_fee_in_bound_range() {
-    let (alice, factory, worker) = create_contract();
+    let (alice, factory, _, worker) = create_contract();
     let rt = Runtime::new().unwrap();
     const INIT_ALICE_BALANCE: u64 = 1000;
 
@@ -882,7 +882,7 @@ fn test_token_deposit_with_fee_in_bound_range() {
 
 #[test]
 fn test_token_withdraw_without_fee_bound_and_fee_percentage() {
-    let (alice, factory, worker) = create_contract();
+    let (alice, factory, _, worker) = create_contract();
     let rt = Runtime::new().unwrap();
     const INIT_ALICE_BALANCE: u64 = 1000;
     const WITHDRAW_AMOUNT: u64 = 100;
@@ -1013,7 +1013,7 @@ fn test_token_withdraw_without_fee_bound_and_fee_percentage() {
 
 #[test]
 fn test_token_withdraw_with_fee_less_than_lower_bound() {
-    let (alice, factory, worker) = create_contract();
+    let (alice, factory, _, worker) = create_contract();
     let rt = Runtime::new().unwrap();
     const INIT_ALICE_BALANCE: u64 = 1000;
     const WITHDRAW_AMOUNT: u64 = 100;
@@ -1184,7 +1184,7 @@ fn test_token_withdraw_with_fee_less_than_lower_bound() {
 }
 #[test]
 fn test_token_withdraw_with_fee_more_than_upper_bound() {
-    let (alice, factory, worker) = create_contract();
+    let (alice, factory, _, worker) = create_contract();
     let rt = Runtime::new().unwrap();
     const INIT_ALICE_BALANCE: u64 = 1000;
     const WITHDRAW_AMOUNT: u64 = 100;
@@ -1356,7 +1356,7 @@ fn test_token_withdraw_with_fee_more_than_upper_bound() {
 
 #[test]
 fn test_token_withdraw_with_fee_in_bound_range() {
-    let (alice, factory, worker) = create_contract();
+    let (alice, factory, _, worker) = create_contract();
     let rt = Runtime::new().unwrap();
     const INIT_ALICE_BALANCE: u64 = 1000;
     const WITHDRAW_AMOUNT: u64 = 100;
@@ -1527,8 +1527,299 @@ fn test_token_withdraw_with_fee_in_bound_range() {
 }
 
 #[test]
+fn test_fee_deposit_claim() {
+    let (alice, factory, factory_account, worker) = create_contract();
+    let rt = Runtime::new().unwrap();
+    const INIT_ALICE_BALANCE: u64 = 1000;
+    const WITHDRAW_AMOUNT: u64 = 100;
+
+    assert!(&rt
+        .block_on(
+            alice
+                .call(factory.id(), "deploy_bridge_token")
+                .deposit(35 * ONE_NEAR)
+                .args(
+                    json!({"address": DAI_ADDRESS.to_string()})
+                        .to_string()
+                        .into_bytes()
+                )
+                .max_gas()
+                .transact()
+        )
+        .unwrap()
+        .is_success());
+
+    let token_account_id: String = run_view_function(
+        &rt,
+        &factory.id().to_string(),
+        &worker,
+        "get_bridge_token_account_id",
+        json!({"address": DAI_ADDRESS.to_string()}),
+    );
+
+    assert_eq!(
+        token_account_id,
+        format!("{}.{}", DAI_ADDRESS, factory.id())
+    );
+
+    let alice_balance: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": ALICE }),
+    );
+
+    assert_eq!(alice_balance, "0");
+
+    let total_supply: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_total_supply",
+        json!({}),
+    );
+    assert_eq!(total_supply, "0");
+
+    let _grant_fee_claimer_role_call = rt
+        .block_on(
+            factory_account
+                .call(factory.id(), "acl_grant_role")
+                .args(
+                    json!({"role": "FeeClaimer".to_string(), "account_id": alice.id()})
+                        .to_string()
+                        .into_bytes(),
+                )
+                .transact(),
+        )
+        .unwrap();
+    assert!(
+        _grant_fee_claimer_role_call.is_success(),
+        "fee setter grant role failed"
+    );
+
+    let mut proof = Proof::default();
+    proof.log_entry_data = EthLockedEvent {
+        locker_address: validate_eth_address(LOCKER_ADDRESS.to_string()),
+        token: DAI_ADDRESS.to_string(),
+        sender: SENDER_ADDRESS.to_string(),
+        amount: Balance::from(INIT_ALICE_BALANCE),
+        recipient: ALICE.parse().unwrap(),
+    }
+    .to_log_entry_data();
+
+    let fee_setter_call = &rt
+    .block_on(
+        alice
+            .call(factory.id(), "set_deposit_fee_bound")
+            .args(
+                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": 500, "lower_bound": 100})
+                    .to_string()
+                    .into_bytes()
+            )
+            .max_gas()
+            .transact()
+    )
+    .unwrap();
+    assert!(fee_setter_call.is_success(), "Fee setter called failed");
+
+    let fee_percentage_setter_call = &rt
+    .block_on(
+        alice
+            .call(factory.id(), "set_deposit_fee_percentage")
+            .args(
+                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": 400000, "eth_to_aurora": 40000})
+                    .to_string()
+                    .into_bytes()
+            )
+            .max_gas()
+            .transact()
+    )
+    .unwrap();
+
+    assert!(
+        fee_percentage_setter_call.is_success(),
+        "Fee percentage setter called failed"
+    );
+
+    let withdraw_fee_setter_call = &rt
+        .block_on(
+            alice
+                .call(factory.id(), "set_withdraw_fee_bound")
+                .args(
+                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": 50, "lower_bound": 10})
+                        .to_string()
+                        .into_bytes(),
+                )
+                .max_gas()
+                .transact(),
+        )
+        .unwrap();
+    assert!(
+        withdraw_fee_setter_call.is_success(),
+        "Withdraw Fee setter called failed"
+    );
+
+    let withdraw_fee_percentage_setter_call = &rt
+    .block_on(
+        alice
+            .call(factory.id(), "set_withdraw_fee_percentage")
+            .args(
+                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": 350000, "aurora_to_eth": 300000})
+                    .to_string()
+                    .into_bytes()
+            )
+            .max_gas()
+            .transact()
+    )
+    .unwrap();
+
+    assert!(
+        withdraw_fee_percentage_setter_call.is_success(),
+        "Withdraw fee percentage setter called failed"
+    );
+
+    let deposit_call = &rt
+        .block_on(
+            alice
+                .call(factory.id(), "deposit")
+                .deposit(DEFAULT_DEPOSIT)
+                .max_gas()
+                .args(proof.try_to_vec().unwrap())
+                .transact(),
+        )
+        .unwrap();
+    if deposit_call.is_failure() {
+        println!("\n\n\n Deposit error {:?}\n\n", deposit_call.failures());
+    }
+    let deposit_fee_amount =
+        get_fee_amount(u128::from(INIT_ALICE_BALANCE), 400000u128, 100u128, 500u128);
+    let transfer_amount = INIT_ALICE_BALANCE as u128 - deposit_fee_amount;
+
+    let alice_balance: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": ALICE }),
+    );
+    assert_eq!(alice_balance, format!("{}", transfer_amount));
+
+    let token_factory_balance_after_deposit: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": factory.id().to_string() }),
+    );
+    assert_eq!(
+        token_factory_balance_after_deposit,
+        format!("{}", deposit_fee_amount)
+    );
+
+    assert!(&rt
+        .block_on(
+            alice
+                .call(&token_account_id.parse().unwrap(), "withdraw")
+                .max_gas()
+                .deposit(ONE_YOCTO)
+                .args(
+                    json!({
+                        "amount" : format!("{}", WITHDRAW_AMOUNT),
+                        "recipient" : SENDER_ADDRESS.to_string()
+                    })
+                    .to_string()
+                    .into_bytes(),
+                )
+                .transact(),
+        )
+        .unwrap()
+        .is_success());
+
+    let alice_balance: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": ALICE }),
+    );
+    assert_eq!(
+        alice_balance,
+        format!(
+            "{}",
+            u128::from(INIT_ALICE_BALANCE) - u128::from(WITHDRAW_AMOUNT) - deposit_fee_amount
+        )
+    );
+    let withdraw_fee_amount =
+        get_fee_amount(u128::from(WITHDRAW_AMOUNT), 350000u128, 10u128, 50u128);
+    let token_factory_balance_after_withdraw: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": factory.id().to_string()}),
+    );
+    assert_eq!(
+        format!("{}", deposit_fee_amount + withdraw_fee_amount),
+        token_factory_balance_after_withdraw
+    );
+
+    let alice_balance_before_claim: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": ALICE }),
+    );
+
+    let claim_fee_call = &rt
+        .block_on(
+            alice
+                .call(factory.id(), "claim_fee")
+                .args(
+                    json!({"token": token_account_id, "amount": 50})
+                        .to_string()
+                        .into_bytes(),
+                )
+                .max_gas()
+                .transact(),
+        )
+        .unwrap();
+    assert!(claim_fee_call.is_success(), "Claim Fee call failed");
+
+    let token_factory_balance_after_claim: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": factory.id().to_string()}),
+    );
+
+    let alice_balance_after_claim: String = run_view_function(
+        &rt,
+        &token_account_id,
+        &worker,
+        "ft_balance_of",
+        json!({ "account_id": ALICE }),
+    );
+    let alice_bal_before_claim: u128 = alice_balance_before_claim.parse().unwrap();
+    let token_factory_balance_before_claim: u128 =
+        token_factory_balance_after_withdraw.parse().unwrap();
+    assert_eq!(
+        format!("{}", token_factory_balance_before_claim - 50),
+        token_factory_balance_after_claim,
+        "Token Factory balance didn't matched before and after fee is claimed"
+    );
+    assert_eq!(
+        format!("{}", alice_bal_before_claim + 50),
+        alice_balance_after_claim,
+        "Before-After claim balance of alice not matched"
+    );
+}
+
+#[test]
 fn test_with_invalid_proof() {
-    let (user, factory, worker) = create_contract();
+    let (user, factory, _, worker) = create_contract();
     let rt = Runtime::new().unwrap();
 
     assert!(&rt
@@ -1615,7 +1906,7 @@ fn test_with_invalid_proof() {
 
 #[test]
 fn test_bridge_token_failures() {
-    let (user, factory, _worker) = create_contract();
+    let (user, factory, _, _worker) = create_contract();
     let rt = Runtime::new().unwrap();
 
     assert!(&rt
@@ -1728,7 +2019,7 @@ fn test_bridge_token_failures() {
 
 #[test]
 fn test_deploy_failures() {
-    let (user, factory, _worker) = create_contract();
+    let (user, factory, _, _worker) = create_contract();
     let rt = Runtime::new().unwrap();
 
     // Fails with not enough deposit.
