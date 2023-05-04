@@ -1126,6 +1126,29 @@ mod tests {
     }
 
     #[test]
+    fn test_finish_withdraw() {
+        set_env!(predecessor_account_id: alice());
+        let mut contract = BridgeTokenFactory::new(prover(), token_locker());
+
+        set_env!(
+            predecessor_account_id: alice(),
+            attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
+        );
+        contract.deploy_bridge_token(token_locker());
+
+        set_env!(
+            current_account_id: bridge_token_factory(),
+            predecessor_account_id: format!("{}.{}", token_locker(), bridge_token_factory())
+        );
+
+        let address = validate_eth_address(token_locker());
+        assert_eq!(
+            contract.finish_withdraw(alice() ,1_000, token_locker()),
+            result_types::Withdraw::new(1_000, address, address)
+        );
+    }
+
+    #[test]
     fn deploy_bridge_token_paused() {
         set_env!(
             current_account_id: bridge_token_factory(),
