@@ -11,7 +11,7 @@ use near_sdk::{
     Promise, PromiseOrValue, PublicKey, ONE_NEAR,
 };
 
-pub use bridge_common::prover::{validate_eth_address, Proof};
+pub use bridge_common::prover::{is_eth_address, validate_eth_address, Proof};
 use bridge_common::{parse_recipient, prover::*, result_types, Recipient};
 pub use lock_event::EthLockedEvent;
 pub use log_metadata_event::TokenMetadataEvent;
@@ -143,14 +143,6 @@ pub struct BridgeTokenFactory {
     pub locker_address: EthAddress,
     /// Set of created BridgeToken contracts.
     pub tokens: UnorderedSet<String>,
-    /// Fee amount bound for deposit.
-    pub deposit_fee_bound: UnorderedMap<String, DepositTokenBounds>,
-    /// Fee amount bound for withdraw
-    pub withdraw_fee_bound: UnorderedMap<String, WithdrawTokenBounds>,
-    /// Fee percentage of each token for deposit
-    pub deposit_fee_percentage: UnorderedMap<String, DepositFeePercentage>,
-    /// Fee percentage of each token for withdraw
-    pub withdraw_fee_percentage: UnorderedMap<String, WithdrawFeePercentage>,
     /// Hashes of the events that were already used.
     pub used_events: UnorderedSet<Vec<u8>>,
     /// Public key of the account deploying the factory.
@@ -160,6 +152,14 @@ pub struct BridgeTokenFactory {
     /// Mask determining all paused functions
     #[deprecated]
     paused: Mask,
+    /// Fee amount bound for deposit.
+    pub deposit_fee_bound: UnorderedMap<String, DepositTokenBounds>,
+    /// Fee amount bound for withdraw
+    pub withdraw_fee_bound: UnorderedMap<String, WithdrawTokenBounds>,
+    /// Fee percentage of each token for deposit
+    pub deposit_fee_percentage: UnorderedMap<String, DepositFeePercentage>,
+    /// Fee percentage of each token for withdraw
+    pub withdraw_fee_percentage: UnorderedMap<String, WithdrawFeePercentage>,
 }
 
 #[ext_contract(ext_self)]
@@ -223,6 +223,22 @@ pub fn assert_self() {
     assert_eq!(env::predecessor_account_id(), env::current_account_id());
 }
 
+pub fn is_withdrawer_aurora_engine(withdrawer: AccountId) -> bool {
+    let mut parts: Vec<&str> = withdrawer.as_str().split('.').collect();
+    println!("PARTS: {:?}", parts);
+    if parts.len() < 2 {
+        return withdrawer.as_str() == AURORA_ID;
+    } else if parts.len() == 2 {
+        let first_data = parts[0];
+        let master_account = parts.pop().unwrap();
+        if !is_eth_address(first_data.to_string()) {
+            return master_account == AURORA_ID;
+        };
+    }
+
+    return false;
+}
+
 #[near_bindgen]
 impl BridgeTokenFactory {
     /// Initializes the contract.
@@ -236,10 +252,6 @@ impl BridgeTokenFactory {
             prover_account,
             locker_address: validate_eth_address(locker_address),
             tokens: UnorderedSet::new(b"t".to_vec()),
-            deposit_fee_bound: UnorderedMap::new(StorageKey::DepositBounds),
-            withdraw_fee_bound: UnorderedMap::new(StorageKey::WithdrawBounds),
-            deposit_fee_percentage: UnorderedMap::new(StorageKey::DepositFeePercentage),
-            withdraw_fee_percentage: UnorderedMap::new(StorageKey::WithdrawFeePercentage),
             used_events: UnorderedSet::new(b"u".to_vec()),
             owner_pk: env::signer_account_pk(),
             bridge_token_storage_deposit_required:
@@ -247,6 +259,10 @@ impl BridgeTokenFactory {
                     .account_storage_usage as Balance
                     * env::storage_byte_cost(),
             paused: Mask::default(),
+            deposit_fee_bound: UnorderedMap::new(StorageKey::DepositBounds),
+            withdraw_fee_bound: UnorderedMap::new(StorageKey::WithdrawBounds),
+            deposit_fee_percentage: UnorderedMap::new(StorageKey::DepositFeePercentage),
+            withdraw_fee_percentage: UnorderedMap::new(StorageKey::WithdrawFeePercentage),
         };
 
         contract.acl_init_super_admin(near_sdk::env::predecessor_account_id());
@@ -637,7 +653,7 @@ impl BridgeTokenFactory {
 
         match withdraw_fee_bound {
             Some(token_bounds) => {
-                if withdrawer.as_str() == AURORA_ID {
+                if is_withdrawer_aurora_engine(withdrawer) {
                     fee_amount =
                         (amount * withdraw_fee_percentage.aurora_to_eth) / FEE_DECIMAL_PRECISION;
                 } else {
@@ -883,6 +899,20 @@ mod tests {
         "6b175474e89094c44da98b954eedeac495271d0f".to_string()
     }
 
+    fn withdrawer_as_silos() -> AccountId {
+        "silo1.aurora".parse().unwrap()
+    }
+
+    fn withdrawer_as_native_aurora() -> AccountId {
+        "aurora".parse().unwrap()
+    }
+
+    fn withdrawer_as_evm_aurora() -> AccountId {
+        "6b175474e89094c44da98b954eedeac495271d0f.aurora"
+            .parse()
+            .unwrap()
+    }
+
     /// Generate a valid ethereum address
     fn ethereum_address_from_id(id: u8) -> String {
         let mut buffer = vec![id];
@@ -948,6 +978,17 @@ mod tests {
             deposit_bound.upper_bound, bound.upper_bound,
             "Upper bound not matched"
         );
+    }
+
+    #[test]
+    fn test_withdrawer_is_aurora_account() {
+        set_env!(predecessor_account_id: alice(), current_account_id: alice());
+        let silos_call = is_withdrawer_aurora_engine(withdrawer_as_silos());
+        let native_aurora_call = is_withdrawer_aurora_engine(withdrawer_as_native_aurora());
+        let aurora_with_evm_address_call = is_withdrawer_aurora_engine(withdrawer_as_evm_aurora());
+        assert_eq!(silos_call, true);
+        assert_eq!(native_aurora_call, true);
+        assert_eq!(aurora_with_evm_address_call, false);
     }
 
     #[test]
@@ -1143,7 +1184,7 @@ mod tests {
 
         let address = validate_eth_address(token_locker());
         assert_eq!(
-            contract.finish_withdraw(alice() ,1_000, token_locker()),
+            contract.finish_withdraw(alice(), 1_000, token_locker()),
             result_types::Withdraw::new(1_000, address, address)
         );
     }

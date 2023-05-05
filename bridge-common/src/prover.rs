@@ -33,6 +33,17 @@ pub fn validate_eth_address(address: String) -> EthAddress {
     result
 }
 
+pub fn is_eth_address(address: String) -> bool{
+    let data = hex::decode(address);
+    
+    match data {
+        Ok(evm_address) => {
+            return evm_address.len() == 20;
+        },
+        Err(_) => false,
+    }
+}
+
 #[ext_contract(ext_prover)]
 pub trait Prover {
     #[result_serializer(borsh)]
