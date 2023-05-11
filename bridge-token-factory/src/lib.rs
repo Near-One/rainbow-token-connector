@@ -123,6 +123,7 @@ enum StorageKey {
     DepositFeePercentage,
     WithdrawBounds,
     WithdrawFeePercentage,
+    WithdrawFeePerSilo,
 }
 
 #[near_bindgen]
@@ -160,6 +161,8 @@ pub struct BridgeTokenFactory {
     pub deposit_fee_percentage: UnorderedMap<String, DepositFeePercentage>,
     /// Fee percentage of each token for withdraw
     pub withdraw_fee_percentage: UnorderedMap<String, WithdrawFeePercentage>,
+    /// Fee percentage of each token for withdraw to Aurora as per silo
+    pub withdraw_fee_percentage_per_silo: UnorderedMap<AccountId, u128>,
 }
 
 #[ext_contract(ext_self)]
@@ -223,7 +226,7 @@ pub fn assert_self() {
     assert_eq!(env::predecessor_account_id(), env::current_account_id());
 }
 
-pub fn is_withdrawer_aurora_engine(withdrawer: AccountId) -> bool {
+pub fn is_aurora_engine_account(withdrawer: AccountId) -> bool {
     let mut parts: Vec<&str> = withdrawer.as_str().split('.').collect();
     println!("PARTS: {:?}", parts);
     if parts.len() < 2 {
@@ -263,6 +266,7 @@ impl BridgeTokenFactory {
             withdraw_fee_bound: UnorderedMap::new(StorageKey::WithdrawBounds),
             deposit_fee_percentage: UnorderedMap::new(StorageKey::DepositFeePercentage),
             withdraw_fee_percentage: UnorderedMap::new(StorageKey::WithdrawFeePercentage),
+            withdraw_fee_percentage_per_silo: UnorderedMap::new(StorageKey::WithdrawFeePerSilo),
         };
 
         contract.acl_init_super_admin(near_sdk::env::predecessor_account_id());
@@ -431,11 +435,16 @@ impl BridgeTokenFactory {
     pub fn get_withdraw_token_fee_bound(&self, token: &String) -> Option<WithdrawTokenBounds> {
         self.withdraw_fee_bound.get(token)
     }
+
     pub fn get_withdraw_token_fee_percentage(
         &self,
         token: &String,
     ) -> Option<WithdrawFeePercentage> {
         self.withdraw_fee_percentage.get(token)
+    }
+
+    pub fn get_withdraw_fee_percentage_per_silo(&self, silo_account: &AccountId) -> Option<u128> {
+        self.withdraw_fee_percentage_per_silo.get(silo_account)
     }
 
     //token here should be ethereum address
@@ -523,6 +532,21 @@ impl BridgeTokenFactory {
             near_to_eth,
             aurora_to_eth,
         }
+    }
+
+    //this should be added as per: 10% -> 0.1 = 0.1*10^6
+    #[access_control_any(roles(Role::FeeSetter))]
+    pub fn set_withdraw_fee_percentage_per_silo(
+        &mut self,
+        silo_address: &AccountId,
+        fee_percent: u128,
+    ) -> u128 {
+        let _ = is_aurora_engine_account(silo_address.clone());
+        self.withdraw_fee_percentage_per_silo.insert(
+            silo_address,
+           &fee_percent,
+        );
+        fee_percent
     }
 
     /// Finish depositing once the proof was successfully validated. Can only be called by the contract
@@ -653,9 +677,15 @@ impl BridgeTokenFactory {
 
         match withdraw_fee_bound {
             Some(token_bounds) => {
-                if is_withdrawer_aurora_engine(withdrawer) {
-                    fee_amount =
-                        (amount * withdraw_fee_percentage.aurora_to_eth) / FEE_DECIMAL_PRECISION;
+                if is_aurora_engine_account(withdrawer.clone()) {
+                    let silo_fee = self.get_withdraw_fee_percentage_per_silo(&withdrawer).unwrap_or(0);
+                    if silo_fee != 0{
+                        fee_amount =
+                            (amount * silo_fee) / FEE_DECIMAL_PRECISION;    
+                    } else{
+                        fee_amount =
+                            (amount * withdraw_fee_percentage.aurora_to_eth) / FEE_DECIMAL_PRECISION;
+                    }
                 } else {
                     fee_amount =
                         (amount * withdraw_fee_percentage.near_to_eth) / FEE_DECIMAL_PRECISION;
@@ -839,7 +869,7 @@ impl BridgeTokenFactory {
 #[cfg(not(target_arch = "wasm32"))]
 #[cfg(test)]
 mod tests {
-    use std::convert::TryInto;
+    use std::{convert::TryInto, str::FromStr};
     use std::panic;
 
     use near_sdk::env::sha256;
@@ -983,9 +1013,9 @@ mod tests {
     #[test]
     fn test_withdrawer_is_aurora_account() {
         set_env!(predecessor_account_id: alice(), current_account_id: alice());
-        let silos_call = is_withdrawer_aurora_engine(withdrawer_as_silos());
-        let native_aurora_call = is_withdrawer_aurora_engine(withdrawer_as_native_aurora());
-        let aurora_with_evm_address_call = is_withdrawer_aurora_engine(withdrawer_as_evm_aurora());
+        let silos_call = is_aurora_engine_account(withdrawer_as_silos());
+        let native_aurora_call = is_aurora_engine_account(withdrawer_as_native_aurora());
+        let aurora_with_evm_address_call = is_aurora_engine_account(withdrawer_as_evm_aurora());
         assert_eq!(silos_call, true);
         assert_eq!(native_aurora_call, true);
         assert_eq!(aurora_with_evm_address_call, false);
@@ -1087,6 +1117,27 @@ mod tests {
             "Eth -> Near fee percentage not matched for withdraw"
         );
     }
+
+    #[test]
+    fn test_withdraw_fee_setter_silo() {
+        set_env!(predecessor_account_id: alice(), current_account_id: alice());
+        let token_address = ethereum_address_from_id(2);
+        let mut contract = BridgeTokenFactory::new(prover(), token_locker());
+        contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
+        set_env!(predecessor_account_id: fee_setter());
+        let silo_account = AccountId::from_str("silo.aurora").unwrap();
+        let withdraw_fee_percentage =
+            contract.set_withdraw_fee_percentage_per_silo(&silo_account, 10000000); 
+        let expected_fee_percentage = contract
+            .get_withdraw_fee_percentage_per_silo(&silo_account)
+            .unwrap();
+        assert_eq!(
+            withdraw_fee_percentage, expected_fee_percentage,
+            "Aurora -> Eth fee percentage not matched for withdraw"
+        );
+    }
+
+
     #[test]
     #[should_panic]
     fn test_fee_token_percentage_setter_for_deposit_with_unallowed_role() {
