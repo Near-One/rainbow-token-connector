@@ -6,7 +6,4 @@ metadata:
   description: Public Rainbow Token Connector repository
 spec:
   targets:
-    - ./bridge-token/.catalog-info.yaml
-    - ./bridge-token-factory/.catalog-info.yaml
-    - ./erc20-connector/.catalog-info.yaml
-    - ./erc20-bridge-token/.catalog-info.yaml
+    - ./**/.catalog-info.yaml
