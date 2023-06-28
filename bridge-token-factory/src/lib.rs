@@ -453,7 +453,7 @@ impl BridgeTokenFactory {
         self.withdraw_fee_percentage.get(token)
     }
 
-    // Returns fee percentage for different tokens of different tokens
+    // Returns fee percentage for different silos of different tokens
     pub fn get_withdraw_fee_percentage_per_silo_per_token(
         &self,
         silo_account: &AccountId,
