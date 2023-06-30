@@ -1,3 +1,4 @@
+use ethabi::token;
 use near_plugins::{
     access_control, access_control_any, pause, AccessControlRole, AccessControllable, Pausable,
     Upgradable,
@@ -23,7 +24,7 @@ const BRIDGE_TOKEN_BINARY: &'static [u8] = include_bytes!(std::env!(
     "BRIDGE_TOKEN",
     "Set BRIDGE_TOKEN to be the path of the bridge token binary"
 ));
-// const BRIDGE_TOKEN_BINARY: &'static [u8] = &[0];
+
 /// Initial balance for the BridgeToken contract to cover storage and related.
 const BRIDGE_TOKEN_INIT_BALANCE: Balance = ONE_NEAR * 3; // 3e24yN, 3N
 
@@ -86,13 +87,7 @@ pub enum Role {
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct DepositFeeBounds {
-    lower_bound: U128,
-    upper_bound: U128,
-}
-
-#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct WithdrawFeeBounds {
+pub struct FeeBounds {
     lower_bound: U128,
     upper_bound: U128,
 }
@@ -159,9 +154,9 @@ pub struct BridgeTokenFactory {
     #[deprecated]
     paused: Mask,
     /// Fee amount bound for deposit.
-    pub deposit_fee_bound: UnorderedMap<String, DepositFeeBounds>,
+    pub deposit_fee_bound: UnorderedMap<String, FeeBounds>,
     /// Fee amount bound for withdraw
-    pub withdraw_fee_bound: UnorderedMap<String, WithdrawFeeBounds>,
+    pub withdraw_fee_bound: UnorderedMap<String, FeeBounds>,
     /// Fee percentage of each token for deposit
     pub deposit_fee_percentage: UnorderedMap<String, DepositFeePercentage>,
     /// Fee percentage of each token for withdraw
@@ -432,7 +427,7 @@ impl BridgeTokenFactory {
             );
     }
 
-    pub fn get_deposit_token_fee_bound(&self, token: &String) -> Option<DepositFeeBounds> {
+    pub fn get_deposit_token_fee_bound(&self, token: &String) -> Option<FeeBounds> {
         self.deposit_fee_bound.get(token)
     }
 
@@ -440,7 +435,7 @@ impl BridgeTokenFactory {
         self.deposit_fee_percentage.get(token)
     }
 
-    pub fn get_withdraw_token_fee_bound(&self, token: &String) -> Option<WithdrawFeeBounds> {
+    pub fn get_withdraw_token_fee_bound(&self, token: &String) -> Option<FeeBounds> {
         self.withdraw_fee_bound.get(token)
     }
 
@@ -476,16 +471,16 @@ impl BridgeTokenFactory {
         token: &String,
         upper_bound: U128,
         lower_bound: U128,
-    ) -> DepositFeeBounds {
+    ) -> FeeBounds {
         let _ = validate_eth_address(token.clone());
         self.deposit_fee_bound.insert(
             token,
-            &DepositFeeBounds {
+            &FeeBounds {
                 lower_bound,
                 upper_bound,
             },
         );
-        DepositFeeBounds {
+        FeeBounds {
             lower_bound,
             upper_bound,
         }
@@ -520,16 +515,16 @@ impl BridgeTokenFactory {
         token: &String,
         upper_bound: U128,
         lower_bound: U128,
-    ) -> WithdrawFeeBounds {
+    ) -> FeeBounds {
         let _ = validate_eth_address(token.clone());
         self.withdraw_fee_bound.insert(
             token,
-            &WithdrawFeeBounds {
+            &FeeBounds {
                 lower_bound,
                 upper_bound,
             },
         );
-        WithdrawFeeBounds {
+        FeeBounds {
             lower_bound,
             upper_bound,
         }
@@ -640,41 +635,31 @@ impl BridgeTokenFactory {
 
     fn adjust_fee_amount_between_bounds(
         &self,
-        deposit_fee_bound: Option<DepositFeeBounds>,
-        withdraw_fee_bound: Option<WithdrawFeeBounds>,
+        token: &String,
         mut fee_amount: u128,
         fee_type: FeeType,
     ) -> u128 {
+        let fee_bound;
         match fee_type {
             FeeType::Deposit => {
-                // If some token bounds is set for deposit than update the fee amount according to bounds
-                match deposit_fee_bound {
-                    Some(token_bounds) => {
-                        if fee_amount < token_bounds.lower_bound.0 {
-                            fee_amount = token_bounds.lower_bound.0;
-                        } else if fee_amount > token_bounds.upper_bound.0 {
-                            fee_amount = token_bounds.upper_bound.0;
-                        }
-                        fee_amount
-                    }
-                    _ => fee_amount,
-                }
+                fee_bound = self.get_deposit_token_fee_bound(token);
             }
             FeeType::Withdraw => {
-                // If some token bounds is set for withdraw than update the fee amount according to bounds
-                match withdraw_fee_bound {
-                    Some(token_bounds) => {
-                        if fee_amount < token_bounds.lower_bound.0 {
-                            //bound checks
-                            fee_amount = token_bounds.lower_bound.0;
-                        } else if fee_amount > token_bounds.upper_bound.0 {
-                            fee_amount = token_bounds.upper_bound.0;
-                        }
-                        fee_amount
-                    }
-                    _ => fee_amount,
-                }
+                fee_bound = self.get_withdraw_token_fee_bound(token);
             }
+        }
+        // If some token fee-bounds is set for deposit or withdraw than update the fee amount according to bounds
+        match fee_bound {
+            Some(token_bounds) => {
+                if fee_amount < token_bounds.lower_bound.0 {
+                    //bound checks
+                    fee_amount = token_bounds.lower_bound.0;
+                } else if fee_amount > token_bounds.upper_bound.0 {
+                    fee_amount = token_bounds.upper_bound.0;
+                }
+                fee_amount
+            }
+            _ => return fee_amount,
         }
     }
 
@@ -708,7 +693,6 @@ impl BridgeTokenFactory {
             target, message
         ));
 
-        let deposit_fee_bound = self.get_deposit_token_fee_bound(&token);
         let deposit_fee_percentage =
             self.get_deposit_token_fee_percentage(&token)
                 .unwrap_or(DepositFeePercentage {
@@ -717,7 +701,7 @@ impl BridgeTokenFactory {
                 });
 
         let amount_to_transfer: u128;
-        let fee_amount: u128;
+        let mut fee_amount: u128;
 
         // check if some msg attached than this call is for eth -> aurora otherwise eth -> near
         match message {
@@ -731,14 +715,8 @@ impl BridgeTokenFactory {
                 // 0.01 for ETH -> NEAR
             }
         }
-
-        amount_to_transfer = amount
-            - self.adjust_fee_amount_between_bounds(
-                deposit_fee_bound,
-                None,
-                fee_amount,
-                FeeType::Deposit,
-            );
+        fee_amount = self.adjust_fee_amount_between_bounds(&token, fee_amount, FeeType::Deposit);
+        amount_to_transfer = amount - fee_amount;
 
         match message {
             Some(message) => ext_bridge_token::ext(self.get_bridge_token_account_id(token.clone()))
@@ -789,7 +767,6 @@ impl BridgeTokenFactory {
         let token_address = validate_eth_address(parts[0].to_string());
         let recipient_address = validate_eth_address(recipient);
 
-        let withdraw_fee_bound = self.get_withdraw_token_fee_bound(&parts[0].to_string());
         let withdraw_fee_percentage = self
             .get_withdraw_token_fee_percentage(&parts[0].to_string())
             .unwrap_or(WithdrawFeePercentage {
@@ -798,7 +775,7 @@ impl BridgeTokenFactory {
             });
 
         let amount_to_transfer: u128;
-        let fee_amount: u128;
+        let mut fee_amount: u128;
         // check whether the withdrawer is aurora native account or it's silos
         if is_aurora_engine_account(withdrawer.clone()) {
             let silo_fee = self
@@ -813,33 +790,19 @@ impl BridgeTokenFactory {
         } else {
             fee_amount = (amount * withdraw_fee_percentage.near_to_eth.0) / FEE_DECIMAL_PRECISION;
         }
-        // // If some token bounds is set for withdraw than update the fee amount according to bounds
-        // match withdraw_fee_bound {
-        //     Some(token_bounds) => {
-        //         if fee_amount < token_bounds.lower_bound.0 {
-        //             //bound checks
-        //             fee_amount = token_bounds.lower_bound.0;
-        //         } else if fee_amount > token_bounds.upper_bound.0 {
-        //             fee_amount = token_bounds.upper_bound.0;
-        //         }
-        //     }
-        //     _ => {}
-        // }
-
-        amount_to_transfer = amount
-            - self.adjust_fee_amount_between_bounds(
-                None,
-                withdraw_fee_bound,
-                fee_amount,
-                FeeType::Withdraw,
-            );
+        fee_amount = self.adjust_fee_amount_between_bounds(
+            &parts[0].to_string(),
+            fee_amount,
+            FeeType::Withdraw,
+        );
+        amount_to_transfer = amount - fee_amount;
 
         if fee_amount != 0 {
             ext_bridge_token::ext(token)
                 .with_static_gas(MINT_GAS)
                 .with_attached_deposit(env::attached_deposit())
                 .mint(env::current_account_id(), fee_amount.into());
-        }
+        };
 
         result_types::Withdraw::new(amount_to_transfer, token_address, recipient_address)
     }
@@ -1148,6 +1111,46 @@ mod tests {
         assert_eq!(silos_call, true);
         assert_eq!(native_aurora_call, true);
         assert_eq!(aurora_with_evm_address_call, false);
+    }
+
+    #[test]
+    fn test_adujsted_fee_amount() {
+        set_env!(predecessor_account_id: alice(), current_account_id: alice());
+        let token_address = ethereum_address_from_id(2);
+        let mut contract = BridgeTokenFactory::new(prover(), token_locker());
+        contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
+        set_env!(predecessor_account_id: fee_setter());
+        let deposit_bound = contract.set_deposit_fee_bound(&token_address, U128(200), U128(100));
+        let bound = contract
+            .get_deposit_token_fee_bound(&token_address)
+            .unwrap();
+        assert_eq!(
+            deposit_bound.lower_bound, bound.lower_bound,
+            "Lower bound not matched"
+        );
+        assert_eq!(
+            deposit_bound.upper_bound, bound.upper_bound,
+            "Upper bound not matched"
+        );
+        let deposit_fee_percentage =
+            contract.set_deposit_fee_percentage(&token_address, U128(50000), U128(20000)); //0.05% and 0.02%
+        let expected_fee_percentage = contract
+            .get_deposit_token_fee_percentage(&token_address)
+            .unwrap();
+        assert_eq!(
+            deposit_fee_percentage.eth_to_aurora, expected_fee_percentage.eth_to_aurora,
+            "Aurora -> Eth fee percentage not matched for deposit"
+        );
+        assert_eq!(
+            deposit_fee_percentage.eth_to_near, expected_fee_percentage.eth_to_near,
+            "Eth -> Near fee percentage not matched for deposit"
+        );
+        let adjusted_fee_amount =
+            contract.adjust_fee_amount_between_bounds(&token_address, 50u128, FeeType::Deposit);
+        assert_eq!(
+            adjusted_fee_amount, 100u128,
+            "Adjusted fee amount didn't matched as expected"
+        );
     }
 
     #[test]

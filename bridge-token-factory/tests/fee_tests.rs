@@ -216,7 +216,7 @@ fn test_token_transfer_with_deposit_and_withdraw_fee() {
         alice
             .call(factory.id(), "set_deposit_fee_bound")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": 500, "lower_bound": 100})
+                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "500", "lower_bound": "100"})
                     .to_string()
                     .into_bytes()
             )
@@ -224,6 +224,7 @@ fn test_token_transfer_with_deposit_and_withdraw_fee() {
             .transact()
     )
     .unwrap();
+
     assert!(fee_setter_call.is_success(), "Fee setter called failed");
 
     let fee_percentage_setter_call = &rt
@@ -231,7 +232,7 @@ fn test_token_transfer_with_deposit_and_withdraw_fee() {
         alice
             .call(factory.id(), "set_deposit_fee_percentage")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": 400000, "eth_to_aurora": 40000})
+                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000"})
                     .to_string()
                     .into_bytes()
             )
@@ -250,7 +251,7 @@ fn test_token_transfer_with_deposit_and_withdraw_fee() {
             alice
                 .call(factory.id(), "set_withdraw_fee_bound")
                 .args(
-                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": 50, "lower_bound": 10})
+                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "50", "lower_bound": "10"})
                         .to_string()
                         .into_bytes(),
                 )
@@ -268,7 +269,7 @@ fn test_token_transfer_with_deposit_and_withdraw_fee() {
         alice
             .call(factory.id(), "set_withdraw_fee_percentage")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": 350000, "aurora_to_eth": 300000})
+                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "350000", "aurora_to_eth": "300000"})
                     .to_string()
                     .into_bytes()
             )
@@ -532,7 +533,7 @@ fn test_token_deposit_with_fee_less_than_lower_bound() {
         alice
             .call(factory.id(), "set_deposit_fee_bound")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": 200, "lower_bound": 100})
+                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "200", "lower_bound": "100"})
                     .to_string()
                     .into_bytes()
             )
@@ -547,7 +548,7 @@ fn test_token_deposit_with_fee_less_than_lower_bound() {
         alice
             .call(factory.id(), "set_deposit_fee_percentage")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": 50000, "eth_to_aurora": 40000})
+                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "50000", "eth_to_aurora": "40000"})
                     .to_string()
                     .into_bytes()
             )
@@ -668,7 +669,7 @@ fn test_token_deposit_with_fee_more_than_upper_bound() {
         alice
             .call(factory.id(), "set_deposit_fee_bound")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": 200, "lower_bound": 100})
+                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "200", "lower_bound": "100"})
                     .to_string()
                     .into_bytes()
             )
@@ -683,7 +684,7 @@ fn test_token_deposit_with_fee_more_than_upper_bound() {
         alice
             .call(factory.id(), "set_deposit_fee_percentage")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": 400000, "eth_to_aurora": 40000})
+                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000"})
                     .to_string()
                     .into_bytes()
             )
@@ -801,7 +802,7 @@ fn test_token_deposit_with_fee_in_bound_range() {
         alice
             .call(factory.id(), "set_deposit_fee_bound")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": 500, "lower_bound": 100})
+                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "500", "lower_bound": "100"})
                     .to_string()
                     .into_bytes()
             )
@@ -816,7 +817,7 @@ fn test_token_deposit_with_fee_in_bound_range() {
         alice
             .call(factory.id(), "set_deposit_fee_percentage")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": 400000, "eth_to_aurora": 40000})
+                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000"})
                     .to_string()
                     .into_bytes()
             )
@@ -1066,7 +1067,7 @@ fn test_token_withdraw_with_fee_less_than_lower_bound() {
             alice
                 .call(factory.id(), "set_withdraw_fee_bound")
                 .args(
-                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": 20, "lower_bound": 10})
+                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "20", "lower_bound": "10"})
                         .to_string()
                         .into_bytes(),
                 )
@@ -1084,7 +1085,7 @@ fn test_token_withdraw_with_fee_less_than_lower_bound() {
         alice
             .call(factory.id(), "set_withdraw_fee_percentage")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": 50000, "aurora_to_eth": 40000})
+                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "50000", "aurora_to_eth": "40000"})
                     .to_string()
                     .into_bytes()
             )
@@ -1237,7 +1238,7 @@ fn test_token_withdraw_with_fee_more_than_upper_bound() {
             alice
                 .call(factory.id(), "set_withdraw_fee_bound")
                 .args(
-                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": 30, "lower_bound": 10})
+                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "30", "lower_bound": "10"})
                         .to_string()
                         .into_bytes(),
                 )
@@ -1255,7 +1256,7 @@ fn test_token_withdraw_with_fee_more_than_upper_bound() {
         alice
             .call(factory.id(), "set_withdraw_fee_percentage")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": 350000, "aurora_to_eth": 40000})
+                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "350000", "aurora_to_eth": "40000"})
                     .to_string()
                     .into_bytes()
             )
@@ -1409,7 +1410,7 @@ fn test_token_withdraw_with_fee_in_bound_range() {
             alice
                 .call(factory.id(), "set_withdraw_fee_bound")
                 .args(
-                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": 50, "lower_bound": 10})
+                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "50", "lower_bound": "10"})
                         .to_string()
                         .into_bytes(),
                 )
@@ -1427,7 +1428,7 @@ fn test_token_withdraw_with_fee_in_bound_range() {
         alice
             .call(factory.id(), "set_withdraw_fee_percentage")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": 400000, "aurora_to_eth": 400000})
+                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "400000", "aurora_to_eth": "400000"})
                     .to_string()
                     .into_bytes()
             )
@@ -1598,7 +1599,7 @@ fn test_fee_deposit_claim() {
         alice
             .call(factory.id(), "set_deposit_fee_bound")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": 500, "lower_bound": 100})
+                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "500", "lower_bound": "100"})
                     .to_string()
                     .into_bytes()
             )
@@ -1613,7 +1614,7 @@ fn test_fee_deposit_claim() {
         alice
             .call(factory.id(), "set_deposit_fee_percentage")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": 400000, "eth_to_aurora": 40000})
+                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000"})
                     .to_string()
                     .into_bytes()
             )
@@ -1632,7 +1633,7 @@ fn test_fee_deposit_claim() {
             alice
                 .call(factory.id(), "set_withdraw_fee_bound")
                 .args(
-                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": 50, "lower_bound": 10})
+                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "50", "lower_bound": "10"})
                         .to_string()
                         .into_bytes(),
                 )
@@ -1650,7 +1651,7 @@ fn test_fee_deposit_claim() {
         alice
             .call(factory.id(), "set_withdraw_fee_percentage")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": 350000, "aurora_to_eth": 300000})
+                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "350000", "aurora_to_eth": "300000"})
                     .to_string()
                     .into_bytes()
             )
