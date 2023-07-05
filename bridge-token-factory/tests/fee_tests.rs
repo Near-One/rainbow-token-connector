@@ -214,7 +214,7 @@ fn test_token_transfer_with_deposit_and_withdraw_fee() {
     let deposit_fee_setter_call = &rt
     .block_on(
         alice
-            .call(factory.id(), "set_deposit_fees")
+            .call(factory.id(), "set_deposit_fee")
             .args(
                 json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000",  "upper_bound": "500", "lower_bound": "100"})
                     .to_string()
@@ -233,7 +233,7 @@ fn test_token_transfer_with_deposit_and_withdraw_fee() {
     let withdraw_fee_setter_call = &rt
         .block_on(
             alice
-                .call(factory.id(), "set_withdraw_fees")
+                .call(factory.id(), "set_withdraw_fee")
                 .args(
                     json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "350000", "aurora_to_eth": "300000", "upper_bound": "50", "lower_bound": "10"})
                         .to_string()
@@ -496,7 +496,7 @@ fn test_token_deposit_with_fee_less_than_lower_bound() {
     let deposit_fee_setter_call = &rt
     .block_on(
         alice
-            .call(factory.id(), "set_deposit_fees")
+            .call(factory.id(), "set_deposit_fee")
             .args(
                 json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "50000", "eth_to_aurora": "40000", "upper_bound": "200", "lower_bound": "100"})
                     .to_string()
@@ -616,7 +616,7 @@ fn test_token_deposit_with_fee_more_than_upper_bound() {
     let deposit_fee_setter_call = &rt
     .block_on(
         alice
-            .call(factory.id(), "set_deposit_fees")
+            .call(factory.id(), "set_deposit_fee")
             .args(
                 json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000", "upper_bound": "200", "lower_bound": "100"})
                     .to_string()
@@ -733,7 +733,7 @@ fn test_token_deposit_with_fee_in_bound_range() {
     let deposit_fee_setter_call = &rt
     .block_on(
         alice
-            .call(factory.id(), "set_deposit_fees")
+            .call(factory.id(), "set_deposit_fee")
             .args(
                 json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000", "upper_bound": "500", "lower_bound": "100"})
                     .to_string()
@@ -982,7 +982,7 @@ fn test_token_withdraw_with_fee_less_than_lower_bound() {
     let withdraw_fee_setter_call = &rt
         .block_on(
             alice
-                .call(factory.id(), "set_withdraw_fees")
+                .call(factory.id(), "set_withdraw_fee")
                 .args(
                     json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "50000", "aurora_to_eth": "40000", "upper_bound": "20", "lower_bound": "10"})
                         .to_string()
@@ -1134,7 +1134,7 @@ fn test_token_withdraw_with_fee_more_than_upper_bound() {
     let withdraw_fee_setter_call = &rt
         .block_on(
             alice
-                .call(factory.id(), "set_withdraw_fees")
+                .call(factory.id(), "set_withdraw_fee")
                 .args(
                     json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "350000", "aurora_to_eth": "40000", "upper_bound": "30", "lower_bound": "10"})
                         .to_string()
@@ -1287,7 +1287,7 @@ fn test_token_withdraw_with_fee_in_bound_range() {
     let withdraw_fee_setter_call = &rt
         .block_on(
             alice
-                .call(factory.id(), "set_withdraw_fees")
+                .call(factory.id(), "set_withdraw_fee")
                 .args(
                     json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "400000", "aurora_to_eth": "400000", "upper_bound": "50", "lower_bound": "10"})
                         .to_string()
@@ -1457,7 +1457,7 @@ fn test_fee_deposit_claim() {
     let deposit_fee_setter_call = &rt
     .block_on(
         alice
-            .call(factory.id(), "set_deposit_fees")
+            .call(factory.id(), "set_deposit_fee")
             .args(
                 json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000", "upper_bound": "500", "lower_bound": "100"})
                     .to_string()
@@ -1475,7 +1475,7 @@ fn test_fee_deposit_claim() {
     let withdraw_fee_setter_call = &rt
         .block_on(
             alice
-                .call(factory.id(), "set_withdraw_fees")
+                .call(factory.id(), "set_withdraw_fee")
                 .args(
                     json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "350000", "aurora_to_eth": "300000", "upper_bound": "50", "lower_bound": "10"})
                         .to_string()
