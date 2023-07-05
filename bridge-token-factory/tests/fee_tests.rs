@@ -211,28 +211,12 @@ fn test_token_transfer_with_deposit_and_withdraw_fee() {
     }
     .to_log_entry_data();
 
-    let fee_setter_call = &rt
+    let deposit_fee_setter_call = &rt
     .block_on(
         alice
-            .call(factory.id(), "set_deposit_fee_bound")
+            .call(factory.id(), "set_deposit_fees")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "500", "lower_bound": "100"})
-                    .to_string()
-                    .into_bytes()
-            )
-            .max_gas()
-            .transact()
-    )
-    .unwrap();
-
-    assert!(fee_setter_call.is_success(), "Fee setter called failed");
-
-    let fee_percentage_setter_call = &rt
-    .block_on(
-        alice
-            .call(factory.id(), "set_deposit_fee_percentage")
-            .args(
-                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000"})
+                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000",  "upper_bound": "500", "lower_bound": "100"})
                     .to_string()
                     .into_bytes()
             )
@@ -242,16 +226,16 @@ fn test_token_transfer_with_deposit_and_withdraw_fee() {
     .unwrap();
 
     assert!(
-        fee_percentage_setter_call.is_success(),
-        "Fee percentage setter called failed"
+        deposit_fee_setter_call.is_success(),
+        "Fee setter called failed"
     );
 
     let withdraw_fee_setter_call = &rt
         .block_on(
             alice
-                .call(factory.id(), "set_withdraw_fee_bound")
+                .call(factory.id(), "set_withdraw_fees")
                 .args(
-                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "50", "lower_bound": "10"})
+                    json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "350000", "aurora_to_eth": "300000", "upper_bound": "50", "lower_bound": "10"})
                         .to_string()
                         .into_bytes(),
                 )
@@ -262,25 +246,6 @@ fn test_token_transfer_with_deposit_and_withdraw_fee() {
     assert!(
         withdraw_fee_setter_call.is_success(),
         "Withdraw Fee setter called failed"
-    );
-
-    let withdraw_fee_percentage_setter_call = &rt
-    .block_on(
-        alice
-            .call(factory.id(), "set_withdraw_fee_percentage")
-            .args(
-                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "350000", "aurora_to_eth": "300000"})
-                    .to_string()
-                    .into_bytes()
-            )
-            .max_gas()
-            .transact()
-    )
-    .unwrap();
-
-    assert!(
-        withdraw_fee_percentage_setter_call.is_success(),
-        "Withdraw fee percentage setter called failed"
     );
 
     let deposit_call = &rt
@@ -528,12 +493,12 @@ fn test_token_deposit_with_fee_less_than_lower_bound() {
     }
     .to_log_entry_data();
 
-    let fee_setter_call = &rt
+    let deposit_fee_setter_call = &rt
     .block_on(
         alice
-            .call(factory.id(), "set_deposit_fee_bound")
+            .call(factory.id(), "set_deposit_fees")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "200", "lower_bound": "100"})
+                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "50000", "eth_to_aurora": "40000", "upper_bound": "200", "lower_bound": "100"})
                     .to_string()
                     .into_bytes()
             )
@@ -541,25 +506,9 @@ fn test_token_deposit_with_fee_less_than_lower_bound() {
             .transact()
     )
     .unwrap();
-    assert!(fee_setter_call.is_success(), "Fee setter called failed");
-
-    let fee_percentage_setter_call = &rt
-    .block_on(
-        alice
-            .call(factory.id(), "set_deposit_fee_percentage")
-            .args(
-                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "50000", "eth_to_aurora": "40000"})
-                    .to_string()
-                    .into_bytes()
-            )
-            .max_gas()
-            .transact()
-    )
-    .unwrap();
-
     assert!(
-        fee_percentage_setter_call.is_success(),
-        "Fee percentage setter called failed"
+        deposit_fee_setter_call.is_success(),
+        "Fee setter called failed"
     );
 
     let deposit_call = &rt
@@ -664,12 +613,12 @@ fn test_token_deposit_with_fee_more_than_upper_bound() {
     }
     .to_log_entry_data();
 
-    let fee_setter_call = &rt
+    let deposit_fee_setter_call = &rt
     .block_on(
         alice
-            .call(factory.id(), "set_deposit_fee_bound")
+            .call(factory.id(), "set_deposit_fees")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "200", "lower_bound": "100"})
+                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000", "upper_bound": "200", "lower_bound": "100"})
                     .to_string()
                     .into_bytes()
             )
@@ -677,25 +626,9 @@ fn test_token_deposit_with_fee_more_than_upper_bound() {
             .transact()
     )
     .unwrap();
-    assert!(fee_setter_call.is_success(), "Fee setter called failed");
-
-    let fee_percentage_setter_call = &rt
-    .block_on(
-        alice
-            .call(factory.id(), "set_deposit_fee_percentage")
-            .args(
-                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000"})
-                    .to_string()
-                    .into_bytes()
-            )
-            .max_gas()
-            .transact()
-    )
-    .unwrap();
-
     assert!(
-        fee_percentage_setter_call.is_success(),
-        "Fee percentage setter called failed"
+        deposit_fee_setter_call.is_success(),
+        "Fee setter called failed"
     );
 
     let deposit_call = &rt
@@ -797,12 +730,12 @@ fn test_token_deposit_with_fee_in_bound_range() {
     }
     .to_log_entry_data();
 
-    let fee_setter_call = &rt
+    let deposit_fee_setter_call = &rt
     .block_on(
         alice
-            .call(factory.id(), "set_deposit_fee_bound")
+            .call(factory.id(), "set_deposit_fees")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "500", "lower_bound": "100"})
+                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000", "upper_bound": "500", "lower_bound": "100"})
                     .to_string()
                     .into_bytes()
             )
@@ -810,25 +743,9 @@ fn test_token_deposit_with_fee_in_bound_range() {
             .transact()
     )
     .unwrap();
-    assert!(fee_setter_call.is_success(), "Fee setter called failed");
-
-    let fee_percentage_setter_call = &rt
-    .block_on(
-        alice
-            .call(factory.id(), "set_deposit_fee_percentage")
-            .args(
-                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000"})
-                    .to_string()
-                    .into_bytes()
-            )
-            .max_gas()
-            .transact()
-    )
-    .unwrap();
-
     assert!(
-        fee_percentage_setter_call.is_success(),
-        "Fee percentage setter called failed"
+        deposit_fee_setter_call.is_success(),
+        "Fee setter called failed"
     );
 
     let deposit_call = &rt
@@ -1065,9 +982,9 @@ fn test_token_withdraw_with_fee_less_than_lower_bound() {
     let withdraw_fee_setter_call = &rt
         .block_on(
             alice
-                .call(factory.id(), "set_withdraw_fee_bound")
+                .call(factory.id(), "set_withdraw_fees")
                 .args(
-                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "20", "lower_bound": "10"})
+                    json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "50000", "aurora_to_eth": "40000", "upper_bound": "20", "lower_bound": "10"})
                         .to_string()
                         .into_bytes(),
                 )
@@ -1078,25 +995,6 @@ fn test_token_withdraw_with_fee_less_than_lower_bound() {
     assert!(
         withdraw_fee_setter_call.is_success(),
         "Withdraw Fee setter called failed"
-    );
-
-    let withdraw_fee_percentage_setter_call = &rt
-    .block_on(
-        alice
-            .call(factory.id(), "set_withdraw_fee_percentage")
-            .args(
-                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "50000", "aurora_to_eth": "40000"})
-                    .to_string()
-                    .into_bytes()
-            )
-            .max_gas()
-            .transact()
-    )
-    .unwrap();
-
-    assert!(
-        withdraw_fee_percentage_setter_call.is_success(),
-        "Withdraw fee percentage setter called failed"
     );
 
     let deposit_call = &rt
@@ -1236,9 +1134,9 @@ fn test_token_withdraw_with_fee_more_than_upper_bound() {
     let withdraw_fee_setter_call = &rt
         .block_on(
             alice
-                .call(factory.id(), "set_withdraw_fee_bound")
+                .call(factory.id(), "set_withdraw_fees")
                 .args(
-                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "30", "lower_bound": "10"})
+                    json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "350000", "aurora_to_eth": "40000", "upper_bound": "30", "lower_bound": "10"})
                         .to_string()
                         .into_bytes(),
                 )
@@ -1249,25 +1147,6 @@ fn test_token_withdraw_with_fee_more_than_upper_bound() {
     assert!(
         withdraw_fee_setter_call.is_success(),
         "Withdraw Fee setter called failed"
-    );
-
-    let withdraw_fee_percentage_setter_call = &rt
-    .block_on(
-        alice
-            .call(factory.id(), "set_withdraw_fee_percentage")
-            .args(
-                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "350000", "aurora_to_eth": "40000"})
-                    .to_string()
-                    .into_bytes()
-            )
-            .max_gas()
-            .transact()
-    )
-    .unwrap();
-
-    assert!(
-        withdraw_fee_percentage_setter_call.is_success(),
-        "Withdraw fee percentage setter called failed"
     );
 
     let deposit_call = &rt
@@ -1408,9 +1287,9 @@ fn test_token_withdraw_with_fee_in_bound_range() {
     let withdraw_fee_setter_call = &rt
         .block_on(
             alice
-                .call(factory.id(), "set_withdraw_fee_bound")
+                .call(factory.id(), "set_withdraw_fees")
                 .args(
-                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "50", "lower_bound": "10"})
+                    json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "400000", "aurora_to_eth": "400000", "upper_bound": "50", "lower_bound": "10"})
                         .to_string()
                         .into_bytes(),
                 )
@@ -1421,25 +1300,6 @@ fn test_token_withdraw_with_fee_in_bound_range() {
     assert!(
         withdraw_fee_setter_call.is_success(),
         "Withdraw Fee setter called failed"
-    );
-
-    let withdraw_fee_percentage_setter_call = &rt
-    .block_on(
-        alice
-            .call(factory.id(), "set_withdraw_fee_percentage")
-            .args(
-                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "400000", "aurora_to_eth": "400000"})
-                    .to_string()
-                    .into_bytes()
-            )
-            .max_gas()
-            .transact()
-    )
-    .unwrap();
-
-    assert!(
-        withdraw_fee_percentage_setter_call.is_success(),
-        "Withdraw fee percentage setter called failed"
     );
 
     let deposit_call = &rt
@@ -1594,12 +1454,12 @@ fn test_fee_deposit_claim() {
     }
     .to_log_entry_data();
 
-    let fee_setter_call = &rt
+    let deposit_fee_setter_call = &rt
     .block_on(
         alice
-            .call(factory.id(), "set_deposit_fee_bound")
+            .call(factory.id(), "set_deposit_fees")
             .args(
-                json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "500", "lower_bound": "100"})
+                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000", "upper_bound": "500", "lower_bound": "100"})
                     .to_string()
                     .into_bytes()
             )
@@ -1607,33 +1467,17 @@ fn test_fee_deposit_claim() {
             .transact()
     )
     .unwrap();
-    assert!(fee_setter_call.is_success(), "Fee setter called failed");
-
-    let fee_percentage_setter_call = &rt
-    .block_on(
-        alice
-            .call(factory.id(), "set_deposit_fee_percentage")
-            .args(
-                json!({"token": DAI_ADDRESS.to_string(), "eth_to_near": "400000", "eth_to_aurora": "40000"})
-                    .to_string()
-                    .into_bytes()
-            )
-            .max_gas()
-            .transact()
-    )
-    .unwrap();
-
     assert!(
-        fee_percentage_setter_call.is_success(),
-        "Fee percentage setter called failed"
+        deposit_fee_setter_call.is_success(),
+        "Fee setter called failed"
     );
 
     let withdraw_fee_setter_call = &rt
         .block_on(
             alice
-                .call(factory.id(), "set_withdraw_fee_bound")
+                .call(factory.id(), "set_withdraw_fees")
                 .args(
-                    json!({"token": DAI_ADDRESS.to_string(), "upper_bound": "50", "lower_bound": "10"})
+                    json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "350000", "aurora_to_eth": "300000", "upper_bound": "50", "lower_bound": "10"})
                         .to_string()
                         .into_bytes(),
                 )
@@ -1644,25 +1488,6 @@ fn test_fee_deposit_claim() {
     assert!(
         withdraw_fee_setter_call.is_success(),
         "Withdraw Fee setter called failed"
-    );
-
-    let withdraw_fee_percentage_setter_call = &rt
-    .block_on(
-        alice
-            .call(factory.id(), "set_withdraw_fee_percentage")
-            .args(
-                json!({"token": DAI_ADDRESS.to_string(), "near_to_eth": "350000", "aurora_to_eth": "300000"})
-                    .to_string()
-                    .into_bytes()
-            )
-            .max_gas()
-            .transact()
-    )
-    .unwrap();
-
-    assert!(
-        withdraw_fee_percentage_setter_call.is_success(),
-        "Withdraw fee percentage setter called failed"
     );
 
     let deposit_call = &rt

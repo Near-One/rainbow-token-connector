@@ -93,6 +93,18 @@ pub struct FeeBounds {
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct DepositFee {
+    fee_percentage: DepositFeePercentage,
+    bounds: FeeBounds,
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct WithdrawFee {
+    fee_percentage: WithdrawFeePercentage,
+    bounds: FeeBounds,
+}
+
+#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct DepositFeePercentage {
     eth_to_near: U128,
     eth_to_aurora: U128,
@@ -113,10 +125,8 @@ pub struct SiloTokenFeeAmount {
 
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {
-    DepositBounds,
-    DepositFeePercentage,
-    WithdrawBounds,
-    WithdrawFeePercentage,
+    DepositFee,
+    WihdrawFee,
     WithdrawFeePerSilo,
 }
 
@@ -153,14 +163,10 @@ pub struct BridgeTokenFactory {
     /// Mask determining all paused functions
     #[deprecated]
     paused: Mask,
-    /// Fee amount bound for deposit.
-    pub deposit_fee_bound: UnorderedMap<String, FeeBounds>,
-    /// Fee amount bound for withdraw
-    pub withdraw_fee_bound: UnorderedMap<String, FeeBounds>,
-    /// Fee percentage of each token for deposit
-    pub deposit_fee_percentage: UnorderedMap<String, DepositFeePercentage>,
-    /// Fee percentage of each token for withdraw
-    pub withdraw_fee_percentage: UnorderedMap<String, WithdrawFeePercentage>,
+    /// deposit fee storage
+    pub deposit_fee: UnorderedMap<String, DepositFee>,
+    /// withdraw fee storage
+    pub withdraw_fee: UnorderedMap<String, WithdrawFee>,
     /// Withdraw fee percentage for each different silos for different tokens
     pub withdraw_fee_percentage_per_silo: UnorderedMap<AccountId, SiloTokenFeeAmount>,
 }
@@ -265,10 +271,12 @@ impl BridgeTokenFactory {
                     .account_storage_usage as Balance
                     * env::storage_byte_cost(),
             paused: Mask::default(),
-            deposit_fee_bound: UnorderedMap::new(StorageKey::DepositBounds),
-            withdraw_fee_bound: UnorderedMap::new(StorageKey::WithdrawBounds),
-            deposit_fee_percentage: UnorderedMap::new(StorageKey::DepositFeePercentage),
-            withdraw_fee_percentage: UnorderedMap::new(StorageKey::WithdrawFeePercentage),
+            // deposit_fee_bound: UnorderedMap::new(StorageKey::DepositBounds),
+            // withdraw_fee_bound: UnorderedMap::new(StorageKey::WithdrawBounds),
+            // deposit_fee_percentage: UnorderedMap::new(StorageKey::DepositFeePercentage),
+            // withdraw_fee_percentage: UnorderedMap::new(StorageKey::WithdrawFeePercentage),
+            deposit_fee: UnorderedMap::new(StorageKey::DepositFee),
+            withdraw_fee: UnorderedMap::new(StorageKey::WihdrawFee),
             withdraw_fee_percentage_per_silo: UnorderedMap::new(StorageKey::WithdrawFeePerSilo),
         };
 
@@ -428,22 +436,34 @@ impl BridgeTokenFactory {
     }
 
     pub fn get_deposit_token_fee_bound(&self, token: &String) -> Option<FeeBounds> {
-        self.deposit_fee_bound.get(token)
+        match self.deposit_fee.get(token) {
+            Some(deposit_fee) => Some(deposit_fee.bounds),
+            None => None,
+        }
     }
 
     pub fn get_deposit_token_fee_percentage(&self, token: &String) -> Option<DepositFeePercentage> {
-        self.deposit_fee_percentage.get(token)
+        match self.deposit_fee.get(token) {
+            Some(deposit_fee) => Some(deposit_fee.fee_percentage),
+            None => None,
+        }
     }
 
     pub fn get_withdraw_token_fee_bound(&self, token: &String) -> Option<FeeBounds> {
-        self.withdraw_fee_bound.get(token)
+        match self.withdraw_fee.get(token) {
+            Some(withdraw_fee) => Some(withdraw_fee.bounds),
+            None => None,
+        }
     }
 
     pub fn get_withdraw_token_fee_percentage(
         &self,
         token: &String,
     ) -> Option<WithdrawFeePercentage> {
-        self.withdraw_fee_percentage.get(token)
+        match self.withdraw_fee.get(token) {
+            Some(withdraw_fee) => Some(withdraw_fee.fee_percentage),
+            None => None,
+        }
     }
 
     // Returns fee percentage for different silos of different tokens
@@ -464,92 +484,56 @@ impl BridgeTokenFactory {
         }
     }
 
-    //token here should be ethereum address
-    #[access_control_any(roles(Role::FeeSetter))]
-    pub fn set_deposit_fee_bound(
-        &mut self,
-        token: &String,
-        upper_bound: U128,
-        lower_bound: U128,
-    ) -> FeeBounds {
-        let _ = validate_eth_address(token.clone());
-        self.deposit_fee_bound.insert(
-            token,
-            &FeeBounds {
-                lower_bound,
-                upper_bound,
-            },
-        );
-        FeeBounds {
-            lower_bound,
-            upper_bound,
-        }
-    }
-
     //this should be added as per: 10% -> 0.1 = 0.1*10^6
     #[access_control_any(roles(Role::FeeSetter))]
-    pub fn set_deposit_fee_percentage(
+    pub fn set_deposit_fees(
         &mut self,
         token: &String,
         eth_to_near: U128,
         eth_to_aurora: U128,
-    ) -> DepositFeePercentage {
-        let _ = validate_eth_address(token.clone());
-        self.deposit_fee_percentage.insert(
-            token,
-            &DepositFeePercentage {
-                eth_to_near,
-                eth_to_aurora,
-            },
-        );
-        DepositFeePercentage {
-            eth_to_near,
-            eth_to_aurora,
-        }
-    }
-
-    // sets fee bounds for withdraw tokens, default bound: None
-    #[access_control_any(roles(Role::FeeSetter))]
-    pub fn set_withdraw_fee_bound(
-        &mut self,
-        token: &String,
-        upper_bound: U128,
         lower_bound: U128,
-    ) -> FeeBounds {
+        upper_bound: U128,
+    ) {
         let _ = validate_eth_address(token.clone());
-        self.withdraw_fee_bound.insert(
+        self.deposit_fee.insert(
             token,
-            &FeeBounds {
-                lower_bound,
-                upper_bound,
+            &DepositFee {
+                fee_percentage: DepositFeePercentage {
+                    eth_to_near,
+                    eth_to_aurora,
+                },
+                bounds: FeeBounds {
+                    lower_bound,
+                    upper_bound,
+                },
             },
         );
-        FeeBounds {
-            lower_bound,
-            upper_bound,
-        }
     }
 
-    //this should be added as per: 10% -> 0.1 = 0.1*10^6
+    //Fee should be added as per: 10% -> 0.1 = 0.1*10^6 with proper fee amount bounds
     #[access_control_any(roles(Role::FeeSetter))]
-    pub fn set_withdraw_fee_percentage(
+    pub fn set_withdraw_fees(
         &mut self,
         token: &String,
         near_to_eth: U128,
         aurora_to_eth: U128,
-    ) -> WithdrawFeePercentage {
+        lower_bound: U128,
+        upper_bound: U128,
+    ) {
         let _ = validate_eth_address(token.clone());
-        self.withdraw_fee_percentage.insert(
+        self.withdraw_fee.insert(
             token,
-            &WithdrawFeePercentage {
-                near_to_eth,
-                aurora_to_eth,
+            &WithdrawFee {
+                fee_percentage: WithdrawFeePercentage {
+                    near_to_eth,
+                    aurora_to_eth,
+                },
+                bounds: FeeBounds {
+                    lower_bound,
+                    upper_bound,
+                },
             },
         );
-        WithdrawFeePercentage {
-            near_to_eth,
-            aurora_to_eth,
-        }
     }
 
     /*
@@ -1082,24 +1066,26 @@ mod tests {
     }
 
     #[test]
-    fn test_fee_token_bound_setter_for_deposit() {
+    fn test_fee_token_bound_for_deposit_fee() {
         set_env!(predecessor_account_id: alice(), current_account_id: alice());
         let token_address = ethereum_address_from_id(2);
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
         set_env!(predecessor_account_id: fee_setter());
-        let deposit_bound = contract.set_deposit_fee_bound(&token_address, U128(100), U128(200));
+        // setting fee-percentage and bounds
+        contract.set_deposit_fees(
+            &token_address,
+            U128(50000),
+            U128(20000),
+            U128(100),
+            U128(200),
+        );
         let bound = contract
             .get_deposit_token_fee_bound(&token_address)
             .unwrap();
-        assert_eq!(
-            deposit_bound.lower_bound, bound.lower_bound,
-            "Lower bound not matched"
-        );
-        assert_eq!(
-            deposit_bound.upper_bound, bound.upper_bound,
-            "Upper bound not matched"
-        );
+
+        assert_eq!(U128(100), bound.lower_bound, "Lower bound not matched");
+        assert_eq!(U128(200), bound.upper_bound, "Upper bound not matched");
     }
 
     #[test]
@@ -1120,29 +1106,40 @@ mod tests {
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
         set_env!(predecessor_account_id: fee_setter());
-        let deposit_bound = contract.set_deposit_fee_bound(&token_address, U128(200), U128(100));
-        let bound = contract
+        // setting fee-percentage and bounds
+        contract.set_deposit_fees(
+            &token_address,
+            U128(50000),
+            U128(20000),
+            U128(100),
+            U128(200),
+        );
+        // let deposit_bound = contract.set_deposit_fee_bound(&token_address, , U128(100));
+        let expected_bound = contract
             .get_deposit_token_fee_bound(&token_address)
             .unwrap();
         assert_eq!(
-            deposit_bound.lower_bound, bound.lower_bound,
+            U128(100),
+            expected_bound.lower_bound,
             "Lower bound not matched"
         );
         assert_eq!(
-            deposit_bound.upper_bound, bound.upper_bound,
+            U128(200),
+            expected_bound.upper_bound,
             "Upper bound not matched"
         );
-        let deposit_fee_percentage =
-            contract.set_deposit_fee_percentage(&token_address, U128(50000), U128(20000)); //0.05% and 0.02%
+
         let expected_fee_percentage = contract
             .get_deposit_token_fee_percentage(&token_address)
             .unwrap();
         assert_eq!(
-            deposit_fee_percentage.eth_to_aurora, expected_fee_percentage.eth_to_aurora,
+            U128(20000),
+            expected_fee_percentage.eth_to_aurora,
             "Aurora -> Eth fee percentage not matched for deposit"
         );
         assert_eq!(
-            deposit_fee_percentage.eth_to_near, expected_fee_percentage.eth_to_near,
+            U128(50000),
+            expected_fee_percentage.eth_to_near,
             "Eth -> Near fee percentage not matched for deposit"
         );
         let adjusted_fee_amount =
@@ -1155,75 +1152,88 @@ mod tests {
 
     #[test]
     #[should_panic]
-    fn test_fee_token_bound_setter_for_deposit_with_unallowed_role() {
+    fn test_fee_setter_for_deposit_with_unallowed_role() {
         set_env!(predecessor_account_id: alice(), current_account_id: alice());
         let token_address = ethereum_address_from_id(2);
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
-        set_env!(predecessor_account_id: bob()); // bob has no role to set fee-bounds);
-        contract.set_deposit_fee_bound(&token_address, U128(100), U128(200));
+        set_env!(predecessor_account_id: bob()); // bob is not allowed (has no role) to set deposit-fees;
+        contract.set_deposit_fees(
+            &token_address,
+            U128(50000),
+            U128(20000),
+            U128(100),
+            U128(200),
+        );
     }
 
     #[test]
-    fn test_fee_token_bound_setter_for_withdraw() {
+    fn test_fee_token_bound_for_withdraw_fee() {
         set_env!(predecessor_account_id: alice(), current_account_id: alice());
         let token_address = ethereum_address_from_id(4);
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
         set_env!(predecessor_account_id: fee_setter());
-        let withdraw_bound = contract.set_withdraw_fee_bound(&token_address, U128(100), U128(200));
+        contract.set_withdraw_fees(
+            &token_address,
+            U128(50000),
+            U128(20000),
+            U128(100),
+            U128(200),
+        );
         let bound = contract
             .get_withdraw_token_fee_bound(&token_address)
             .unwrap();
-        assert_eq!(
-            withdraw_bound.lower_bound, bound.lower_bound,
-            "Lower bound not matched"
-        );
-        assert_eq!(
-            withdraw_bound.upper_bound, bound.upper_bound,
-            "Upper bound not matched"
-        );
+        assert_eq!(U128(100), bound.lower_bound, "Lower bound not matched");
+        assert_eq!(U128(200), bound.upper_bound, "Upper bound not matched");
     }
 
     #[test]
     #[should_panic]
-    fn test_fee_token_bound_setter_for_withdraw_with_unallowed_role() {
+    fn test_fee_setter_for_withdraw_with_unallowed_role() {
         set_env!(predecessor_account_id: alice(), current_account_id: alice());
         let token_address = ethereum_address_from_id(4);
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
-        set_env!(predecessor_account_id: bob());
-        let withdraw_bound = contract.set_withdraw_fee_bound(&token_address, U128(100), U128(200));
+        set_env!(predecessor_account_id: bob()); // bob is not allowed (has no role) to set deposit-fees;
+        contract.set_withdraw_fees(
+            &token_address,
+            U128(50000),
+            U128(20000),
+            U128(100),
+            U128(200),
+        );
         let bound = contract
             .get_withdraw_token_fee_bound(&token_address)
             .unwrap();
-        assert_eq!(
-            withdraw_bound.lower_bound, bound.lower_bound,
-            "Lower bound not matched"
-        );
-        assert_eq!(
-            withdraw_bound.upper_bound, bound.upper_bound,
-            "Upper bound not matched"
-        );
+        assert_eq!(U128(100), bound.lower_bound, "Lower bound not matched");
+        assert_eq!(U128(200), bound.upper_bound, "Upper bound not matched");
     }
 
     #[test]
-    fn test_fee_token_percentage_setter_for_deposit() {
+    fn test_fee_token_percentage_for_deposit_fee() {
         set_env!(predecessor_account_id: alice(), current_account_id: alice());
         let token_address = ethereum_address_from_id(2);
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
         set_env!(predecessor_account_id: fee_setter());
-        let deposit_fee_percentage =
-            contract.set_deposit_fee_percentage(&token_address, U128(50000), U128(20000)); //0.05% and 0.02%
+        contract.set_deposit_fees(
+            &token_address,
+            U128(50000),
+            U128(20000),
+            U128(100),
+            U128(200),
+        ); //0.05% and 0.02%
         let expected_fee_percentage = contract
             .get_deposit_token_fee_percentage(&token_address)
             .unwrap();
         assert_eq!(
-            deposit_fee_percentage.eth_to_aurora, expected_fee_percentage.eth_to_aurora,
+            U128(20000),
+            expected_fee_percentage.eth_to_aurora,
             "Aurora -> Eth fee percentage not matched for deposit"
         );
         assert_eq!(
-            deposit_fee_percentage.eth_to_near, expected_fee_percentage.eth_to_near,
+            U128(50000),
+            expected_fee_percentage.eth_to_near,
             "Eth -> Near fee percentage not matched for deposit"
         );
     }
@@ -1235,17 +1245,24 @@ mod tests {
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
         set_env!(predecessor_account_id: fee_setter());
-        let withdraw_fee_percentage =
-            contract.set_withdraw_fee_percentage(&token_address, U128(90000), U128(40000)); //0.09% and 0.04%
+        contract.set_withdraw_fees(
+            &token_address,
+            U128(90000),
+            U128(40000),
+            U128(100),
+            U128(200),
+        ); //0.09% and 0.04%
         let expected_fee_percentage = contract
             .get_withdraw_token_fee_percentage(&token_address)
             .unwrap();
         assert_eq!(
-            withdraw_fee_percentage.aurora_to_eth, expected_fee_percentage.aurora_to_eth,
+            U128(40000),
+            expected_fee_percentage.aurora_to_eth,
             "Aurora -> Eth fee percentage not matched for withdraw"
         );
         assert_eq!(
-            withdraw_fee_percentage.near_to_eth, expected_fee_percentage.near_to_eth,
+            U128(90000),
+            expected_fee_percentage.near_to_eth,
             "Eth -> Near fee percentage not matched for withdraw"
         );
     }
@@ -1325,6 +1342,7 @@ mod tests {
             "Aurora -> Eth fee percentage not matched for withdraw"
         );
     }
+
     #[test]
     fn test_default_withdraw_fee_setter_silo() {
         set_env!(predecessor_account_id: alice(), current_account_id: alice());
@@ -1398,29 +1416,6 @@ mod tests {
             expected_fee_percentage,
             U128::from(0),
             "Aurora -> Eth fee percentage not matched for withdraw"
-        );
-    }
-
-    #[test]
-    #[should_panic]
-    fn test_fee_token_percentage_setter_for_deposit_with_unallowed_role() {
-        set_env!(predecessor_account_id: alice(), current_account_id: alice());
-        let token_address = ethereum_address_from_id(2);
-        let mut contract = BridgeTokenFactory::new(prover(), token_locker());
-        contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
-        set_env!(predecessor_account_id: bob());
-        let deposit_fee_percentage =
-            contract.set_deposit_fee_percentage(&token_address, U128(50000), U128(20000)); //0.05% and 0.02%
-        let fee_percentage = contract
-            .get_deposit_token_fee_percentage(&token_address)
-            .unwrap();
-        assert_eq!(
-            deposit_fee_percentage.eth_to_aurora, fee_percentage.eth_to_aurora,
-            "Aurora -> Eth fee percentage not matched"
-        );
-        assert_eq!(
-            deposit_fee_percentage.eth_to_near, fee_percentage.eth_to_near,
-            "Eth -> Near fee percentage not matched"
         );
     }
 
