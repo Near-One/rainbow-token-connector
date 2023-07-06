@@ -18,6 +18,7 @@ pub use log_metadata_event::TokenMetadataEvent;
 
 mod lock_event;
 mod log_metadata_event;
+mod migration;
 
 const BRIDGE_TOKEN_BINARY: &'static [u8] = include_bytes!(std::env!(
     "BRIDGE_TOKEN",
@@ -153,9 +154,6 @@ pub struct BridgeTokenFactory {
     pub owner_pk: PublicKey,
     /// Balance required to register a new account in the BridgeToken
     pub bridge_token_storage_deposit_required: Balance,
-    /// Mask determining all paused functions
-    #[deprecated]
-    paused: Mask,
     /// deposit fee storage
     pub deposit_fee: UnorderedMap<String, DepositFee>,
     /// withdraw fee storage
@@ -255,7 +253,6 @@ impl BridgeTokenFactory {
                 near_contract_standards::fungible_token::FungibleToken::new(b"t".to_vec())
                     .account_storage_usage as Balance
                     * env::storage_byte_cost(),
-            paused: Mask::default(),
             deposit_fee: UnorderedMap::new(StorageKey::DepositFee),
             withdraw_fee: UnorderedMap::new(StorageKey::WihdrawFee),
             withdraw_fee_percentage_per_silo: UnorderedMap::new(StorageKey::WithdrawFeePerSilo),
