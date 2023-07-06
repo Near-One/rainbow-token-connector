@@ -529,6 +529,10 @@ async fn test_upgrade() {
         .unwrap()
         .result;
 
+    // Migrate factory contract
+    let result = factory.call("migrate").max_gas().transact().await.unwrap();
+    assert!(result.is_success());
+
     let token_account_id: String = factory
         .view(
             "get_bridge_token_account_id",
