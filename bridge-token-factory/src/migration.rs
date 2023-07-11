@@ -1,5 +1,7 @@
 use crate::*;
 
+pub type Mask = u128;
+
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct OldState {
     pub prover_account: AccountId,

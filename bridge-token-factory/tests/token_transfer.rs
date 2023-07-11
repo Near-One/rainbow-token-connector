@@ -451,7 +451,7 @@ async fn test_deploy_failures() {
             .max_gas()
             .transact()
             .await,
-        "address should be a valid hex string.: OddLength",
+        "Invalid hex character",
     );
 
     // Fails second time because already exists.

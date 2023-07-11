@@ -15,10 +15,14 @@ pub use bridge_common::prover::{validate_eth_address, Proof};
 use bridge_common::{parse_recipient, prover::*, result_types, Recipient};
 pub use lock_event::EthLockedEvent;
 pub use log_metadata_event::TokenMetadataEvent;
+use types::{
+    DepositFee, DepositFeePercentage, EthAddressHex, FeeBounds, WithdrawFee, WithdrawFeePercentage,
+};
 
 mod lock_event;
 mod log_metadata_event;
 mod migration;
+mod types;
 
 const BRIDGE_TOKEN_BINARY: &'static [u8] = include_bytes!(std::env!(
     "BRIDGE_TOKEN",
@@ -67,8 +71,6 @@ const TOKEN_TIMESTAMP_MAP_PREFIX: &[u8] = b"aTT";
 
 const FEE_DECIMAL_PRECISION: u128 = 1000000;
 
-pub type Mask = u128;
-
 #[derive(AccessControlRole, Deserialize, Serialize, Copy, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub enum Role {
@@ -85,36 +87,6 @@ pub enum Role {
     FeeClaimer,
 }
 
-#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct FeeBounds {
-    lower_bound: U128,
-    upper_bound: U128,
-}
-
-#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct DepositFee {
-    fee_percentage: DepositFeePercentage,
-    bounds: FeeBounds,
-}
-
-#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct WithdrawFee {
-    fee_percentage: WithdrawFeePercentage,
-    bounds: FeeBounds,
-}
-
-#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct DepositFeePercentage {
-    eth_to_near: U128,
-    eth_to_aurora: U128,
-}
-
-#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct WithdrawFeePercentage {
-    near_to_eth: U128,
-    aurora_to_eth: U128,
-}
-
 #[derive(BorshSerialize, BorshStorageKey)]
 enum StorageKey {
     DepositFee,
@@ -122,9 +94,9 @@ enum StorageKey {
     WithdrawFeePerSilo,
 }
 
-fn get_silo_fee_map_key(silo_account_id: &AccountId, token: Option<&String>) -> String {
+fn get_silo_fee_map_key(silo_account_id: &AccountId, token: Option<&EthAddressHex>) -> String {
     if let Some(token) = token {
-        format!("{}:{}", silo_account_id, token)
+        format!("{}:{}", silo_account_id, token.0)
     } else {
         silo_account_id.to_string()
     }
@@ -400,7 +372,7 @@ impl BridgeTokenFactory {
         let reference_hash = None;
         let icon = None;
 
-        ext_bridge_token::ext(self.get_bridge_token_account_id(token.clone()))
+        ext_bridge_token::ext(self.get_bridge_token_account_id(&EthAddressHex(token)))
             .with_static_gas(SET_METADATA_GAS)
             .with_attached_deposit(env::attached_deposit() - required_deposit)
             .set_metadata(
@@ -413,41 +385,53 @@ impl BridgeTokenFactory {
             );
     }
 
-    pub fn get_deposit_token_fee(&self, token: &String) -> Option<DepositFee> {
-        self.deposit_fee.get(token)
+    pub fn get_deposit_token_fee(&self, token: &EthAddressHex) -> Option<DepositFee> {
+        self.deposit_fee.get(&token.0)
     }
 
-    pub fn get_withdraw_token_fee(&self, token: &String) -> Option<WithdrawFee> {
-        self.withdraw_fee.get(token)
+    pub fn get_withdraw_token_fee(&self, token: &EthAddressHex) -> Option<WithdrawFee> {
+        self.withdraw_fee.get(&token.0)
     }
 
     // Returns fee percentage for different tokens per silo
     pub fn get_withdraw_fee_percentage_per_silo(
         &self,
-        silo_account_id: &AccountId,
-        token: &String,
+        silo_account_id: AccountId,
+        token: Option<EthAddressHex>,
     ) -> Option<U128> {
-        self.withdraw_fee_percentage_per_silo
-            .get(&get_silo_fee_map_key(&silo_account_id, Some(token)))
-            .or_else(|| {
-                self.withdraw_fee_percentage_per_silo
-                    .get(&get_silo_fee_map_key(&silo_account_id, None))
-            })
+        self.get_withdraw_fee_percentage_per_silo_internal(&silo_account_id, token.as_ref())
+    }
+
+    fn get_withdraw_fee_percentage_per_silo_internal(
+        &self,
+        silo_account_id: &AccountId,
+        token: Option<&EthAddressHex>,
+    ) -> Option<U128> {
+        if token.is_some() {
+            self.withdraw_fee_percentage_per_silo
+                .get(&get_silo_fee_map_key(&silo_account_id, token))
+                .or_else(|| {
+                    self.withdraw_fee_percentage_per_silo
+                        .get(&get_silo_fee_map_key(&silo_account_id, None))
+                })
+        } else {
+            self.withdraw_fee_percentage_per_silo
+                .get(&get_silo_fee_map_key(&silo_account_id, None))
+        }
     }
 
     //this should be added as per: 10% -> 0.1 = 0.1*10^6
     #[access_control_any(roles(Role::FeeSetter))]
     pub fn set_deposit_fee(
         &mut self,
-        token: &String,
+        token: EthAddressHex,
         eth_to_near: U128,
         eth_to_aurora: U128,
         lower_bound: U128,
         upper_bound: U128,
     ) {
-        let _ = validate_eth_address(token.clone());
         self.deposit_fee.insert(
-            token,
+            &token.0,
             &DepositFee {
                 fee_percentage: DepositFeePercentage {
                     eth_to_near,
@@ -465,15 +449,14 @@ impl BridgeTokenFactory {
     #[access_control_any(roles(Role::FeeSetter))]
     pub fn set_withdraw_fee(
         &mut self,
-        token: &String,
+        token: EthAddressHex,
         near_to_eth: U128,
         aurora_to_eth: U128,
         lower_bound: U128,
         upper_bound: U128,
     ) {
-        let _ = validate_eth_address(token.clone());
         self.withdraw_fee.insert(
-            token,
+            &token.0,
             &WithdrawFee {
                 fee_percentage: WithdrawFeePercentage {
                     near_to_eth,
@@ -497,7 +480,7 @@ impl BridgeTokenFactory {
     pub fn set_withdraw_fee_percentage_for_token_per_silo(
         &mut self,
         silo_account_id: AccountId,
-        token: Option<String>,
+        token: Option<EthAddressHex>,
         fee_percent: U128,
     ) -> U128 {
         self.withdraw_fee_percentage_per_silo.insert(
@@ -510,11 +493,11 @@ impl BridgeTokenFactory {
 
     fn calculate_deposit_fee_amount(
         &self,
-        token: &String,
+        token: &EthAddressHex,
         transfer_amount: u128,
         call_msg: &Option<String>,
     ) -> u128 {
-        let Some(deposit_fee) = self.get_deposit_token_fee(&token) else { return 0 };
+        let Some(deposit_fee) = self.get_deposit_token_fee(token) else { return 0 };
 
         // check if some msg attached than deposit call is for eth -> aurora otherwise eth -> near
         let fee_amount = match call_msg {
@@ -533,16 +516,16 @@ impl BridgeTokenFactory {
 
     fn calculate_withdraw_fee_amount(
         &self,
-        token: &String,
+        token: &EthAddressHex,
         transfer_amount: u128,
         withdrawer: &AccountId,
     ) -> u128 {
         let Some(withdraw_fee) =
-            self.get_withdraw_token_fee(&token) else { return 0 };
+            self.get_withdraw_token_fee(token) else { return 0 };
 
         // check whether the withdrawer is aurora native account or it's silos
         let fee_amount = if let Some(silo_fee) =
-            self.get_withdraw_fee_percentage_per_silo(withdrawer, token)
+            self.get_withdraw_fee_percentage_per_silo_internal(withdrawer, Some(token))
         {
             (transfer_amount * silo_fee.0) / FEE_DECIMAL_PRECISION
         } else {
@@ -582,27 +565,28 @@ impl BridgeTokenFactory {
             target, message
         ));
 
+        let token = EthAddressHex(token);
         let amount_to_transfer: u128;
         let fee_amount = self.calculate_deposit_fee_amount(&token, amount, &message);
         amount_to_transfer = amount - fee_amount;
 
         match message {
-            Some(message) => ext_bridge_token::ext(self.get_bridge_token_account_id(token.clone()))
+            Some(message) => ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
                 .with_static_gas(MINT_GAS)
                 .with_attached_deposit(env::attached_deposit() - required_deposit)
                 .mint(env::current_account_id(), amount.into())
                 .then(
-                    ext_bridge_token::ext(self.get_bridge_token_account_id(token))
+                    ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
                         .with_static_gas(FT_TRANSFER_CALL_GAS)
                         .with_attached_deposit(1)
                         .ft_transfer_call(target, amount_to_transfer.into(), None, message),
                 ),
-            None => ext_bridge_token::ext(self.get_bridge_token_account_id(token.clone()))
+            None => ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
                 .with_static_gas(MINT_GAS)
                 .with_attached_deposit(env::attached_deposit() - required_deposit)
                 .mint(target, amount_to_transfer.into())
                 .then(
-                    ext_bridge_token::ext(self.get_bridge_token_account_id(token))
+                    ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
                         .with_static_gas(MINT_GAS)
                         .with_attached_deposit(env::attached_deposit() - required_deposit)
                         .mint(env::current_account_id(), fee_amount.into()),
@@ -623,21 +607,21 @@ impl BridgeTokenFactory {
     ) -> result_types::Withdraw {
         let token = env::predecessor_account_id();
         let parts: Vec<&str> = token.as_str().split('.').collect();
-        let token_address_str = parts[0].to_string();
+        let token_address_hex = EthAddressHex(parts[0].to_string());
 
         assert_eq!(
             token.to_string(),
-            format!("{}.{}", token_address_str, env::current_account_id()),
+            format!("{}.{}", token_address_hex.0, env::current_account_id()),
             "Only sub accounts of BridgeTokenFactory can call this method."
         );
         assert!(
-            self.tokens.contains(&token_address_str),
+            self.tokens.contains(&token_address_hex.0),
             "Such BridgeToken does not exist."
         );
 
         let fee_amount =
-            self.calculate_withdraw_fee_amount(&token_address_str, amount, &withdrawer);
-        let token_address = validate_eth_address(token_address_str);
+            self.calculate_withdraw_fee_amount(&token_address_hex, amount, &withdrawer);
+        let token_address = validate_eth_address(token_address_hex.0);
         let recipient_address = validate_eth_address(recipient);
 
         if fee_amount != 0 {
@@ -662,15 +646,13 @@ impl BridgeTokenFactory {
 
     #[payable]
     #[pause(except(roles(Role::UnrestrictedDeployBridgeToken)))]
-    pub fn deploy_bridge_token(&mut self, address: String) -> Promise {
-        let address = address.to_lowercase();
-        let _ = validate_eth_address(address.clone());
+    pub fn deploy_bridge_token(&mut self, address: EthAddressHex) -> Promise {
         assert!(
-            !self.tokens.contains(&address),
+            !self.tokens.contains(&address.0),
             "BridgeToken contract already exists."
         );
         let initial_storage = env::storage_usage() as u128;
-        self.tokens.insert(&address);
+        self.tokens.insert(&address.0);
         let current_storage = env::storage_usage() as u128;
         assert!(
             env::attached_deposit()
@@ -678,7 +660,7 @@ impl BridgeTokenFactory {
                     + env::storage_byte_cost() * (current_storage - initial_storage),
             "Not enough attached deposit to complete bridge token creation"
         );
-        let bridge_token_account_id = format!("{}.{}", address, env::current_account_id());
+        let bridge_token_account_id = format!("{}.{}", address.0, env::current_account_id());
         Promise::new(bridge_token_account_id.parse().unwrap())
             .create_account()
             .transfer(BRIDGE_TOKEN_INIT_BALANCE)
@@ -693,8 +675,8 @@ impl BridgeTokenFactory {
     }
 
     #[access_control_any(roles(Role::UpgradableCodeDeployer, Role::UpgradableManager))]
-    pub fn upgrade_bridge_token(&self, address: String) -> Promise {
-        Promise::new(self.get_bridge_token_account_id(address)).function_call(
+    pub fn upgrade_bridge_token(&self, address: EthAddressHex) -> Promise {
+        Promise::new(self.get_bridge_token_account_id(&address)).function_call(
             "upgrade_and_migrate".to_string(),
             BRIDGE_TOKEN_BINARY.into(),
             0,
@@ -703,20 +685,18 @@ impl BridgeTokenFactory {
     }
 
     #[access_control_any(roles(Role::PauseManager))]
-    pub fn set_paused_withdraw(&mut self, address: String, paused: bool) -> Promise {
-        ext_bridge_token::ext(self.get_bridge_token_account_id(address))
+    pub fn set_paused_withdraw(&mut self, address: EthAddressHex, paused: bool) -> Promise {
+        ext_bridge_token::ext(self.get_bridge_token_account_id(&address))
             .with_static_gas(SET_PAUSED_GAS)
             .set_paused(paused)
     }
 
-    pub fn get_bridge_token_account_id(&self, address: String) -> AccountId {
-        let address = address.to_lowercase();
-        let _ = validate_eth_address(address.clone());
+    pub fn get_bridge_token_account_id(&self, address: &EthAddressHex) -> AccountId {
         assert!(
-            self.tokens.contains(&address),
+            self.tokens.contains(&address.0),
             "BridgeToken with such address does not exist."
         );
-        format!("{}.{}", address, env::current_account_id())
+        format!("{}.{}", address.0, env::current_account_id())
             .parse()
             .unwrap()
     }
@@ -751,7 +731,7 @@ impl BridgeTokenFactory {
     #[access_control_any(roles(Role::MetadataManager))]
     pub fn set_metadata(
         &mut self,
-        address: String,
+        address: EthAddressHex,
         name: Option<String>,
         symbol: Option<String>,
         reference: Option<String>,
@@ -759,7 +739,7 @@ impl BridgeTokenFactory {
         decimals: Option<u8>,
         icon: Option<String>,
     ) -> Promise {
-        ext_bridge_token::ext(self.get_bridge_token_account_id(address))
+        ext_bridge_token::ext(self.get_bridge_token_account_id(&address))
             .with_static_gas(env::prepaid_gas() - OUTER_SET_METADATA_GAS)
             .with_attached_deposit(env::attached_deposit())
             .set_metadata(name, symbol, reference, reference_hash, decimals, icon)
@@ -870,13 +850,15 @@ mod tests {
     }
 
     /// Generate a valid ethereum address
-    fn ethereum_address_from_id(id: u8) -> String {
+    fn ethereum_address_from_id(id: u8) -> EthAddressHex {
         let mut buffer = vec![id];
-        sha256(buffer.as_mut())
-            .into_iter()
-            .take(20)
-            .collect::<Vec<_>>()
-            .to_hex()
+        EthAddressHex(
+            sha256(buffer.as_mut())
+                .into_iter()
+                .take(20)
+                .collect::<Vec<_>>()
+                .to_hex(),
+        )
     }
 
     fn sample_proof() -> Proof {
@@ -924,7 +906,7 @@ mod tests {
         set_env!(predecessor_account_id: fee_setter());
         // setting fee-percentage and bounds
         contract.set_deposit_fee(
-            &token_address,
+            token_address.clone(),
             U128(50000),
             U128(20000),
             U128(100),
@@ -948,7 +930,7 @@ mod tests {
         set_env!(predecessor_account_id: fee_setter());
         // setting fee-percentage and bounds
         contract.set_deposit_fee(
-            &token_address,
+            token_address.clone(),
             U128(50000),
             U128(20000),
             U128(100),
@@ -996,7 +978,7 @@ mod tests {
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         set_env!(predecessor_account_id: bob()); // bob is not allowed (has no role) to set deposit-fees;
         contract.set_deposit_fee(
-            &token_address,
+            token_address,
             U128(50000),
             U128(20000),
             U128(100),
@@ -1012,7 +994,7 @@ mod tests {
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
         set_env!(predecessor_account_id: fee_setter());
         contract.set_withdraw_fee(
-            &token_address,
+            token_address.clone(),
             U128(50000),
             U128(20000),
             U128(100),
@@ -1035,7 +1017,7 @@ mod tests {
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
         set_env!(predecessor_account_id: bob()); // bob is not allowed (has no role) to set deposit-fees;
         contract.set_withdraw_fee(
-            &token_address,
+            token_address.clone(),
             U128(50000),
             U128(20000),
             U128(100),
@@ -1057,7 +1039,7 @@ mod tests {
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
         set_env!(predecessor_account_id: fee_setter());
         contract.set_deposit_fee(
-            &token_address,
+            token_address.clone(),
             U128(50000),
             U128(20000),
             U128(100),
@@ -1087,7 +1069,7 @@ mod tests {
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
         set_env!(predecessor_account_id: fee_setter());
         contract.set_withdraw_fee(
-            &token_address,
+            token_address.clone(),
             U128(90000),
             U128(40000),
             U128(100),
@@ -1122,15 +1104,15 @@ mod tests {
             Some(token_address.clone()),
             U128(100000),
         ); // 10% fee
-        let expected_fee_percentage1 =
-            contract.get_withdraw_fee_percentage_per_silo(&silo_account(), &token_address);
+        let expected_fee_percentage1 = contract
+            .get_withdraw_fee_percentage_per_silo(silo_account(), Some(token_address.clone()));
         let withdraw_fee_percentage2 = contract.set_withdraw_fee_percentage_for_token_per_silo(
             silo_account(),
             Some(token_address.clone()),
             U128(200000),
         ); //20% fee
         let expected_fee_percentage2 =
-            contract.get_withdraw_fee_percentage_per_silo(&silo_account(), &token_address);
+            contract.get_withdraw_fee_percentage_per_silo(silo_account(), Some(token_address));
 
         assert_eq!(
             withdraw_fee_percentage1,
@@ -1152,7 +1134,7 @@ mod tests {
         let expected_key_without_token = get_silo_fee_map_key(&silo_account(), None);
         assert_eq!(
             expected_key_with_token,
-            format!("{}:{}", silo_account(), token_address),
+            format!("{}:{}", silo_account(), token_address.0),
             "Expected silo with token address not matched"
         );
         assert_eq!(
@@ -1183,12 +1165,12 @@ mod tests {
             U128(100000),
         ); //20% fee
         let expected_fee_percentage1 =
-            contract.get_withdraw_fee_percentage_per_silo(&silo_account(), &token1_address);
+            contract.get_withdraw_fee_percentage_per_silo(silo_account(), Some(token1_address));
         let expected_fee_percentage2 =
-            contract.get_withdraw_fee_percentage_per_silo(&silo_account(), &token2_address);
+            contract.get_withdraw_fee_percentage_per_silo(silo_account(), Some(token2_address));
         // for token-3 fee is not set
         let expected_fee_percentage3 =
-            contract.get_withdraw_fee_percentage_per_silo(&silo_account(), &token3_address);
+            contract.get_withdraw_fee_percentage_per_silo(silo_account(), Some(token3_address));
 
         assert_eq!(
             withdraw_fee_percentage1,
@@ -1225,9 +1207,9 @@ mod tests {
                                                                                                  // Below token is not registered token therefore fees is default one's.
 
         let expected_fee_percentage =
-            contract.get_withdraw_fee_percentage_per_silo(&silo_account(), &token_address);
+            contract.get_withdraw_fee_percentage_per_silo(silo_account(), Some(token_address));
         let expected_default_fee_percentage =
-            contract.get_withdraw_fee_percentage_per_silo(&silo_account(), &"".to_string());
+            contract.get_withdraw_fee_percentage_per_silo(silo_account(), None);
 
         assert_eq!(
             withdraw_fee_percentage,
@@ -1248,7 +1230,7 @@ mod tests {
         let contract = BridgeTokenFactory::new(prover(), token_locker());
 
         let expected_fee_percentage =
-            contract.get_withdraw_fee_percentage_per_silo(&silo_account(), &"".to_string());
+            contract.get_withdraw_fee_percentage_per_silo(silo_account(), None);
         assert_eq!(
             expected_fee_percentage, None,
             "Aurora -> Eth fee percentage not matched for withdraw"
@@ -1264,7 +1246,7 @@ mod tests {
             predecessor_account_id: alice(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE,
         );
-        contract.deploy_bridge_token(token_locker());
+        contract.deploy_bridge_token(token_locker().parse().unwrap());
     }
 
     #[test]
@@ -1289,19 +1271,20 @@ mod tests {
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2,
         );
 
-        contract.deploy_bridge_token(token_locker());
+        contract.deploy_bridge_token(token_locker().parse().unwrap());
         assert_eq!(
             contract
-                .get_bridge_token_account_id(token_locker())
+                .get_bridge_token_account_id(&EthAddressHex(token_locker()))
                 .to_string(),
             format!("{}.{}", token_locker(), bridge_token_factory())
         );
 
         let uppercase_address = "0f5Ea0A652E851678Ebf77B69484bFcD31F9459B".to_string();
-        contract.deploy_bridge_token(uppercase_address.clone());
+        let parsed_address: EthAddressHex = uppercase_address.parse().unwrap();
+        contract.deploy_bridge_token(parsed_address.clone());
         assert_eq!(
             contract
-                .get_bridge_token_account_id(uppercase_address.clone())
+                .get_bridge_token_account_id(&parsed_address)
                 .to_string(),
             format!(
                 "{}.{}",
@@ -1320,7 +1303,7 @@ mod tests {
             predecessor_account_id: alice(),
             attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
         );
-        contract.deploy_bridge_token(token_locker());
+        contract.deploy_bridge_token(token_locker().parse().unwrap());
 
         set_env!(
             current_account_id: bridge_token_factory(),
@@ -1438,7 +1421,7 @@ mod tests {
         contract.deploy_bridge_token(erc20_address.clone());
 
         // Check it is possible to use deposit while the contract is NOT paused
-        contract.deposit(create_proof(token_locker(), erc20_address.clone()));
+        contract.deposit(create_proof(token_locker(), erc20_address.0.clone()));
 
         // Pause deposit
         set_env!(
@@ -1456,7 +1439,7 @@ mod tests {
 
         // Check it is NOT possible to use deposit while the contract is paused
         panic::catch_unwind(move || {
-            contract.deposit(create_proof(token_locker(), erc20_address.clone()));
+            contract.deposit(create_proof(token_locker(), erc20_address.0.clone()));
         })
         .unwrap_err();
     }
@@ -1482,7 +1465,7 @@ mod tests {
         contract.deploy_bridge_token(erc20_address.clone());
 
         // Check it is possible to use deposit while the contract is NOT paused
-        contract.deposit(create_proof(token_locker(), erc20_address.clone()));
+        contract.deposit(create_proof(token_locker(), erc20_address.0.clone()));
 
         // Pause everything
         set_env!(
@@ -1500,7 +1483,7 @@ mod tests {
 
         // Check it is NOT possible to use deposit while the contract is paused
         panic::catch_unwind(move || {
-            contract.deposit(create_proof(token_locker(), erc20_address));
+            contract.deposit(create_proof(token_locker(), erc20_address.0));
         })
         .unwrap_err();
     }
@@ -1526,7 +1509,7 @@ mod tests {
         contract.deploy_bridge_token(erc20_address.clone());
 
         // Check it is possible to use deposit while the contract is NOT paused
-        contract.deposit(create_proof(token_locker(), erc20_address.clone()));
+        contract.deposit(create_proof(token_locker(), erc20_address.0.clone()));
 
         // Pause everything
         set_env!(
@@ -1545,6 +1528,6 @@ mod tests {
         );
 
         // Check the deposit works after pausing and unpausing everything
-        contract.deposit(create_proof(token_locker(), erc20_address));
+        contract.deposit(create_proof(token_locker(), erc20_address.0));
     }
 }
