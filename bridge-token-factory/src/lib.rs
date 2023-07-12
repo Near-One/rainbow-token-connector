@@ -400,17 +400,7 @@ impl BridgeTokenFactory {
 
         let required_deposit = self.record_proof(&proof);
 
-        assert!(
-            env::attached_deposit()
-                >= required_deposit + self.bridge_token_storage_deposit_required
-        );
-
         let Recipient { target, message } = parse_recipient(new_owner_id);
-
-        env::log_str(&format!(
-            "Finish deposit. Target:{} Message:{:?}",
-            target, message
-        ));
 
         let token = EthAddressHex(token);
         let amount_to_transfer: u128;
@@ -421,10 +411,21 @@ impl BridgeTokenFactory {
         );
         amount_to_transfer = amount - fee_amount;
 
+        let multiplier = if fee_amount > 0 { 1 } else { 2 };
+        require!(
+            env::attached_deposit()
+                >= required_deposit + self.bridge_token_storage_deposit_required * multiplier
+        );
+
+        env::log_str(&format!(
+            "Finish deposit. Target:{} Message:{:?}",
+            target, message
+        ));
+
         match message {
             Some(message) => ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
                 .with_static_gas(MINT_GAS)
-                .with_attached_deposit(env::attached_deposit() - required_deposit)
+                .with_attached_deposit(self.bridge_token_storage_deposit_required)
                 .mint(env::current_account_id(), amount.into())
                 .then(
                     ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
@@ -436,12 +437,13 @@ impl BridgeTokenFactory {
                 let mint_target_promise =
                     ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
                         .with_static_gas(MINT_GAS)
-                        .with_attached_deposit(env::attached_deposit() - required_deposit)
+                        .with_attached_deposit(self.bridge_token_storage_deposit_required)
                         .mint(target, amount_to_transfer.into());
 
                 if fee_amount > 0 {
                     mint_target_promise.then(
                         ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
+                            .with_attached_deposit(self.bridge_token_storage_deposit_required)
                             .with_static_gas(MINT_GAS)
                             .mint(env::current_account_id(), fee_amount.into()),
                     )
