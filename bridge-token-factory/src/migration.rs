@@ -31,7 +31,8 @@ impl BridgeTokenFactory {
             bridge_token_storage_deposit_required: old_state.bridge_token_storage_deposit_required,
             deposit_fee: UnorderedMap::new(StorageKey::DepositFee),
             withdraw_fee: UnorderedMap::new(StorageKey::WihdrawFee),
-            withdraw_fee_percentage_per_silo: UnorderedMap::new(StorageKey::WithdrawFeePerSilo),
+            withdraw_fee_per_silo: UnorderedMap::new(StorageKey::WithdrawFeePerSilo),
+            deposit_fee_per_silo: UnorderedMap::new(StorageKey::DespositFeePerSilo),
         }
     }
 }

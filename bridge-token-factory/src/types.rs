@@ -61,30 +61,12 @@ fn is_hex_string(hex_str: &str) -> bool {
 
 #[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FeeBounds {
-    pub lower_bound: U128,
-    pub upper_bound: U128,
+    pub lower_bound: Option<U128>,
+    pub upper_bound: Option<U128>,
 }
 
 #[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct DepositFee {
-    pub fee_percentage: DepositFeePercentage,
+pub struct Fee {
+    pub fee_percentage: U128,
     pub bounds: FeeBounds,
-}
-
-#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct WithdrawFee {
-    pub fee_percentage: WithdrawFeePercentage,
-    pub bounds: FeeBounds,
-}
-
-#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct DepositFeePercentage {
-    pub eth_to_near: U128,
-    pub eth_to_aurora: U128,
-}
-
-#[derive(BorshDeserialize, BorshSerialize, Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct WithdrawFeePercentage {
-    pub near_to_eth: U128,
-    pub aurora_to_eth: U128,
 }

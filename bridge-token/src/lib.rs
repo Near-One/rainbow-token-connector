@@ -59,9 +59,12 @@ impl BridgeToken {
             "Only the factory account can init this contract"
         );
 
+        let mut token = FungibleToken::new(b"t".to_vec());
+        token.internal_register_account(&env::predecessor_account_id());
+
         Self {
             controller: env::predecessor_account_id(),
-            token: FungibleToken::new(b"t".to_vec()),
+            token,
             name: String::default(),
             symbol: String::default(),
             reference: String::default(),
