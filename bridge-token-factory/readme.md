@@ -16,12 +16,11 @@
 * ### For withdraw:
   
   * `set_withdraw_fee_percentage`: method to set withdraw fee-percentage for near -> eth and aurora -> eth.
-  * `set_withdraw_fee_percentage_for_token_per_silo`: method to set withdraw fee-percentage for different aurora-silos per different tokens. Here first it checks for any default value set for the silo or not, than it updates the passed params fee-percentage values. 
-  * `set_default_withdraw_fee_percentage_per_silo`: method to set default fee-percentage for different aurora-silos per different tokens.
+  * `set_withdraw_fee_percentage_per_silo`: method to set withdraw fee-percentage for different aurora-silos per different tokens.
   * `set_withdraw_fee_bound`: method to set upper and lower_bounds for withdraw fee.
   * `get_withdraw_token_fee_percentage`: returns withdraw fee-percentage for specific erc-20 token address.
   * `get_withdraw_token_fee_bound`: returns fee-bounds for withdraw of specific erc-20 token address.
-  * `get_withdraw_fee_percentage_per_silo_per_token`: returns withdraw fee-percentage for different silos per different tokens. It also returns the default value, if have any.
+  * `get_withdraw_fee_percentage_per_silo`: returns withdraw fee-percentage for different silos per different tokens. It also returns the default value, if have any.
   
 * ### To claim the accumulated fee:-
    * `claim_fee`: method to claim the fee-amount accumulated, by passing Near-token-address and the desired amount. 

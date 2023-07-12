@@ -496,7 +496,7 @@ impl BridgeTokenFactory {
             token:- token address, if passed `None` than default value is set.
      */
     #[access_control_any(roles(Role::FeeSetter))]
-    pub fn set_withdraw_fee_percentage_for_token_per_silo(
+    pub fn set_withdraw_fee_percentage_per_silo(
         &mut self,
         silo_account_id: AccountId,
         token: Option<EthAddressHex>,
@@ -1145,14 +1145,14 @@ mod tests {
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
         set_env!(predecessor_account_id: fee_setter());
 
-        let withdraw_fee_percentage1 = contract.set_withdraw_fee_percentage_for_token_per_silo(
+        let withdraw_fee_percentage1 = contract.set_withdraw_fee_percentage_per_silo(
             silo_account(),
             Some(token_address.clone()),
             U128(100000),
         ); // 10% fee
         let expected_fee_percentage1 = contract
             .get_withdraw_fee_percentage_per_silo(silo_account(), Some(token_address.clone()));
-        let withdraw_fee_percentage2 = contract.set_withdraw_fee_percentage_for_token_per_silo(
+        let withdraw_fee_percentage2 = contract.set_withdraw_fee_percentage_per_silo(
             silo_account(),
             Some(token_address.clone()),
             U128(200000),
@@ -1199,13 +1199,13 @@ mod tests {
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
         set_env!(predecessor_account_id: fee_setter());
 
-        let withdraw_fee_percentage1 = contract.set_withdraw_fee_percentage_for_token_per_silo(
+        let withdraw_fee_percentage1 = contract.set_withdraw_fee_percentage_per_silo(
             silo_account(),
             Some(token1_address.clone()),
             U128(100000),
         ); // 10% fee
 
-        let withdraw_fee_percentage2 = contract.set_withdraw_fee_percentage_for_token_per_silo(
+        let withdraw_fee_percentage2 = contract.set_withdraw_fee_percentage_per_silo(
             silo_account(),
             Some(token2_address.clone()),
             U128(100000),
@@ -1242,15 +1242,15 @@ mod tests {
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
         set_env!(predecessor_account_id: fee_setter());
 
-        let withdraw_fee_percentage = contract.set_withdraw_fee_percentage_for_token_per_silo(
+        let withdraw_fee_percentage = contract.set_withdraw_fee_percentage_per_silo(
             silo_account(),
             Some(token_address.clone()),
             U128(200000),
         ); // 20% fee
 
-        let default_withdraw_fee_percentage = contract
-            .set_withdraw_fee_percentage_for_token_per_silo(silo_account(), None, U128(100000)); // 10% fee
-                                                                                                 // Below token is not registered token therefore fees is default one's.
+        let default_withdraw_fee_percentage =
+            contract.set_withdraw_fee_percentage_per_silo(silo_account(), None, U128(100000)); // 10% fee
+                                                                                               // Below token is not registered token therefore fees is default one's.
 
         let expected_fee_percentage =
             contract.get_withdraw_fee_percentage_per_silo(silo_account(), Some(token_address));
