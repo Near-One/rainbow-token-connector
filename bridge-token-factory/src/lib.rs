@@ -7,8 +7,8 @@ use near_sdk::collections::{UnorderedMap, UnorderedSet};
 use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
-    env, ext_contract, near_bindgen, AccountId, Balance, BorshStorageKey, Gas, PanicOnDefault,
-    Promise, PromiseOrValue, PublicKey, ONE_NEAR,
+    env, ext_contract, near_bindgen, require, AccountId, Balance, BorshStorageKey, Gas,
+    PanicOnDefault, Promise, PromiseOrValue, PublicKey, ONE_NEAR,
 };
 
 pub use bridge_common::prover::{validate_eth_address, Proof};
@@ -57,6 +57,9 @@ const SET_PAUSED_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 
 /// Amount of gas used upgrade and migrate bridge token.
 const UPGRADE_TOKEN_GAS: Gas = Gas(Gas::ONE_TERA.0 * 200);
+
+/// Amount of gas used by bridge token for storage deposit.
+const TOKEN_STORAGE_DEPOSIT_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 
 /// Controller storage key.
 const CONTROLLER_STORAGE_KEY: &[u8] = b"aCONTROLLER";
@@ -189,6 +192,8 @@ pub trait ExtBridgeToken {
     fn set_paused(&mut self, paused: bool);
 
     fn upgrade_and_migrate(&mut self, code: &[u8]);
+
+    fn storage_deposit(&mut self, account_id: Option<AccountId>, registration_only: Option<bool>);
 }
 
 pub fn assert_self() {
@@ -422,6 +427,7 @@ impl BridgeTokenFactory {
 
     //this should be added as per: 10% -> 0.1 = 0.1*10^6
     #[access_control_any(roles(Role::FeeSetter))]
+    #[payable]
     pub fn set_deposit_fee(
         &mut self,
         token: EthAddressHex,
@@ -429,7 +435,7 @@ impl BridgeTokenFactory {
         eth_to_aurora: U128,
         lower_bound: U128,
         upper_bound: U128,
-    ) {
+    ) -> Promise {
         self.deposit_fee.insert(
             &token.0,
             &DepositFee {
@@ -443,10 +449,17 @@ impl BridgeTokenFactory {
                 },
             },
         );
+
+        require!(env::attached_deposit() >= self.bridge_token_storage_deposit_required);
+        ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
+            .with_static_gas(TOKEN_STORAGE_DEPOSIT_GAS)
+            .with_attached_deposit(env::attached_deposit())
+            .storage_deposit(None, None)
     }
 
     //Fee should be added as per: 10% -> 0.1 = 0.1*10^6 with proper fee amount bounds
     #[access_control_any(roles(Role::FeeSetter))]
+    #[payable]
     pub fn set_withdraw_fee(
         &mut self,
         token: EthAddressHex,
@@ -454,7 +467,7 @@ impl BridgeTokenFactory {
         aurora_to_eth: U128,
         lower_bound: U128,
         upper_bound: U128,
-    ) {
+    ) -> Promise {
         self.withdraw_fee.insert(
             &token.0,
             &WithdrawFee {
@@ -468,6 +481,12 @@ impl BridgeTokenFactory {
                 },
             },
         );
+
+        require!(env::attached_deposit() >= self.bridge_token_storage_deposit_required);
+        ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
+            .with_static_gas(TOKEN_STORAGE_DEPOSIT_GAS)
+            .with_attached_deposit(env::attached_deposit())
+            .storage_deposit(None, None)
     }
 
     /*
@@ -581,16 +600,23 @@ impl BridgeTokenFactory {
                         .with_attached_deposit(1)
                         .ft_transfer_call(target, amount_to_transfer.into(), None, message),
                 ),
-            None => ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
-                .with_static_gas(MINT_GAS)
-                .with_attached_deposit(env::attached_deposit() - required_deposit)
-                .mint(target, amount_to_transfer.into())
-                .then(
+            None => {
+                let mint_target_promise =
                     ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
                         .with_static_gas(MINT_GAS)
                         .with_attached_deposit(env::attached_deposit() - required_deposit)
-                        .mint(env::current_account_id(), fee_amount.into()),
-                ),
+                        .mint(target, amount_to_transfer.into());
+
+                if fee_amount > 0 {
+                    mint_target_promise.then(
+                        ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
+                            .with_static_gas(MINT_GAS)
+                            .mint(env::current_account_id(), fee_amount.into()),
+                    )
+                } else {
+                    mint_target_promise
+                }
+            }
         }
     }
 
@@ -903,7 +929,11 @@ mod tests {
         let token_address = ethereum_address_from_id(2);
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
-        set_env!(predecessor_account_id: fee_setter());
+        set_env!(
+            predecessor_account_id: fee_setter(),
+            attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
+        );
+        contract.deploy_bridge_token(token_address.clone());
         // setting fee-percentage and bounds
         contract.set_deposit_fee(
             token_address.clone(),
@@ -927,7 +957,11 @@ mod tests {
         let token_address = ethereum_address_from_id(2);
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
-        set_env!(predecessor_account_id: fee_setter());
+        set_env!(
+            predecessor_account_id: fee_setter(),
+            attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
+        );
+        contract.deploy_bridge_token(token_address.clone());
         // setting fee-percentage and bounds
         contract.set_deposit_fee(
             token_address.clone(),
@@ -992,7 +1026,11 @@ mod tests {
         let token_address = ethereum_address_from_id(4);
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
-        set_env!(predecessor_account_id: fee_setter());
+        set_env!(
+            predecessor_account_id: fee_setter(),
+            attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
+        );
+        contract.deploy_bridge_token(token_address.clone());
         contract.set_withdraw_fee(
             token_address.clone(),
             U128(50000),
@@ -1037,7 +1075,11 @@ mod tests {
         let token_address = ethereum_address_from_id(2);
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
-        set_env!(predecessor_account_id: fee_setter());
+        set_env!(
+            predecessor_account_id: fee_setter(),
+            attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
+        );
+        contract.deploy_bridge_token(token_address.clone());
         contract.set_deposit_fee(
             token_address.clone(),
             U128(50000),
@@ -1067,7 +1109,11 @@ mod tests {
         let token_address = ethereum_address_from_id(2);
         let mut contract = BridgeTokenFactory::new(prover(), token_locker());
         contract.acl_grant_role("FeeSetter".to_string(), fee_setter());
-        set_env!(predecessor_account_id: fee_setter());
+        set_env!(
+            predecessor_account_id: fee_setter(),
+            attached_deposit: BRIDGE_TOKEN_INIT_BALANCE * 2
+        );
+        contract.deploy_bridge_token(token_address.clone());
         contract.set_withdraw_fee(
             token_address.clone(),
             U128(90000),
