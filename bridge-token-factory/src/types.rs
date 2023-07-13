@@ -19,7 +19,6 @@ impl<'de> Deserialize<'de> for EthAddressHex {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
 pub struct ParseEthAddressError(String);
 
 impl fmt::Display for ParseEthAddressError {
