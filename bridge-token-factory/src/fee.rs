@@ -1,3 +1,5 @@
+use near_sdk::{assert_one_yocto, ONE_YOCTO};
+
 use crate::*;
 
 fn adjust_fee_amount_between_bounds(fee_amount: u128, fee_bounds: &FeeBounds) -> u128 {
@@ -146,12 +148,14 @@ impl BridgeTokenFactory {
     }
 
     // Accumulated fee should be claimed from here.
+    #[payable]
     #[access_control_any(roles(Role::FeeClaimer))]
-    pub fn claim_fee(&self, token: AccountId, amount: Balance) {
+    pub fn claim_fee(&mut self, token: AccountId, amount: Balance) -> Promise {
+        assert_one_yocto();
         ext_bridge_token::ext(token)
             .with_static_gas(FT_TRANSFER_GAS)
-            .with_attached_deposit(1)
-            .ft_transfer(env::predecessor_account_id(), amount.into(), None);
+            .with_attached_deposit(ONE_YOCTO)
+            .ft_transfer(env::predecessor_account_id(), amount.into(), None)
     }
 
     pub(crate) fn calculate_deposit_fee_amount(
