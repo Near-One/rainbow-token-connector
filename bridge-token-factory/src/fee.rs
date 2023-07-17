@@ -30,7 +30,7 @@ impl BridgeTokenFactory {
         fee_percentage: U128,
         lower_bound: Option<U128>,
         upper_bound: Option<U128>,
-    ) -> Promise {
+    ) {
         self.deposit_fee.insert(
             &token.0,
             &Fee {
@@ -41,12 +41,6 @@ impl BridgeTokenFactory {
                 },
             },
         );
-
-        require!(env::attached_deposit() >= self.bridge_token_storage_deposit_required);
-        ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
-            .with_static_gas(TOKEN_STORAGE_DEPOSIT_GAS)
-            .with_attached_deposit(env::attached_deposit())
-            .storage_deposit(None, None)
     }
 
     // Fee should be added as per: 10% -> 0.1 = 0.1*10^6 with proper fee amount bounds
@@ -73,14 +67,13 @@ impl BridgeTokenFactory {
 
     // Fee should be added as per: 10% -> 0.1 = 0.1*10^6 with proper fee amount bounds
     #[access_control_any(roles(Role::FeeSetter))]
-    #[payable]
     pub fn set_withdraw_fee(
         &mut self,
         token: EthAddressHex,
         fee_percentage: U128,
         lower_bound: Option<U128>,
         upper_bound: Option<U128>,
-    ) -> Promise {
+    ) {
         self.withdraw_fee.insert(
             &token.0,
             &Fee {
@@ -91,12 +84,6 @@ impl BridgeTokenFactory {
                 },
             },
         );
-
-        require!(env::attached_deposit() >= self.bridge_token_storage_deposit_required);
-        ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
-            .with_static_gas(TOKEN_STORAGE_DEPOSIT_GAS)
-            .with_attached_deposit(env::attached_deposit())
-            .storage_deposit(None, None)
     }
 
     // Fee should be added as per: 10% -> 0.1 = 0.1*10^6 with proper fee amount bounds
