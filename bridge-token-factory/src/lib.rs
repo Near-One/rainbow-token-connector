@@ -8,7 +8,7 @@ use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::{
     env, ext_contract, near_bindgen, require, AccountId, Balance, BorshStorageKey, Gas,
-    PanicOnDefault, Promise, PromiseOrValue, PublicKey, ONE_NEAR,
+    PanicOnDefault, Promise, PromiseOrValue, PublicKey, ONE_NEAR, ONE_YOCTO,
 };
 
 pub use bridge_common::prover::{validate_eth_address, Proof};
@@ -56,9 +56,6 @@ const SET_PAUSED_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 
 /// Amount of gas used upgrade and migrate bridge token.
 const UPGRADE_TOKEN_GAS: Gas = Gas(Gas::ONE_TERA.0 * 200);
-
-/// Amount of gas used by bridge token for storage deposit.
-const TOKEN_STORAGE_DEPOSIT_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 
 /// Controller storage key.
 const CONTROLLER_STORAGE_KEY: &[u8] = b"aCONTROLLER";
@@ -400,22 +397,25 @@ impl BridgeTokenFactory {
 
         let required_deposit = self.record_proof(&proof);
 
+        require!(
+            env::attached_deposit()
+                >= required_deposit + self.bridge_token_storage_deposit_required + ONE_YOCTO
+        );
+
         let Recipient { target, message } = parse_recipient(new_owner_id);
 
+        env::log_str(&format!(
+            "Finish deposit. Target:{} Message:{:?}",
+            target, message
+        ));
+
         let token = EthAddressHex(token);
-        let amount_to_transfer: u128;
         let fee_amount = self.calculate_deposit_fee_amount(
             &token,
             amount,
             message.as_ref().and_then(|_| Some(&target)),
         );
-        amount_to_transfer = amount - fee_amount;
-
-        let multiplier = if fee_amount > 0 { 1 } else { 2 };
-        require!(
-            env::attached_deposit()
-                >= required_deposit + self.bridge_token_storage_deposit_required * multiplier
-        );
+        let amount_to_transfer = amount.checked_sub(fee_amount).unwrap_or(0);
 
         env::log_str(&format!(
             "Finish deposit. Target:{} Message:{:?}",
@@ -423,32 +423,45 @@ impl BridgeTokenFactory {
         ));
 
         match message {
-            Some(message) => ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
-                .with_static_gas(MINT_GAS)
-                .with_attached_deposit(self.bridge_token_storage_deposit_required)
-                .mint(env::current_account_id(), amount.into())
-                .then(
-                    ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
-                        .with_static_gas(FT_TRANSFER_CALL_GAS)
-                        .with_attached_deposit(1)
-                        .ft_transfer_call(target, amount_to_transfer.into(), None, message),
-                ),
-            None => {
-                let mint_target_promise =
+            Some(message) => {
+                let mint_self_promise =
                     ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
                         .with_static_gas(MINT_GAS)
                         .with_attached_deposit(self.bridge_token_storage_deposit_required)
-                        .mint(target, amount_to_transfer.into());
+                        .mint(env::current_account_id(), amount.into());
 
-                if fee_amount > 0 {
-                    mint_target_promise.then(
+                if amount_to_transfer > 0 {
+                    mint_self_promise.then(
                         ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
-                            .with_attached_deposit(self.bridge_token_storage_deposit_required)
-                            .with_static_gas(MINT_GAS)
-                            .mint(env::current_account_id(), fee_amount.into()),
+                            .with_static_gas(FT_TRANSFER_CALL_GAS)
+                            .with_attached_deposit(ONE_YOCTO)
+                            .ft_transfer_call(target, amount_to_transfer.into(), None, message),
                     )
                 } else {
-                    mint_target_promise
+                    mint_self_promise
+                }
+            }
+            None => {
+                if fee_amount > 0 {
+                    let mint_fee_promise =
+                        ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
+                            .with_static_gas(MINT_GAS)
+                            .mint(env::current_account_id(), fee_amount.into());
+
+                    if amount_to_transfer > 0 {
+                        ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
+                            .with_static_gas(MINT_GAS)
+                            .with_attached_deposit(self.bridge_token_storage_deposit_required)
+                            .mint(target, amount_to_transfer.into())
+                            .then(mint_fee_promise)
+                    } else {
+                        mint_fee_promise
+                    }
+                } else {
+                    ext_bridge_token::ext(self.get_bridge_token_account_id(&token))
+                        .with_static_gas(MINT_GAS)
+                        .with_attached_deposit(self.bridge_token_storage_deposit_required)
+                        .mint(target, amount_to_transfer.into())
                 }
             }
         }
@@ -491,7 +504,7 @@ impl BridgeTokenFactory {
                 .mint(env::current_account_id(), fee_amount.into());
         };
 
-        let amount_to_transfer = amount - fee_amount;
+        let amount_to_transfer = amount.checked_sub(fee_amount).unwrap_or(0);
         result_types::Withdraw::new(amount_to_transfer, token_address, recipient_address)
     }
 
