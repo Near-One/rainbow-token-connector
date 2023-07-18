@@ -23,7 +23,6 @@ fn adjust_fee_amount_between_bounds(fee_amount: u128, fee_bounds: &FeeBounds) ->
 impl BridgeTokenFactory {
     //this should be added as per: 10% -> 0.1 = 0.1*10^6
     #[access_control_any(roles(Role::FeeSetter))]
-    #[payable]
     pub fn set_deposit_fee(
         &mut self,
         token: EthAddressHex,
@@ -41,6 +40,11 @@ impl BridgeTokenFactory {
                 },
             },
         );
+    }
+
+    #[access_control_any(roles(Role::FeeSetter))]
+    pub fn unset_deposit_fee(&mut self, token: EthAddressHex) {
+        self.deposit_fee.remove(&token.0);
     }
 
     // Fee should be added as per: 10% -> 0.1 = 0.1*10^6 with proper fee amount bounds
@@ -65,6 +69,16 @@ impl BridgeTokenFactory {
         );
     }
 
+    #[access_control_any(roles(Role::FeeSetter))]
+    pub fn unset_deposit_fee_per_silo(
+        &mut self,
+        silo_account_id: AccountId,
+        token: Option<EthAddressHex>,
+    ) {
+        self.deposit_fee_per_silo
+            .remove(&get_silo_fee_map_key(&silo_account_id, token.as_ref()));
+    }
+
     // Fee should be added as per: 10% -> 0.1 = 0.1*10^6 with proper fee amount bounds
     #[access_control_any(roles(Role::FeeSetter))]
     pub fn set_withdraw_fee(
@@ -84,6 +98,11 @@ impl BridgeTokenFactory {
                 },
             },
         );
+    }
+
+    #[access_control_any(roles(Role::FeeSetter))]
+    pub fn unset_withdraw_fee(&mut self, token: EthAddressHex) {
+        self.withdraw_fee.remove(&token.0);
     }
 
     // Fee should be added as per: 10% -> 0.1 = 0.1*10^6 with proper fee amount bounds
@@ -106,6 +125,16 @@ impl BridgeTokenFactory {
                 },
             },
         );
+    }
+
+    #[access_control_any(roles(Role::FeeSetter))]
+    pub fn unset_withdraw_fee_per_silo(
+        &mut self,
+        silo_account_id: AccountId,
+        token: Option<EthAddressHex>,
+    ) {
+        self.withdraw_fee_per_silo
+            .remove(&get_silo_fee_map_key(&silo_account_id, token.as_ref()));
     }
 
     pub fn get_deposit_fee(&self, token: &EthAddressHex) -> Option<Fee> {
@@ -246,10 +275,7 @@ mod tests {
             Some(U128(100)),
             Some(U128(200)),
         );
-        let bound = contract
-            .get_deposit_fee(&token_address)
-            .unwrap()
-            .bounds;
+        let bound = contract.get_deposit_fee(&token_address).unwrap().bounds;
 
         assert_eq!(
             U128(100),
@@ -282,10 +308,7 @@ mod tests {
             Some(U128(200)),
         );
         // let deposit_bound = contract.set_deposit_fee_bound(&token_address, , U128(100));
-        let expected_bound = contract
-            .get_deposit_fee(&token_address)
-            .unwrap()
-            .bounds;
+        let expected_bound = contract.get_deposit_fee(&token_address).unwrap().bounds;
         assert_eq!(
             U128(100),
             expected_bound.lower_bound.unwrap(),
@@ -337,10 +360,7 @@ mod tests {
             Some(U128(100)),
             Some(U128(200)),
         );
-        let bound = contract
-            .get_withdraw_fee(&token_address)
-            .unwrap()
-            .bounds;
+        let bound = contract.get_withdraw_fee(&token_address).unwrap().bounds;
         assert_eq!(
             U128(100),
             bound.lower_bound.unwrap(),
@@ -367,10 +387,7 @@ mod tests {
             Some(U128(100)),
             Some(U128(200)),
         );
-        let bound = contract
-            .get_withdraw_fee(&token_address)
-            .unwrap()
-            .bounds;
+        let bound = contract.get_withdraw_fee(&token_address).unwrap().bounds;
         assert_eq!(
             U128(100),
             bound.lower_bound.unwrap(),

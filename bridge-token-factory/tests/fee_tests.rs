@@ -215,7 +215,6 @@ fn test_token_transfer_with_deposit_and_withdraw_fee() {
     .block_on(
         alice
             .call(factory.id(), "set_deposit_fee")
-            .deposit(DEFAULT_DEPOSIT)
             .args(
                 json!({"token": DAI_ADDRESS.to_string(), "fee_percentage": "400000", "upper_bound": "500", "lower_bound": "100"})
                     .to_string()
@@ -618,7 +617,6 @@ fn test_token_deposit_with_fee_more_than_upper_bound() {
     .block_on(
         alice
             .call(factory.id(), "set_deposit_fee")
-            .deposit(DEFAULT_DEPOSIT)
             .args(
                 json!({"token": DAI_ADDRESS.to_string(), "fee_percentage": "400000", "upper_bound": "200", "lower_bound": "100"})
                     .to_string()
