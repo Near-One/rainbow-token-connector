@@ -108,11 +108,11 @@ impl BridgeTokenFactory {
         );
     }
 
-    pub fn get_deposit_token_fee(&self, token: &EthAddressHex) -> Option<Fee> {
+    pub fn get_deposit_fee(&self, token: &EthAddressHex) -> Option<Fee> {
         self.deposit_fee.get(&token.0)
     }
 
-    pub fn get_withdraw_token_fee(&self, token: &EthAddressHex) -> Option<Fee> {
+    pub fn get_withdraw_fee(&self, token: &EthAddressHex) -> Option<Fee> {
         self.withdraw_fee.get(&token.0)
     }
 
@@ -153,7 +153,7 @@ impl BridgeTokenFactory {
     ) -> u128 {
         let Some(deposit_fee) = target
                 .and_then(|target| self.get_deposit_fee_per_silo_internal(target, Some(token)))
-                .or_else(|| self.get_deposit_token_fee(token))
+                .or_else(|| self.get_deposit_fee(token))
                 else { return 0 };
 
         let fee_amount = (transfer_amount * deposit_fee.fee_percentage.0) / FEE_DECIMAL_PRECISION;
@@ -167,7 +167,7 @@ impl BridgeTokenFactory {
         withdrawer: &AccountId,
     ) -> u128 {
         let Some(withdraw_fee) = self.get_withdraw_fee_per_silo_internal(withdrawer, Some(token))
-                .or_else(|| self.get_withdraw_token_fee(token))
+                .or_else(|| self.get_withdraw_fee(token))
                 else { return 0 };
 
         let fee_amount = (transfer_amount * withdraw_fee.fee_percentage.0) / FEE_DECIMAL_PRECISION;
@@ -247,7 +247,7 @@ mod tests {
             Some(U128(200)),
         );
         let bound = contract
-            .get_deposit_token_fee(&token_address)
+            .get_deposit_fee(&token_address)
             .unwrap()
             .bounds;
 
@@ -283,7 +283,7 @@ mod tests {
         );
         // let deposit_bound = contract.set_deposit_fee_bound(&token_address, , U128(100));
         let expected_bound = contract
-            .get_deposit_token_fee(&token_address)
+            .get_deposit_fee(&token_address)
             .unwrap()
             .bounds;
         assert_eq!(
@@ -297,7 +297,7 @@ mod tests {
             "Upper bound not matched"
         );
 
-        let expected_fee = contract.get_deposit_token_fee(&token_address).unwrap();
+        let expected_fee = contract.get_deposit_fee(&token_address).unwrap();
         assert_eq!(
             U128(50000),
             expected_fee.fee_percentage,
@@ -338,7 +338,7 @@ mod tests {
             Some(U128(200)),
         );
         let bound = contract
-            .get_withdraw_token_fee(&token_address)
+            .get_withdraw_fee(&token_address)
             .unwrap()
             .bounds;
         assert_eq!(
@@ -368,7 +368,7 @@ mod tests {
             Some(U128(200)),
         );
         let bound = contract
-            .get_withdraw_token_fee(&token_address)
+            .get_withdraw_fee(&token_address)
             .unwrap()
             .bounds;
         assert_eq!(
@@ -419,7 +419,7 @@ mod tests {
         );
 
         let expected_fee_percentage = contract
-            .get_deposit_token_fee(&token_address)
+            .get_deposit_fee(&token_address)
             .unwrap()
             .fee_percentage;
         assert_eq!(
@@ -464,7 +464,7 @@ mod tests {
         );
 
         let expected_fee_percentage = contract
-            .get_withdraw_token_fee(&token_address)
+            .get_withdraw_fee(&token_address)
             .unwrap()
             .fee_percentage;
         assert_eq!(
