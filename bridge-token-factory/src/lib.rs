@@ -119,6 +119,7 @@ pub struct BridgeTokenFactory {
     /// Address of the Ethereum locker contract.
     pub locker_address: EthAddress,
     /// Set of created BridgeToken contracts.
+    /// Key: ETH token address as a lowercase hex string without `0x`.
     pub tokens: UnorderedSet<String>,
     /// Hashes of the events that were already used.
     pub used_events: UnorderedSet<Vec<u8>>,
@@ -126,13 +127,17 @@ pub struct BridgeTokenFactory {
     pub owner_pk: PublicKey,
     /// Balance required to register a new account in the BridgeToken
     pub bridge_token_storage_deposit_required: Balance,
-    /// deposit fee storage
+    /// Deposit fee storage
+    /// Key: ETH token address as a lowercase hex string without `0x`.
     pub deposit_fee: UnorderedMap<String, Fee>,
-    /// withdraw fee storage
+    /// Withdraw fee storage.
+    /// Key: ETH token address as a lowercase hex string without `0x`.
     pub withdraw_fee: UnorderedMap<String, Fee>,
     /// Withdraw fee for each different silos for different tokens
+    /// Key: `silo_account_id:eth_token_address` or `silo_account_id`.
     pub withdraw_fee_per_silo: UnorderedMap<String, Fee>,
     /// Deposit fee for each different silos for different tokens
+    /// Key: `silo_account_id:eth_token_address` or `silo_account_id`.
     pub deposit_fee_per_silo: UnorderedMap<String, Fee>,
 }
 
