@@ -15,7 +15,7 @@ pub use bridge_common::prover::{validate_eth_address, Proof};
 use bridge_common::{parse_recipient, prover::*, result_types, Recipient};
 pub use lock_event::EthLockedEvent;
 pub use log_metadata_event::TokenMetadataEvent;
-use types::{EthAddressHex, Fee, FeeBounds};
+use types::{EthAddressHex, Fee};
 
 mod fee;
 mod lock_event;

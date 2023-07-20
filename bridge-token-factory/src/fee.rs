@@ -2,7 +2,7 @@ use near_sdk::{assert_one_yocto, ONE_YOCTO};
 
 use crate::*;
 
-fn adjust_fee_amount_between_bounds(fee_amount: u128, fee_bounds: &FeeBounds) -> u128 {
+fn adjust_fee_amount_between_bounds(fee_amount: u128, fee_bounds: &Fee) -> u128 {
     // If some token fee-bounds is set for deposit or withdraw than update the fee amount according to bounds
     if let Some(lower_bound) = fee_bounds.lower_bound {
         if fee_amount < lower_bound.0 {
@@ -34,10 +34,8 @@ impl BridgeTokenFactory {
             &token.0,
             &Fee {
                 fee_percentage,
-                bounds: FeeBounds {
-                    lower_bound,
-                    upper_bound,
-                },
+                lower_bound,
+                upper_bound,
             },
         );
     }
@@ -61,10 +59,8 @@ impl BridgeTokenFactory {
             &get_silo_fee_map_key(&silo_account_id, token.as_ref()),
             &Fee {
                 fee_percentage,
-                bounds: FeeBounds {
-                    lower_bound,
-                    upper_bound,
-                },
+                lower_bound,
+                upper_bound,
             },
         );
     }
@@ -92,10 +88,8 @@ impl BridgeTokenFactory {
             &token.0,
             &Fee {
                 fee_percentage,
-                bounds: FeeBounds {
-                    lower_bound,
-                    upper_bound,
-                },
+                lower_bound,
+                upper_bound,
             },
         );
     }
@@ -119,10 +113,8 @@ impl BridgeTokenFactory {
             &get_silo_fee_map_key(&silo_account_id, token.as_ref()),
             &Fee {
                 fee_percentage,
-                bounds: FeeBounds {
-                    lower_bound,
-                    upper_bound,
-                },
+                lower_bound,
+                upper_bound,
             },
         );
     }
@@ -186,7 +178,7 @@ impl BridgeTokenFactory {
                 else { return 0 };
 
         let fee_amount = (transfer_amount * deposit_fee.fee_percentage.0) / FEE_DECIMAL_PRECISION;
-        adjust_fee_amount_between_bounds(fee_amount, &deposit_fee.bounds)
+        adjust_fee_amount_between_bounds(fee_amount, &deposit_fee)
     }
 
     pub(crate) fn calculate_withdraw_fee_amount(
@@ -200,7 +192,7 @@ impl BridgeTokenFactory {
                 else { return 0 };
 
         let fee_amount = (transfer_amount * withdraw_fee.fee_percentage.0) / FEE_DECIMAL_PRECISION;
-        adjust_fee_amount_between_bounds(fee_amount, &withdraw_fee.bounds)
+        adjust_fee_amount_between_bounds(fee_amount, &withdraw_fee)
     }
 
     pub(crate) fn get_withdraw_fee_per_silo_internal(
@@ -275,16 +267,16 @@ mod tests {
             Some(U128(100)),
             Some(U128(200)),
         );
-        let bound = contract.get_deposit_fee(&token_address).unwrap().bounds;
+        let fee = contract.get_deposit_fee(&token_address).unwrap();
 
         assert_eq!(
             U128(100),
-            bound.lower_bound.unwrap(),
+            fee.lower_bound.unwrap(),
             "Lower bound not matched"
         );
         assert_eq!(
             U128(200),
-            bound.upper_bound.unwrap(),
+            fee.upper_bound.unwrap(),
             "Upper bound not matched"
         );
     }
@@ -308,15 +300,15 @@ mod tests {
             Some(U128(200)),
         );
         // let deposit_bound = contract.set_deposit_fee_bound(&token_address, , U128(100));
-        let expected_bound = contract.get_deposit_fee(&token_address).unwrap().bounds;
+        let expected_fee = contract.get_deposit_fee(&token_address).unwrap();
         assert_eq!(
             U128(100),
-            expected_bound.lower_bound.unwrap(),
+            expected_fee.lower_bound.unwrap(),
             "Lower bound not matched"
         );
         assert_eq!(
             U128(200),
-            expected_bound.upper_bound.unwrap(),
+            expected_fee.upper_bound.unwrap(),
             "Upper bound not matched"
         );
 
@@ -326,7 +318,7 @@ mod tests {
             expected_fee.fee_percentage,
             "Eth -> Near fee percentage not matched for deposit"
         );
-        let adjusted_fee_amount = adjust_fee_amount_between_bounds(50u128, &expected_fee.bounds);
+        let adjusted_fee_amount = adjust_fee_amount_between_bounds(50u128, &expected_fee);
         assert_eq!(
             adjusted_fee_amount, 100u128,
             "Adjusted fee amount didn't matched as expected"
@@ -360,15 +352,15 @@ mod tests {
             Some(U128(100)),
             Some(U128(200)),
         );
-        let bound = contract.get_withdraw_fee(&token_address).unwrap().bounds;
+        let fee = contract.get_withdraw_fee(&token_address).unwrap();
         assert_eq!(
             U128(100),
-            bound.lower_bound.unwrap(),
+            fee.lower_bound.unwrap(),
             "Lower bound not matched"
         );
         assert_eq!(
             U128(200),
-            bound.upper_bound.unwrap(),
+            fee.upper_bound.unwrap(),
             "Upper bound not matched"
         );
     }
@@ -387,15 +379,15 @@ mod tests {
             Some(U128(100)),
             Some(U128(200)),
         );
-        let bound = contract.get_withdraw_fee(&token_address).unwrap().bounds;
+        let fee = contract.get_withdraw_fee(&token_address).unwrap();
         assert_eq!(
             U128(100),
-            bound.lower_bound.unwrap(),
+            fee.lower_bound.unwrap(),
             "Lower bound not matched"
         );
         assert_eq!(
             U128(200),
-            bound.upper_bound.unwrap(),
+            fee.upper_bound.unwrap(),
             "Upper bound not matched"
         );
     }
@@ -501,34 +493,30 @@ mod tests {
 
         let withdraw_fee1 = Fee {
             fee_percentage: U128(100000),
-            bounds: FeeBounds {
-                lower_bound: None,
-                upper_bound: None,
-            },
+            lower_bound: None,
+            upper_bound: None,
         };
         contract.set_withdraw_fee_per_silo(
             silo_account(),
             Some(token_address.clone()),
             withdraw_fee1.fee_percentage,
-            withdraw_fee1.bounds.lower_bound,
-            withdraw_fee1.bounds.upper_bound,
+            withdraw_fee1.lower_bound,
+            withdraw_fee1.upper_bound,
         ); // 10% fee
         let expected_fee1 =
             contract.get_withdraw_fee_per_silo(silo_account(), Some(token_address.clone()));
 
         let withdraw_fee2 = Fee {
             fee_percentage: U128(200000),
-            bounds: FeeBounds {
-                lower_bound: None,
-                upper_bound: None,
-            },
+            lower_bound: None,
+            upper_bound: None,
         };
         contract.set_withdraw_fee_per_silo(
             silo_account(),
             Some(token_address.clone()),
             withdraw_fee2.fee_percentage,
-            withdraw_fee2.bounds.lower_bound,
-            withdraw_fee2.bounds.upper_bound,
+            withdraw_fee2.lower_bound,
+            withdraw_fee2.upper_bound,
         ); //20% fee
         let expected_fee2 = contract.get_withdraw_fee_per_silo(silo_account(), Some(token_address));
 
