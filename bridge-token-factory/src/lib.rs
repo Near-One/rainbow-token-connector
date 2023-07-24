@@ -415,11 +415,13 @@ impl BridgeTokenFactory {
         ));
 
         let token = EthAddressHex(token);
-        let fee_amount = self.calculate_deposit_fee_amount(
-            &token,
-            amount,
-            message.as_ref().and_then(|_| Some(&target)),
-        );
+        let fee_amount = self
+            .calculate_deposit_fee_amount(
+                &token,
+                amount.into(),
+                message.as_ref().and_then(|_| Some(target.clone())),
+            )
+            .0;
         let amount_to_transfer = amount.checked_sub(fee_amount).unwrap_or(0);
 
         env::log_str(&format!(
@@ -497,8 +499,9 @@ impl BridgeTokenFactory {
             "Such BridgeToken does not exist."
         );
 
-        let fee_amount =
-            self.calculate_withdraw_fee_amount(&token_address_hex, amount, &withdrawer);
+        let fee_amount = self
+            .calculate_withdraw_fee_amount(&token_address_hex, amount.into(), &withdrawer)
+            .0;
         let token_address = validate_eth_address(token_address_hex.0);
         let recipient_address = validate_eth_address(recipient);
 

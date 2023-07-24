@@ -2,21 +2,18 @@ use near_sdk::{assert_one_yocto, ONE_YOCTO};
 
 use crate::*;
 
-fn adjust_fee_amount_between_bounds(fee_amount: u128, fee_bounds: &Fee) -> u128 {
-    // If some token fee-bounds is set for deposit or withdraw than update the fee amount according to bounds
-    if let Some(lower_bound) = fee_bounds.lower_bound {
-        if fee_amount < lower_bound.0 {
-            return lower_bound.0;
-        }
-    }
+fn calculate_fee_amount(transfer_amount: u128, fee: &Fee) -> u128 {
+    let fee_amount = (transfer_amount * fee.fee_percentage.0) / FEE_DECIMAL_PRECISION;
 
-    if let Some(upper_bound) = fee_bounds.upper_bound {
-        if fee_amount > upper_bound.0 {
-            return upper_bound.0;
-        }
-    }
+    let bounded_fee_amount = if fee.lower_bound.map_or(false, |bound| fee_amount < bound.0) {
+        fee.lower_bound.unwrap().0
+    } else if fee.upper_bound.map_or(false, |bound| fee_amount > bound.0) {
+        fee.upper_bound.unwrap().0
+    } else {
+        fee_amount
+    };
 
-    fee_amount
+    std::cmp::min(bounded_fee_amount, transfer_amount)
 }
 
 #[near_bindgen]
@@ -166,33 +163,31 @@ impl BridgeTokenFactory {
             .ft_transfer(env::predecessor_account_id(), amount.into(), None)
     }
 
-    pub(crate) fn calculate_deposit_fee_amount(
+    pub fn calculate_deposit_fee_amount(
         &self,
         token: &EthAddressHex,
-        transfer_amount: u128,
-        target: Option<&AccountId>,
-    ) -> u128 {
+        amount: U128,
+        target: Option<AccountId>,
+    ) -> U128 {
         let Some(deposit_fee) = target
-                .and_then(|target| self.get_deposit_fee_per_silo_internal(target, Some(token)))
+                .and_then(|target| self.get_deposit_fee_per_silo_internal(&target, Some(token)))
                 .or_else(|| self.get_deposit_fee(token))
-                else { return 0 };
+                else { return U128(0) };
 
-        let fee_amount = (transfer_amount * deposit_fee.fee_percentage.0) / FEE_DECIMAL_PRECISION;
-        adjust_fee_amount_between_bounds(fee_amount, &deposit_fee)
+        U128(calculate_fee_amount(amount.0, &deposit_fee))
     }
 
-    pub(crate) fn calculate_withdraw_fee_amount(
+    pub fn calculate_withdraw_fee_amount(
         &self,
         token: &EthAddressHex,
-        transfer_amount: u128,
+        amount: U128,
         withdrawer: &AccountId,
-    ) -> u128 {
+    ) -> U128 {
         let Some(withdraw_fee) = self.get_withdraw_fee_per_silo_internal(withdrawer, Some(token))
                 .or_else(|| self.get_withdraw_fee(token))
-                else { return 0 };
+                else { return U128(0) };
 
-        let fee_amount = (transfer_amount * withdraw_fee.fee_percentage.0) / FEE_DECIMAL_PRECISION;
-        adjust_fee_amount_between_bounds(fee_amount, &withdraw_fee)
+        U128(calculate_fee_amount(amount.0, &withdraw_fee))
     }
 
     pub(crate) fn get_withdraw_fee_per_silo_internal(
