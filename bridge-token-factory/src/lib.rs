@@ -17,6 +17,8 @@ pub use lock_event::EthLockedEvent;
 pub use log_metadata_event::TokenMetadataEvent;
 use types::{EthAddressHex, Fee};
 
+use crate::types::SdkUnwrap;
+
 mod fee;
 mod lock_event;
 mod log_metadata_event;
@@ -422,7 +424,7 @@ impl BridgeTokenFactory {
                 message.as_ref().and_then(|_| Some(target.clone())),
             )
             .0;
-        let amount_to_transfer = amount.checked_sub(fee_amount).unwrap_or(0);
+        let amount_to_transfer = amount.checked_sub(fee_amount).sdk_unwrap();
 
         env::log_str(&format!(
             "Finish deposit. Target:{} Message:{:?}",
@@ -512,7 +514,7 @@ impl BridgeTokenFactory {
                 .mint(env::current_account_id(), fee_amount.into());
         };
 
-        let amount_to_transfer = amount.checked_sub(fee_amount).unwrap_or(0);
+        let amount_to_transfer = amount.checked_sub(fee_amount).sdk_unwrap();
         result_types::Withdraw::new(amount_to_transfer, token_address, recipient_address)
     }
 

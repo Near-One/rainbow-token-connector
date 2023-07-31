@@ -64,3 +64,23 @@ pub struct Fee {
     pub lower_bound: Option<U128>,
     pub upper_bound: Option<U128>,
 }
+
+pub trait SdkUnwrap<T> {
+    fn sdk_unwrap(self) -> T;
+}
+
+impl<T> SdkUnwrap<T> for Option<T> {
+    fn sdk_unwrap(self) -> T {
+        self.unwrap_or_else(|| near_sdk::env::panic_str("ERR_UNWRAP"))
+    }
+}
+
+impl<T, E: AsRef<[u8]>> SdkUnwrap<T> for Result<T, E> {
+    fn sdk_unwrap(self) -> T {
+        self.unwrap_or_else(|e| near_sdk::env::panic_str(err_to_str(&e)))
+    }
+}
+
+fn err_to_str<E: AsRef<[u8]>>(err: &E) -> &str {
+    std::str::from_utf8(err.as_ref()).unwrap_or("INVALID_UTF8_ERR_STRING")
+}
