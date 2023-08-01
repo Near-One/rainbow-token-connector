@@ -78,7 +78,7 @@ mod tests {
     ) -> DeployedContract {
         let contract_path = "../contracts";
 
-        let aurora_sdk_path = Path::new("./aurora-solidity-sdk");
+        let aurora_sdk_path = Path::new("./aurora-contracts-sdk/aurora-solidity-sdk");
         let codec_lib = forge::deploy_codec_lib(&aurora_sdk_path, engine)
             .await
             .unwrap();
