@@ -3070,6 +3070,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "74233d3b3b2f6d4b006dc19dee745e73e2a6bfb6f93607cd3b02bd5b00797d7c"
 
 [[package]]
+name = "silo-to-silo-integration-tests"
+version = "0.1.0"
+dependencies = [
+ "aurora-sdk-integration-tests",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
 name = "siphasher"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3099,15 +3108,6 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
-]
-
-[[package]]
-name = "social-db-from-aurora-integration-tests"
-version = "0.1.0"
-dependencies = [
- "aurora-sdk-integration-tests",
- "serde",
- "serde_json",
 ]
 
 [[package]]

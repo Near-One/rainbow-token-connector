@@ -1,5 +1,5 @@
 [package]
-name = "social-db-from-aurora-integration-tests"
+name = "silo-to-silo-integration-tests"
 version = "0.1.0"
 edition = "2021"
 

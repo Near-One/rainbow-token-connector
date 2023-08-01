@@ -13,8 +13,10 @@ mod tests {
         workspaces::{self, AccountId},
     };
     use std::path::Path;
-    use aurora_sdk_integration_tests::aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus, ViewCallArgs};
-    use serde_json::to_string;
+    use aurora_sdk_integration_tests::aurora_engine::erc20::ERC20;
+    use aurora_sdk_integration_tests::aurora_engine_types::H160;
+    use aurora_sdk_integration_tests::aurora_engine_types::parameters::engine::{SubmitResult, TransactionStatus};
+    use aurora_sdk_integration_tests::workspaces::{Account, Contract};
 
     const ATTACHED_NEAR: u128 = 5_000_000_000_000_000_000_000_000;
     const NEAR_DEPOSIT: u128 = 2_000_000_000_000_000_000_000_000;
@@ -24,10 +26,8 @@ mod tests {
         let worker = workspaces::sandbox().await.unwrap();
         let engine = aurora_engine::deploy_latest(&worker, "aurora.test.near").await.unwrap();
         let silo = aurora_engine::deploy_latest(&worker, "silo.test.near").await.unwrap();
-        let engine_wnear = wnear::Wnear::deploy(&worker, &engine).await.unwrap();
 
-        println!("{:?}", engine.inner.id().to_string());
-        println!("{:?}", silo.inner.id().to_string());
+        let engine_wnear = wnear::Wnear::deploy(&worker, &engine).await.unwrap();
 
         let user_account = worker.dev_create_account().await.unwrap();
         let user_address =
@@ -41,223 +41,28 @@ mod tests {
             engine_wnear.aurora_token.address,
         ).await;
 
-        let mock_token = deploy_mock_token(&worker).await;
-
-        mock_token
-            .call("new_default_meta")
-            .args_json(serde_json::json!({"owner_id": user_account.id(), "name": "MockToken", "symbol": "MCT", "total_supply": "1000000"}))
-            .transact()
-            .await
-            .unwrap()
-            .into_result()
-            .unwrap();
-
+        let mock_token = deploy_mock_token(&worker, user_account.id()).await;
         let engine_mock_token = engine.bridge_nep141(mock_token.id()).await.unwrap();
         let silo_mock_token = silo.bridge_nep141(mock_token.id()).await.unwrap();
 
-        // Give user some wNEAR to use for XCC
         engine
             .mint_wnear(&engine_wnear, user_address, 2 * (ATTACHED_NEAR + NEAR_DEPOSIT))
             .await
             .unwrap();
 
-        // Give user some wNEAR to use for XCC
-        engine
-            .mint_wnear(&engine_wnear, engine_silo_to_silo_contract.address, 2 * (ATTACHED_NEAR + NEAR_DEPOSIT))
-            .await
-            .unwrap();
+        approve_spend_tokens(&engine_wnear.aurora_token, engine_silo_to_silo_contract.address, &user_account, &engine).await;
+        mint_tokens_near(&mock_token, engine.inner.id()).await;
 
-        mock_token
-            .call("mint")
-            .args_json(serde_json::json!({
-                "account_id": engine.inner.id(),
-                "amount": "10000000000"
-            }))
-            .transact()
-            .await
-            .unwrap()
-            .into_result()
-            .unwrap();
+        silo_to_silo_register_token(&engine_silo_to_silo_contract, engine_mock_token.address.raw(), mock_token.id().to_string(), &user_account, &engine).await;
+        check_token_account_id(&engine_silo_to_silo_contract, engine_mock_token.address.raw(), mock_token.id().to_string(), &user_account, &engine).await;
+        check_near_account_id(&engine_silo_to_silo_contract, &user_account, &engine).await;
 
-        // Approve proxy contract to spend user's wNEAR
-        let evm_input = engine_wnear
-            .aurora_token
-            .create_approve_call_bytes(engine_silo_to_silo_contract.address, U256::MAX);
-        let result = engine
-            .call_evm_contract_with(
-                &user_account,
-                engine_wnear.aurora_token.address,
-                evm_input,
-                Wei::zero(),
-            )
-            .await
-            .unwrap();
-        aurora_engine::unwrap_success(result.status).unwrap();
+        storage_deposit(&mock_token, engine.inner.id()).await;
+        storage_deposit(&mock_token, silo.inner.id()).await;
 
-        let contract_args = engine_silo_to_silo_contract.create_call_method_bytes_with_args(
-            "registerToken",
-            &[
-                ethabi::Token::Address(engine_mock_token.address.raw()),
-                ethabi::Token::String( mock_token.id().to_string())
-            ],
-        );
-
-        let call_args = CallArgs::V1(FunctionCallArgsV1 {
-            contract: engine_silo_to_silo_contract.address,
-            input: contract_args,
-        });
-        let outcome = user_account
-            .call(engine.inner.id(), "call")
-            .args_borsh(call_args)
-            .max_gas()
-            .transact()
-            .await
-            .unwrap();
-
-        assert!(
-            outcome.failures().is_empty(),
-            "Call to set failed: {:?}",
-            outcome.failures()
-        );
-
-
-        //
-        let contract_args = engine_silo_to_silo_contract.create_call_method_bytes_with_args(
-            "getTokenAccountId",
-            &[
-                ethabi::Token::Address(engine_mock_token.address.raw())
-            ],
-        );
-
-        let call_args = CallArgs::V1(FunctionCallArgsV1 {
-            contract: engine_silo_to_silo_contract.address,
-            input: contract_args,
-        });
-
-        let outcome = user_account
-            .call(engine.inner.id(), "call")
-            .args_borsh(call_args)
-            .max_gas()
-            .transact()
-            .await
-            .unwrap();
-
-        let result = outcome.unwrap().borsh::<SubmitResult>().unwrap();
-        if let TransactionStatus::Succeed(res) = result.status {
-            let str_res = std::str::from_utf8(&res).unwrap();
-            println!("{:?}", str_res);
-            println!("{:?}", mock_token.id().to_string());
-        }
-
-        //
-        let contract_args = engine_silo_to_silo_contract.create_call_method_bytes_with_args(
-            "getNearAccountId",
-            &[],
-        );
-
-        let call_args = CallArgs::V1(FunctionCallArgsV1 {
-            contract: engine_silo_to_silo_contract.address,
-            input: contract_args,
-        });
-
-        let outcome = user_account
-            .call(engine.inner.id(), "call")
-            .args_borsh(call_args)
-            .max_gas()
-            .transact()
-            .await
-            .unwrap();
-
-        let result = outcome.unwrap().borsh::<SubmitResult>().unwrap();
-        if let TransactionStatus::Succeed(res) = result.status {
-            let str_res = std::str::from_utf8(&res).unwrap();
-            println!("{:?}", str_res);
-            println!("{:?}", engine_silo_to_silo_contract.address.encode());
-        }
-
-        let outcome = mock_token.call("storage_deposit")
-            .args_json(serde_json::json!({
-                "account_id": engine.inner.id().to_string()
-            }))
-            .max_gas()
-            .deposit(1_250_000_000_000_000_000_000)
-            .transact()
-            .await
-            .unwrap();
-
-        println!("Storage deposit: {:?}", outcome);
-
-        let outcome = mock_token.call("storage_deposit")
-            .args_json(serde_json::json!({
-                "account_id": silo.inner.id().to_string()
-            }))
-            .max_gas()
-            .deposit(1_250_000_000_000_000_000_000)
-            .transact()
-            .await
-            .unwrap();
-
-        let mint_args = engine_mock_token.create_mint_call_bytes(user_address, U256::from(1000000000));
-        let call_args = CallArgs::V1(FunctionCallArgsV1 {
-            contract: engine_mock_token.address,
-            input: mint_args.0,
-        });
-
-        let outcome = engine.inner.call("call")
-            .args_borsh(call_args)
-            .max_gas()
-            .transact()
-            .await
-            .unwrap();
-        println!("{:?}", outcome);
-
-        let balance = engine.erc20_balance_of(&engine_mock_token, user_address).await.unwrap();
-        println!("Balance MockTokens on Aurora: {:?}", balance.as_u64());
-
-
-        // Approve proxy contract to spend user's wNEAR
-        let evm_input = engine_mock_token
-            .create_approve_call_bytes(engine_silo_to_silo_contract.address, U256::MAX);
-        let result = engine
-            .call_evm_contract_with(
-                &user_account,
-                engine_mock_token.address,
-                evm_input,
-                Wei::zero(),
-            )
-            .await
-            .unwrap();
-        aurora_engine::unwrap_success(result.status).unwrap();
-
-        //
-        let contract_args = engine_silo_to_silo_contract.create_call_method_bytes_with_args(
-            "ftTransferCallToNear",
-            &[
-                ethabi::Token::Address(engine_mock_token.address.raw()),
-                ethabi::Token::Uint(U256::from(100)),
-                ethabi::Token::String( silo.inner.id().to_string()),
-                ethabi::Token::String( user_address.encode())
-            ],
-        );
-
-        let call_args = CallArgs::V1(FunctionCallArgsV1 {
-            contract: engine_silo_to_silo_contract.address,
-            input: contract_args,
-        });
-
-        let outcome = user_account
-            .call(engine.inner.id(), "call")
-            .args_borsh(call_args)
-            .max_gas()
-            .transact()
-            .await
-            .unwrap();
-
-        assert!(
-            outcome.failures().is_empty(),
-            "Call to set failed: {:?}",
-            outcome.failures()
-        );
+        engine_mint_tokens(user_address, &engine_mock_token, &engine).await;
+        approve_spend_tokens(&engine_mock_token, engine_silo_to_silo_contract.address, &user_account, &engine).await;
+        silo_to_silo_transfer(&engine_silo_to_silo_contract, &engine_mock_token, engine.inner.id(), silo.inner.id(), user_account, user_address.encode()).await;
 
         let balance = engine.erc20_balance_of(&engine_mock_token, user_address).await.unwrap();
         println!("Balance MockTokens on Aurora: {:?}", balance.as_u64());
@@ -316,6 +121,7 @@ mod tests {
 
     async fn deploy_mock_token(
         worker: &workspaces::Worker<workspaces::network::Sandbox>,
+        user_account_id: &str
     ) -> workspaces::Contract {
         let contract_path = Path::new("./mock_token");
         let output = tokio::process::Command::new("cargo")
@@ -329,6 +135,222 @@ mod tests {
         let artifact_path =
             contract_path.join("target/wasm32-unknown-unknown/release/mock_token.wasm");
         let wasm_bytes = tokio::fs::read(artifact_path).await.unwrap();
-        worker.dev_deploy(&wasm_bytes).await.unwrap()
+        let mock_token = worker.dev_deploy(&wasm_bytes).await.unwrap();
+
+        mock_token
+            .call("new_default_meta")
+            .args_json(serde_json::json!({"owner_id": user_account_id, "name": "MockToken", "symbol": "MCT", "total_supply": "1000000"}))
+            .transact()
+            .await
+            .unwrap()
+            .into_result()
+            .unwrap();
+
+        mock_token
+    }
+
+    async fn mint_tokens_near(
+        token_contract: &Contract,
+        receiver_id: &str
+    ) {
+        token_contract
+            .call("mint")
+            .args_json(serde_json::json!({
+                "account_id": receiver_id,
+                "amount": "10000000000"
+            }))
+            .transact()
+            .await
+            .unwrap()
+            .into_result()
+            .unwrap();
+    }
+
+    async fn approve_spend_tokens(token_contract: &ERC20,
+                                  spender_address: Address,
+                                  user_account: &Account,
+                                  engine: &AuroraEngine) {
+        let evm_input = token_contract
+            .create_approve_call_bytes(spender_address, U256::MAX);
+        let result = engine
+            .call_evm_contract_with(
+                user_account,
+                token_contract.address,
+                evm_input,
+                Wei::zero(),
+            )
+            .await
+            .unwrap();
+        aurora_engine::unwrap_success(result.status).unwrap();
+    }
+
+    async fn silo_to_silo_register_token(silo_to_silo_contract: &DeployedContract, engine_mock_token_address: H160, near_mock_token_account_id: String, user_account: &Account, engine: &AuroraEngine) {
+        let contract_args = silo_to_silo_contract.create_call_method_bytes_with_args(
+            "registerToken",
+            &[
+                ethabi::Token::Address(engine_mock_token_address),
+                ethabi::Token::String(near_mock_token_account_id)
+            ],
+        );
+
+        let call_args = CallArgs::V1(FunctionCallArgsV1 {
+            contract: silo_to_silo_contract.address,
+            input: contract_args,
+        });
+        let outcome = user_account
+            .call(engine.inner.id(), "call")
+            .args_borsh(call_args)
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+
+        assert!(
+            outcome.failures().is_empty(),
+            "Call to set failed: {:?}",
+            outcome.failures()
+        );
+    }
+
+    async fn check_token_account_id(silo_to_silo_contract: &DeployedContract,
+                                    engine_mock_token_address: H160,
+                                    near_mock_token_account_id: String,
+                                    user_account: &Account,
+                                    engine: &AuroraEngine) {
+        let contract_args = silo_to_silo_contract.create_call_method_bytes_with_args(
+            "getTokenAccountId",
+            &[
+                ethabi::Token::Address(engine_mock_token_address)
+            ],
+        );
+
+        let call_args = CallArgs::V1(FunctionCallArgsV1 {
+            contract: silo_to_silo_contract.address,
+            input: contract_args,
+        });
+
+        let outcome = user_account
+            .call(engine.inner.id(), "call")
+            .args_borsh(call_args)
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+
+        let result = outcome.unwrap().borsh::<SubmitResult>().unwrap();
+        if let TransactionStatus::Succeed(res) = result.status {
+            let str_res = std::str::from_utf8(&res).unwrap();
+            assert!(str_res.contains(&near_mock_token_account_id));
+        }
+    }
+
+    async fn check_near_account_id(silo_to_silo_contract: &DeployedContract,
+                                   user_account: &Account,
+                                   engine: &AuroraEngine) {
+        let contract_args = silo_to_silo_contract.create_call_method_bytes_with_args(
+            "getNearAccountId",
+            &[],
+        );
+
+        let call_args = CallArgs::V1(FunctionCallArgsV1 {
+            contract: silo_to_silo_contract.address,
+            input: contract_args,
+        });
+
+        let outcome = user_account
+            .call(engine.inner.id(), "call")
+            .args_borsh(call_args)
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+
+        let result = outcome.unwrap().borsh::<SubmitResult>().unwrap();
+        if let TransactionStatus::Succeed(res) = result.status {
+            let str_res = std::str::from_utf8(&res).unwrap();
+            assert!(str_res.contains(&silo_to_silo_contract.address.encode()));
+        }
+    }
+
+    async fn storage_deposit(token_contract: &Contract,
+                             account_id: &str) {
+        let outcome = token_contract.call("storage_deposit")
+            .args_json(serde_json::json!({
+                "account_id": account_id
+            }))
+            .max_gas()
+            .deposit(1_250_000_000_000_000_000_000)
+            .transact()
+            .await
+            .unwrap();
+
+        assert!(
+            outcome.failures().is_empty(),
+            "Call to set failed: {:?}",
+            outcome.failures()
+        );
+    }
+
+    async fn engine_mint_tokens(user_address: Address,
+                                token_account: &ERC20,
+                                engine: &AuroraEngine) {
+        let mint_args = token_account.create_mint_call_bytes(user_address, U256::from(1000000000));
+        let call_args = CallArgs::V1(FunctionCallArgsV1 {
+            contract: token_account.address,
+            input: mint_args.0,
+        });
+
+        let outcome = engine.inner.call("call")
+            .args_borsh(call_args)
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+
+        assert!(
+            outcome.failures().is_empty(),
+            "Call to set failed: {:?}",
+            outcome.failures()
+        );
+
+        let balance = engine.erc20_balance_of(&token_account, user_address).await.unwrap();
+        assert_eq!(balance.as_u64(), 1000000000);
+    }
+
+    async fn silo_to_silo_transfer(silo_to_silo_contract: &DeployedContract,
+                                   token_account: &ERC20,
+                                   silo1_address: &AccountId,
+                                   silo2_address: &AccountId,
+                                   user_account: Account,
+                                   user_address: String
+    ) {
+        let contract_args = silo_to_silo_contract.create_call_method_bytes_with_args(
+            "ftTransferCallToNear",
+            &[
+                ethabi::Token::Address(token_account.address.raw()),
+                ethabi::Token::Uint(U256::from(100)),
+                ethabi::Token::String(silo2_address.to_string()),
+                ethabi::Token::String(user_address)
+            ],
+        );
+
+        let call_args = CallArgs::V1(FunctionCallArgsV1 {
+            contract: silo_to_silo_contract.address,
+            input: contract_args,
+        });
+
+        let outcome = user_account
+            .call(silo1_address, "call")
+            .args_borsh(call_args)
+            .max_gas()
+            .transact()
+            .await
+            .unwrap();
+
+        assert!(
+            outcome.failures().is_empty(),
+            "Call to set failed: {:?}",
+            outcome.failures()
+        );
     }
 }
