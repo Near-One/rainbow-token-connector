@@ -18,7 +18,7 @@ contract SiloToSilo is AccessControl {
 
     uint64 constant BASE_NEAR_GAS = 10_000_000_000_000;
     uint64 constant WITHDRAW_NEAR_GAS = 50_000_000_000_000;
-    uint64 constant FT_TRANSFER_CALL_NEAR_GAS = 200_000_000_000_000;
+    uint64 constant FT_TRANSFER_CALL_NEAR_GAS = 150_000_000_000_000;
 
     uint128 constant NEAR_STORAGE_DEPOSIT = 12_500_000_000_000_000_000_000;
 
