@@ -313,9 +313,10 @@ mod tests {
             expected_fee.fee_percentage,
             "Eth -> Near fee percentage not matched for deposit"
         );
-        let adjusted_fee_amount = adjust_fee_amount_between_bounds(50u128, &expected_fee);
+        let adjusted_fee_amount = calculate_fee_amount(100u128, &expected_fee);
         assert_eq!(
-            adjusted_fee_amount, 100u128,
+            adjusted_fee_amount,
+            expected_fee.lower_bound.unwrap().0,
             "Adjusted fee amount didn't matched as expected"
         );
     }
