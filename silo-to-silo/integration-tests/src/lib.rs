@@ -21,6 +21,9 @@ mod tests {
     const ATTACHED_NEAR: u128 = 5_000_000_000_000_000_000_000_000;
     const NEAR_DEPOSIT: u128 = 2_000_000_000_000_000_000_000_000;
 
+    const TRANSFER_TOKENS_AMOUNT: u64 = 100;
+    const TOKEN_SUPPLY: u64 = 1000000000;
+
     #[tokio::test]
     async fn test_contract() {
         let worker = workspaces::sandbox().await.unwrap();
@@ -67,10 +70,10 @@ mod tests {
         silo_to_silo_transfer(&engine_silo_to_silo_contract, &engine_mock_token, engine.inner.id(), silo.inner.id(), user_account, user_address.encode()).await;
 
         let balance_engine_after = engine.erc20_balance_of(&engine_mock_token, user_address).await.unwrap();
-        assert_eq!((balance_engine_before - balance_engine_after).as_u64(), 100);
+        assert_eq!((balance_engine_before - balance_engine_after).as_u64(), TRANSFER_TOKENS_AMOUNT);
 
         let balance_silo = silo.erc20_balance_of(&silo_mock_token, user_address).await.unwrap();
-        assert_eq!(balance_silo.as_u64(), 100);
+        assert_eq!(balance_silo.as_u64(), TRANSFER_TOKENS_AMOUNT);
     }
 
     async fn deploy_silo_to_silo_sol_contract(
@@ -141,7 +144,7 @@ mod tests {
 
         mock_token
             .call("new_default_meta")
-            .args_json(serde_json::json!({"owner_id": user_account_id, "name": "MockToken", "symbol": "MCT", "total_supply": "1000000"}))
+            .args_json(serde_json::json!({"owner_id": user_account_id, "name": "MockToken", "symbol": "MCT", "total_supply": format!("{}", TOKEN_SUPPLY)}))
             .transact()
             .await
             .unwrap()
@@ -159,7 +162,7 @@ mod tests {
             .call("mint")
             .args_json(serde_json::json!({
                 "account_id": receiver_id,
-                "amount": "10000000000"
+                "amount": format!("{}", TOKEN_SUPPLY)
             }))
             .transact()
             .await
@@ -296,7 +299,7 @@ mod tests {
     async fn engine_mint_tokens(user_address: Address,
                                 token_account: &ERC20,
                                 engine: &AuroraEngine) {
-        let mint_args = token_account.create_mint_call_bytes(user_address, U256::from(1000000000));
+        let mint_args = token_account.create_mint_call_bytes(user_address, U256::from(TRANSFER_TOKENS_AMOUNT));
         let call_args = CallArgs::V1(FunctionCallArgsV1 {
             contract: token_account.address,
             input: mint_args.0,
@@ -316,7 +319,7 @@ mod tests {
         );
 
         let balance = engine.erc20_balance_of(&token_account, user_address).await.unwrap();
-        assert_eq!(balance.as_u64(), 1000000000);
+        assert_eq!(balance.as_u64(), TRANSFER_TOKENS_AMOUNT);
     }
 
     async fn silo_to_silo_transfer(silo_to_silo_contract: &DeployedContract,
@@ -330,7 +333,7 @@ mod tests {
             "ftTransferCallToNear",
             &[
                 ethabi::Token::Address(token_account.address.raw()),
-                ethabi::Token::Uint(U256::from(100)),
+                ethabi::Token::Uint(U256::from(TRANSFER_TOKENS_AMOUNT)),
                 ethabi::Token::String(silo2_address.to_string()),
                 ethabi::Token::String(user_address)
             ],
