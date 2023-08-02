@@ -62,13 +62,15 @@ mod tests {
 
         engine_mint_tokens(user_address, &engine_mock_token, &engine).await;
         approve_spend_tokens(&engine_mock_token, engine_silo_to_silo_contract.address, &user_account, &engine).await;
+
+        let balance_engine_before = engine.erc20_balance_of(&engine_mock_token, user_address).await.unwrap();
         silo_to_silo_transfer(&engine_silo_to_silo_contract, &engine_mock_token, engine.inner.id(), silo.inner.id(), user_account, user_address.encode()).await;
 
-        let balance = engine.erc20_balance_of(&engine_mock_token, user_address).await.unwrap();
-        println!("Balance MockTokens on Aurora: {:?}", balance.as_u64());
+        let balance_engine_after = engine.erc20_balance_of(&engine_mock_token, user_address).await.unwrap();
+        assert_eq!((balance_engine_before - balance_engine_after).as_u64(), 100);
 
-        let balance = silo.erc20_balance_of(&silo_mock_token, user_address).await.unwrap();
-        println!("Balance MockTokens on Silo: {:?}", balance.as_u64());
+        let balance_silo = silo.erc20_balance_of(&silo_mock_token, user_address).await.unwrap();
+        assert_eq!(balance_silo.as_u64(), 100);
     }
 
     async fn deploy_silo_to_silo_sol_contract(
