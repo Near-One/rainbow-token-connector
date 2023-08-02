@@ -187,7 +187,7 @@ mod tests {
             &silo_mock_token,
             silo.inner.id(),
             engine.inner.id(),
-            user_account,
+            user_account.clone(),
             user_address.encode(),
             true
         )

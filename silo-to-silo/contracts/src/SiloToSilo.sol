@@ -151,10 +151,7 @@ contract SiloToSilo is AccessControl {
         );
 
         uint128 transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
-
-        if (transferredAmount > 0) {
-            balance[token][sender] -= transferredAmount;
-        }
+        balance[token][sender] -= transferredAmount;
     }
 
     function getNearAccountId() public view returns (string memory) {
@@ -175,9 +172,13 @@ contract SiloToSilo is AccessControl {
 
     function _stringToUint(bytes memory b) private pure returns (uint128) {
         uint128 result = 0;
+        
         for (uint256 i = 0; i < b.length; i++) {
-            result = result * 10 + (uint128(uint8(b[i])) - 48);
+            if (uint8(b[i]) > uint8(47) && uint8(b[i]) < uint8(58)) {
+                result = result * 10 + (uint128(uint8(b[i])) - 48);
+            }
         }
+        
         return result;
     }
 }
