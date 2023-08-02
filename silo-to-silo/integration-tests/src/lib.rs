@@ -115,6 +115,7 @@ mod tests {
             silo.inner.id(),
             user_account.clone(),
             user_address.encode(),
+            true
         )
         .await;
 
@@ -188,6 +189,7 @@ mod tests {
             engine.inner.id(),
             user_account,
             user_address.encode(),
+            true
         )
         .await;
 
@@ -205,6 +207,139 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(balance_silo.as_u64(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_withdraw() {
+        let worker = workspaces::sandbox().await.unwrap();
+        let engine = aurora_engine::deploy_latest(&worker, "aurora.test.near")
+            .await
+            .unwrap();
+        let silo = aurora_engine::deploy_latest(&worker, "silo.test.near")
+            .await
+            .unwrap();
+
+        let engine_wnear = wnear::Wnear::deploy(&worker, &engine).await.unwrap();
+
+        let user_account = worker.dev_create_account().await.unwrap();
+        let user_address =
+            aurora_sdk_integration_tests::aurora_engine_sdk::types::near_account_to_evm_address(
+                user_account.id().as_bytes(),
+            );
+
+        let engine_silo_to_silo_contract = deploy_silo_to_silo_sol_contract(
+            &engine,
+            &user_account,
+            engine_wnear.aurora_token.address,
+        )
+            .await;
+
+        let mock_token = deploy_mock_token(&worker, user_account.id()).await;
+        let engine_mock_token = engine.bridge_nep141(mock_token.id()).await.unwrap();
+        let silo_mock_token = silo.bridge_nep141(mock_token.id()).await.unwrap();
+
+        engine
+            .mint_wnear(
+                &engine_wnear,
+                user_address,
+                2 * (ATTACHED_NEAR + NEAR_DEPOSIT),
+            )
+            .await
+            .unwrap();
+
+        approve_spend_tokens(
+            &engine_wnear.aurora_token,
+            engine_silo_to_silo_contract.address,
+            &user_account,
+            &engine,
+        )
+            .await;
+        mint_tokens_near(&mock_token, engine.inner.id()).await;
+
+        silo_to_silo_register_token(
+            &engine_silo_to_silo_contract,
+            engine_mock_token.address.raw(),
+            mock_token.id().to_string(),
+            &user_account,
+            &engine,
+        )
+            .await;
+        check_token_account_id(
+            &engine_silo_to_silo_contract,
+            engine_mock_token.address.raw(),
+            mock_token.id().to_string(),
+            &user_account,
+            &engine,
+        )
+            .await;
+        check_near_account_id(&engine_silo_to_silo_contract, &user_account, &engine).await;
+
+        storage_deposit(&mock_token, engine.inner.id()).await;
+
+        engine_mint_tokens(user_address, &engine_mock_token, &engine).await;
+        approve_spend_tokens(
+            &engine_mock_token,
+            engine_silo_to_silo_contract.address,
+            &user_account,
+            &engine,
+        ).await;
+
+        let balance_engine_before = engine
+            .erc20_balance_of(&engine_mock_token, user_address)
+            .await
+            .unwrap();
+        silo_to_silo_transfer(
+            &engine_silo_to_silo_contract,
+            &engine_mock_token,
+            engine.inner.id(),
+            silo.inner.id(),
+            user_account.clone(),
+            user_address.encode(),
+            false
+        )
+            .await;
+
+        let balance_engine_after = engine
+            .erc20_balance_of(&engine_mock_token, user_address)
+            .await
+            .unwrap();
+        assert_eq!(
+            (balance_engine_before - balance_engine_after).as_u64(),
+            TRANSFER_TOKENS_AMOUNT
+        );
+
+        let balance_silo = silo
+            .erc20_balance_of(&silo_mock_token, user_address)
+            .await
+            .unwrap();
+        assert_eq!(balance_silo.as_u64(), 0);
+
+        check_get_user_balance(
+            &engine_silo_to_silo_contract,
+            &user_account,
+            engine_mock_token.address.raw(),
+            user_address.raw(),
+            &engine,
+            100
+        ).await;
+
+        withdraw(&engine_silo_to_silo_contract, &engine_mock_token, engine.inner.id(), user_account.clone()).await;
+
+        let balance_engine_after_withdraw = engine
+            .erc20_balance_of(&engine_mock_token, user_address)
+            .await
+            .unwrap();
+
+        assert_eq!(balance_engine_before, balance_engine_after_withdraw);
+
+        check_get_user_balance(
+            &engine_silo_to_silo_contract,
+            &user_account,
+            engine_mock_token.address.raw(),
+            user_address.raw(),
+            &engine,
+            0
+        ).await;
     }
 
     async fn deploy_silo_to_silo_sol_contract(
@@ -340,6 +475,7 @@ mod tests {
             contract_args,
             user_account,
             engine.inner.id(),
+            true
         )
         .await
         .unwrap();
@@ -362,6 +498,7 @@ mod tests {
             contract_args,
             user_account,
             engine.inner.id(),
+            true
         )
         .await;
 
@@ -385,6 +522,7 @@ mod tests {
             contract_args,
             user_account,
             engine.inner.id(),
+            true
         )
         .await;
 
@@ -392,6 +530,33 @@ mod tests {
         if let TransactionStatus::Succeed(res) = result.status {
             let str_res = std::str::from_utf8(&res).unwrap();
             assert!(str_res.contains(&silo_to_silo_contract.address.encode()));
+        }
+    }
+
+    async fn check_get_user_balance(
+        silo_to_silo_contract: &DeployedContract,
+        user_account: &Account,
+        engine_mock_token_address: H160,
+        user_address: H160,
+        engine: &AuroraEngine,
+        expected_value: u8
+    ) {
+        let contract_args =
+            silo_to_silo_contract.create_call_method_bytes_with_args("getUserBalance",
+                                                                     &[ethabi::Token::Address(engine_mock_token_address),
+                                                                         ethabi::Token::Address(user_address)]);
+        let outcome = call_aurora_contract(
+            silo_to_silo_contract.address,
+            contract_args,
+            user_account,
+            engine.inner.id(),
+            true
+        )
+            .await;
+
+        let result = outcome.unwrap().borsh::<SubmitResult>().unwrap();
+        if let TransactionStatus::Succeed(res) = result.status {
+             assert_eq!(res[res.len() - 1], expected_value);
         }
     }
 
@@ -453,6 +618,7 @@ mod tests {
         silo2_address: &AccountId,
         user_account: Account,
         user_address: String,
+        check_output: bool
     ) {
         let contract_args = silo_to_silo_contract.create_call_method_bytes_with_args(
             "ftTransferCallToNear",
@@ -469,9 +635,34 @@ mod tests {
             contract_args,
             &user_account,
             silo1_address,
+            check_output
         )
         .await
         .unwrap();
+    }
+
+    async fn withdraw(
+        silo_to_silo_contract: &DeployedContract,
+        token_account: &ERC20,
+        engine_address: &AccountId,
+        user_account: Account,
+    ) {
+        let contract_args = silo_to_silo_contract.create_call_method_bytes_with_args(
+            "withdraw",
+            &[
+                ethabi::Token::Address(token_account.address.raw()),
+            ],
+        );
+
+        call_aurora_contract(
+            silo_to_silo_contract.address,
+            contract_args,
+            &user_account,
+            engine_address,
+            true
+        )
+            .await
+            .unwrap();
     }
 
     async fn call_aurora_contract(
@@ -479,6 +670,7 @@ mod tests {
         contract_args: Vec<u8>,
         user_account: &Account,
         engine_account: &AccountId,
+        check_output: bool
     ) -> ExecutionFinalResult {
         let call_args = CallArgs::V1(FunctionCallArgsV1 {
             contract: contract_address,
@@ -493,11 +685,13 @@ mod tests {
             .await
             .unwrap();
 
-        assert!(
-            outcome.failures().is_empty(),
-            "Call to set failed: {:?}",
-            outcome.failures()
-        );
+        if check_output {
+            assert!(
+                outcome.failures().is_empty(),
+                "Call to set failed: {:?}",
+                outcome.failures()
+            );
+        }
 
         outcome
     }

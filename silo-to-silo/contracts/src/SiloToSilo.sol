@@ -96,7 +96,8 @@ contract SiloToSilo is AccessControl {
             1,
             FT_TRANSFER_CALL_NEAR_GAS
         );
-        bytes memory callbackArg = abi.encodeWithSelector(this.ftTransferCallCallback.selector, msg.sender, amount);
+        
+        bytes memory callbackArg = abi.encodeWithSelector(this.ftTransferCallCallback.selector, msg.sender, token, amount);
         PromiseCreateArgs memory callback = near.auroraCall(address(this), callbackArg, 0, BASE_NEAR_GAS);
 
         callFtTransfer.then(callback).transact();
@@ -121,9 +122,9 @@ contract SiloToSilo is AccessControl {
         near.wNEAR.transferFrom(msg.sender, address(this), uint256(1));
         bytes memory args = bytes(
             string.concat(
-                '{"receiver_id":',
+                '{"receiver_id": "',
                 siloAccountId,
-                '"amount": "',
+                '", "amount": "',
                 Strings.toString(senderBalance),
                 '", "msg": "',
                 _addressToString(msg.sender),
