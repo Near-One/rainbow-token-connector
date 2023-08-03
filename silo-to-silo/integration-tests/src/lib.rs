@@ -30,7 +30,7 @@ mod tests {
     const TOKEN_SUPPLY: u64 = 1000000000;
 
     struct TestsInfrastructure {
-        _worker: Worker<Sandbox>,
+        worker: Worker<Sandbox>,
         engine: AuroraEngine,
         silo: AuroraEngine,
         engine_wnear: Wnear,
@@ -78,7 +78,7 @@ mod tests {
 
 
             TestsInfrastructure {
-                _worker: worker,
+                worker: worker,
                 engine,
                 silo,
                 engine_wnear,
@@ -93,11 +93,11 @@ mod tests {
             }
         }
 
-        pub async fn mint_wnear_engine(&self) {
+        pub async fn mint_wnear_engine(&self, user_address: Option<Address>) {
             self.engine
                 .mint_wnear(
                     &self.engine_wnear,
-                    self.user_address,
+                    user_address.unwrap_or(self.user_address),
                     2 * (ATTACHED_NEAR + NEAR_DEPOSIT),
                 )
                 .await
@@ -115,21 +115,21 @@ mod tests {
                 .unwrap();
         }
 
-        pub async fn approve_spend_wnear_engine(&self) {
+        pub async fn approve_spend_wnear_engine(&self, user_account: Option<Account>) {
             approve_spend_tokens(
                 &self.engine_wnear.aurora_token,
                 self.engine_silo_to_silo_contract.address,
-                &self.user_account,
+                &user_account.unwrap_or(self.user_account.clone()),
                 &self.engine,
             ).await;
         }
 
-        pub async fn silo_to_silo_register_token_engine(&self) {
+        pub async fn silo_to_silo_register_token_engine(&self, user_account: Option<Account>) {
             silo_to_silo_register_token(
                 &self.engine_silo_to_silo_contract,
                 self.engine_mock_token.address.raw(),
                 self.mock_token.id().to_string(),
-                &self.user_account,
+                &user_account.unwrap_or(self.user_account.clone()),
                 &self.engine,
             ).await;
         }
@@ -144,13 +144,14 @@ mod tests {
             ).await;
         }
 
-        pub async fn check_token_account_id_engine(&self) {
+        pub async fn check_token_is_regester_engine(&self, expected_result: bool) {
             check_token_account_id(
                 &self.engine_silo_to_silo_contract,
                 self.engine_mock_token.address.raw(),
                 self.mock_token.id().to_string(),
                 &self.user_account,
                 &self.engine,
+                expected_result
             ).await;
         }
 
@@ -218,6 +219,7 @@ mod tests {
                 self.mock_token.id().to_string(),
                 &self.user_account,
                 &self.silo,
+                true
             ).await;
         }
 
@@ -240,6 +242,27 @@ mod tests {
                 expected_value
             ).await;
         }
+
+        pub async fn call_ft_transfer_call_callback_engine(&self, user_account: Account) {
+            let contract_args = self.engine_silo_to_silo_contract.create_call_method_bytes_with_args(
+                "ftTransferCallCallback",
+                &[
+                    ethabi::Token::Address(self.user_address.raw()),
+                    ethabi::Token::Address(self.engine_mock_token.address.raw()),
+                    ethabi::Token::Uint(U256::from(TRANSFER_TOKENS_AMOUNT))
+                ],
+            );
+
+            call_aurora_contract(
+                self.engine_silo_to_silo_contract.address,
+                contract_args,
+                &user_account,
+                self.engine.inner.id(),
+                true
+            )
+                .await
+                .unwrap();
+        }
     }
 
     #[tokio::test]
@@ -248,11 +271,11 @@ mod tests {
 
         mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
 
-        infra.mint_wnear_engine().await;
-        infra.approve_spend_wnear_engine().await;
+        infra.mint_wnear_engine(None).await;
+        infra.approve_spend_wnear_engine(None).await;
 
-        infra.silo_to_silo_register_token_engine().await;
-        infra.check_token_account_id_engine().await;
+        infra.silo_to_silo_register_token_engine(None).await;
+        infra.check_token_is_regester_engine(true).await;
         check_near_account_id(&infra.engine_silo_to_silo_contract, &infra.user_account, &infra.engine).await;
 
         storage_deposit(&infra.mock_token, infra.engine.inner.id()).await;
@@ -296,13 +319,13 @@ mod tests {
     #[tokio::test]
     async fn test_withdraw() {
         let infra = TestsInfrastructure::init().await;
-        infra.mint_wnear_engine().await;
-        infra.approve_spend_wnear_engine().await;
+        infra.mint_wnear_engine(None).await;
+        infra.approve_spend_wnear_engine(None).await;
 
         mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
 
-        infra.silo_to_silo_register_token_engine().await;
-        infra.check_token_account_id_engine().await;
+        infra.silo_to_silo_register_token_engine(None).await;
+        infra.check_token_is_regester_engine(true).await;
         check_near_account_id(&infra.engine_silo_to_silo_contract, &infra.user_account, &infra.engine).await;
 
         storage_deposit(&infra.mock_token, infra.engine.inner.id()).await;
@@ -329,6 +352,44 @@ mod tests {
         let balance_engine_after_withdraw = infra.get_mock_token_balance_engine().await;
         assert_eq!(balance_engine_before, balance_engine_after_withdraw);
 
+        infra.check_user_balance_engine(0).await;
+    }
+
+    #[tokio::test]
+    async fn check_access_control() {
+        let infra = TestsInfrastructure::init().await;
+        //create new user
+        let regular_user_account = infra.worker.dev_create_account().await.unwrap();
+        let regular_user_address = aurora_sdk_integration_tests::aurora_engine_sdk::types::near_account_to_evm_address(
+            regular_user_account.id().as_bytes(),
+        );
+
+        //error on call registerToken by regular user
+        infra.mint_wnear_engine(Some(regular_user_address)).await;
+        infra.approve_spend_wnear_engine(Some(regular_user_account.clone())).await;
+
+        infra.silo_to_silo_register_token_engine(Some(regular_user_account.clone())).await;
+        infra.check_token_is_regester_engine(false).await;
+
+        //error on call registerToken by aurora account
+        let aurora_address = aurora_sdk_integration_tests::aurora_engine_sdk::types::near_account_to_evm_address(
+            infra.engine.inner.id().as_bytes(),
+        );
+        infra.mint_wnear_engine(Some(aurora_address)).await;
+        infra.approve_spend_wnear_engine(Some(infra.engine.inner.as_account().clone())).await;
+        infra.silo_to_silo_register_token_engine(Some(infra.engine.inner.as_account().clone())).await;
+        infra.check_token_is_regester_engine(false).await;
+
+        //error on call ftTransferCallCallback by regular user
+        infra.call_ft_transfer_call_callback_engine(regular_user_account.clone()).await;
+        infra.check_user_balance_engine(0).await;
+
+        //error on call ftTransferCallCallback by admin
+        infra.call_ft_transfer_call_callback_engine(infra.user_account.clone()).await;
+        infra.check_user_balance_engine(0).await;
+
+        //error on call ftTransferCallCallback by aurora
+        infra.call_ft_transfer_call_callback_engine(infra.engine.inner.as_account().clone()).await;
         infra.check_user_balance_engine(0).await;
     }
 
@@ -477,6 +538,7 @@ mod tests {
         near_mock_token_account_id: String,
         user_account: &Account,
         engine: &AuroraEngine,
+        expected_result: bool
     ) {
         let contract_args = silo_to_silo_contract.create_call_method_bytes_with_args(
             "getTokenAccountId",
@@ -495,7 +557,7 @@ mod tests {
         let result = outcome.unwrap().borsh::<SubmitResult>().unwrap();
         if let TransactionStatus::Succeed(res) = result.status {
             let str_res = std::str::from_utf8(&res).unwrap();
-            assert!(str_res.contains(&near_mock_token_account_id));
+            assert_eq!(str_res.contains(&near_mock_token_account_id), expected_result);
         }
     }
 
