@@ -45,7 +45,7 @@ mod tests {
     }
 
     impl TestsInfrastructure {
-        pub async fn init() -> Self {
+        pub async fn init(storage_deposit: Option<u128>) -> Self {
             let worker = workspaces::sandbox().await.unwrap();
             let engine = aurora_engine::deploy_latest(&worker, "aurora.test.near")
                 .await
@@ -68,7 +68,7 @@ mod tests {
             )
                 .await;
 
-            let mock_token = deploy_mock_token(&worker, user_account.id()).await;
+            let mock_token = deploy_mock_token(&worker, user_account.id(), storage_deposit).await;
             let engine_mock_token = engine.bridge_nep141(mock_token.id()).await.unwrap();
             let silo_mock_token = silo.bridge_nep141(mock_token.id()).await.unwrap();
 
@@ -124,13 +124,14 @@ mod tests {
             ).await;
         }
 
-        pub async fn silo_to_silo_register_token_engine(&self, user_account: Option<Account>) {
+        pub async fn silo_to_silo_register_token_engine(&self, user_account: Option<Account>, check_result: bool) {
             silo_to_silo_register_token(
                 &self.engine_silo_to_silo_contract,
                 self.engine_mock_token.address.raw(),
                 self.mock_token.id().to_string(),
                 &user_account.unwrap_or(self.user_account.clone()),
                 &self.engine,
+                check_result
             ).await;
         }
 
@@ -141,6 +142,7 @@ mod tests {
                 self.mock_token.id().to_string(),
                 &self.user_account,
                 &self.silo,
+                true
             ).await;
         }
 
@@ -267,19 +269,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_ft_transfer_to_silo() {
-        let infra = TestsInfrastructure::init().await;
+        let infra = TestsInfrastructure::init(None).await;
 
         mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
 
         infra.mint_wnear_engine(None).await;
         infra.approve_spend_wnear_engine(None).await;
 
-        infra.silo_to_silo_register_token_engine(None).await;
+        infra.silo_to_silo_register_token_engine(None, true).await;
         infra.check_token_is_regester_engine(true).await;
         check_near_account_id(&infra.engine_silo_to_silo_contract, &infra.user_account, &infra.engine).await;
 
-        storage_deposit(&infra.mock_token, infra.engine.inner.id()).await;
-        storage_deposit(&infra.mock_token, infra.silo.inner.id()).await;
+        storage_deposit(&infra.mock_token, infra.engine.inner.id(), None).await;
+        storage_deposit(&infra.mock_token, infra.silo.inner.id(), None).await;
 
         engine_mint_tokens(infra.user_address, &infra.engine_mock_token, &infra.engine).await;
         infra.approve_spend_mock_tokens_engine().await;
@@ -318,17 +320,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_withdraw() {
-        let infra = TestsInfrastructure::init().await;
+        let infra = TestsInfrastructure::init(None).await;
         infra.mint_wnear_engine(None).await;
         infra.approve_spend_wnear_engine(None).await;
 
         mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
 
-        infra.silo_to_silo_register_token_engine(None).await;
+        infra.silo_to_silo_register_token_engine(None, true).await;
         infra.check_token_is_regester_engine(true).await;
         check_near_account_id(&infra.engine_silo_to_silo_contract, &infra.user_account, &infra.engine).await;
 
-        storage_deposit(&infra.mock_token, infra.engine.inner.id()).await;
+        storage_deposit(&infra.mock_token, infra.engine.inner.id(), None).await;
 
         engine_mint_tokens(infra.user_address, &infra.engine_mock_token, &infra.engine).await;
         infra.approve_spend_mock_tokens_engine().await;
@@ -357,7 +359,7 @@ mod tests {
 
     #[tokio::test]
     async fn check_access_control() {
-        let infra = TestsInfrastructure::init().await;
+        let infra = TestsInfrastructure::init(None).await;
         //create new user
         let regular_user_account = infra.worker.dev_create_account().await.unwrap();
         let regular_user_address = aurora_sdk_integration_tests::aurora_engine_sdk::types::near_account_to_evm_address(
@@ -368,7 +370,7 @@ mod tests {
         infra.mint_wnear_engine(Some(regular_user_address)).await;
         infra.approve_spend_wnear_engine(Some(regular_user_account.clone())).await;
 
-        infra.silo_to_silo_register_token_engine(Some(regular_user_account.clone())).await;
+        infra.silo_to_silo_register_token_engine(Some(regular_user_account.clone()), true).await;
         infra.check_token_is_regester_engine(false).await;
 
         //error on call registerToken by aurora account
@@ -377,7 +379,7 @@ mod tests {
         );
         infra.mint_wnear_engine(Some(aurora_address)).await;
         infra.approve_spend_wnear_engine(Some(infra.engine.inner.as_account().clone())).await;
-        infra.silo_to_silo_register_token_engine(Some(infra.engine.inner.as_account().clone())).await;
+        infra.silo_to_silo_register_token_engine(Some(infra.engine.inner.as_account().clone()), true).await;
         infra.check_token_is_regester_engine(false).await;
 
         //error on call ftTransferCallCallback by regular user
@@ -395,7 +397,7 @@ mod tests {
 
     #[tokio::test]
     async fn transfer_not_register_tokens() {
-        let infra = TestsInfrastructure::init().await;
+        let infra = TestsInfrastructure::init(None).await;
 
         mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
         infra.mint_wnear_engine(None).await;
@@ -403,8 +405,8 @@ mod tests {
 
         infra.check_token_is_regester_engine(false).await;
 
-        storage_deposit(&infra.mock_token, infra.engine.inner.id()).await;
-        storage_deposit(&infra.mock_token, infra.silo.inner.id()).await;
+        storage_deposit(&infra.mock_token, infra.engine.inner.id(), None).await;
+        storage_deposit(&infra.mock_token, infra.silo.inner.id(), None).await;
 
         engine_mint_tokens(infra.user_address, &infra.engine_mock_token, &infra.engine).await;
         infra.approve_spend_mock_tokens_engine().await;
@@ -417,6 +419,48 @@ mod tests {
         assert_eq!(balance_engine_before, balance_engine_after);
     }
 
+    #[tokio::test]
+    async fn error_on_withdraw_to_near() {
+        let deposit_value = Some(10_000_000_000_000_000_000_000_000u128);
+        let infra = TestsInfrastructure::init(deposit_value).await;
+
+        mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
+        infra.mint_wnear_engine(None).await;
+        infra.approve_spend_wnear_engine(None).await;
+
+        infra.silo_to_silo_register_token_engine(None, false).await;
+        infra.check_token_is_regester_engine(true).await;
+
+        storage_deposit(&infra.mock_token, infra.engine.inner.id(), deposit_value).await;
+        storage_deposit(&infra.mock_token, infra.silo.inner.id(), deposit_value).await;
+
+        engine_mint_tokens(infra.user_address, &infra.engine_mock_token, &infra.engine).await;
+        infra.approve_spend_mock_tokens_engine().await;
+
+        let balance_engine_before = infra.get_mock_token_balance_engine().await;
+
+        infra.engine_to_silo_transfer(false).await;
+
+        let balance_engine_after = infra.get_mock_token_balance_engine().await;
+
+        assert_eq!(
+            (balance_engine_before - balance_engine_after).as_u64(),
+            TRANSFER_TOKENS_AMOUNT
+        );
+
+        let balance_silo = infra.get_mock_token_balance_silo().await;
+        assert_eq!(balance_silo.as_u64(), 0);
+
+        infra.check_user_balance_engine(TRANSFER_TOKENS_AMOUNT as u8).await;
+
+        storage_deposit(&infra.mock_token, &(infra.engine_silo_to_silo_contract.address.encode() + "." + &infra.engine.inner.id().to_string()), deposit_value).await;
+        withdraw(&infra.engine_silo_to_silo_contract, &infra.engine_mock_token, infra.engine.inner.id(), infra.user_account.clone()).await;
+
+        let balance_engine_after_withdraw = infra.get_mock_token_balance_engine().await;
+        assert_eq!(balance_engine_before, balance_engine_after_withdraw);
+
+        infra.check_user_balance_engine(0).await;
+    }
 
     async fn deploy_silo_to_silo_sol_contract(
         engine: &AuroraEngine,
@@ -470,6 +514,7 @@ mod tests {
     async fn deploy_mock_token(
         worker: &workspaces::Worker<workspaces::network::Sandbox>,
         user_account_id: &str,
+        storage_deposit: Option<u128>
     ) -> workspaces::Contract {
         let contract_path = Path::new("./mock_token");
         let output = tokio::process::Command::new("cargo")
@@ -493,7 +538,7 @@ mod tests {
 
         mock_token
             .call("new_default_meta")
-            .args_json(serde_json::json!({"owner_id": user_account_id, "name": "MockToken", "symbol": "MCT", "total_supply": format!("{}", TOKEN_SUPPLY)}))
+            .args_json(serde_json::json!({"owner_id": user_account_id, "name": "MockToken", "symbol": "MCT", "total_supply": format!("{}", TOKEN_SUPPLY), "storage_deposit": storage_deposit.map(|x| format!("{}", x))}))
             .transact()
             .await
             .unwrap()
@@ -537,6 +582,7 @@ mod tests {
         near_mock_token_account_id: String,
         user_account: &Account,
         engine: &AuroraEngine,
+        check_result: bool
     ) {
         let contract_args = silo_to_silo_contract.create_call_method_bytes_with_args(
             "registerToken",
@@ -551,7 +597,7 @@ mod tests {
             contract_args,
             user_account,
             engine.inner.id(),
-            true
+            check_result
         )
         .await
         .unwrap();
@@ -637,12 +683,12 @@ mod tests {
         }
     }
 
-    async fn storage_deposit(token_contract: &Contract, account_id: &str) {
+    async fn storage_deposit(token_contract: &Contract, account_id: &str, deposit: Option<u128>) {
         let outcome = token_contract
             .call("storage_deposit")
             .args_json(serde_json::json!({ "account_id": account_id }))
             .max_gas()
-            .deposit(1_250_000_000_000_000_000_000)
+            .deposit(deposit.unwrap_or(1_250_000_000_000_000_000_000))
             .transact()
             .await
             .unwrap();

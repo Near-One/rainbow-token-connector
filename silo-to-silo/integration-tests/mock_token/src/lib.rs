@@ -2,10 +2,11 @@ use near_contract_standards::fungible_token::metadata::{
     FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC,
 };
 use near_contract_standards::fungible_token::FungibleToken;
+use near_contract_standards::storage_management::{StorageBalance, StorageBalanceBounds, StorageManagement};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LazyOption;
 use near_sdk::json_types::U128;
-use near_sdk::require;
+use near_sdk::{Balance, log, Promise, require};
 use near_sdk::{env, near_bindgen, AccountId, PanicOnDefault, PromiseOrValue};
 
 #[near_bindgen]
@@ -13,6 +14,7 @@ use near_sdk::{env, near_bindgen, AccountId, PanicOnDefault, PromiseOrValue};
 pub struct Contract {
     token: FungibleToken,
     metadata: LazyOption<FungibleTokenMetadata>,
+    storage_deposit: Option<U128>
 }
 
 // example from near
@@ -26,6 +28,7 @@ impl Contract {
         name: String,
         symbol: String,
         total_supply: U128,
+        storage_deposit: Option<U128>
     ) -> Self {
         Self::new(
             owner_id,
@@ -39,17 +42,19 @@ impl Contract {
                 reference_hash: None,
                 decimals: 24,
             },
+            storage_deposit
         )
     }
 
     #[init]
-    pub fn new(owner_id: AccountId, total_supply: U128, metadata: FungibleTokenMetadata) -> Self {
+    pub fn new(owner_id: AccountId, total_supply: U128, metadata: FungibleTokenMetadata, storage_deposit: Option<U128>) -> Self {
         require!(!env::state_exists(), "Already initialized");
 
         metadata.assert_valid();
         let mut this = Self {
             token: FungibleToken::new(b"a".to_vec()),
             metadata: LazyOption::new(b"m".to_vec(), Some(&metadata)),
+            storage_deposit
         };
         this.token.internal_register_account(&owner_id);
         this.token.internal_deposit(&owner_id, total_supply.into());
@@ -71,12 +76,72 @@ impl Contract {
 
 // main implementation for token and storage
 near_contract_standards::impl_fungible_token_core!(Contract, token);
-near_contract_standards::impl_fungible_token_storage!(Contract, token);
 
 #[near_bindgen]
 impl FungibleTokenMetadataProvider for Contract {
     fn ft_metadata(&self) -> FungibleTokenMetadata {
         self.metadata.get().unwrap()
+    }
+}
+
+#[near_bindgen]
+impl StorageManagement for Contract {
+    #[payable]
+    fn storage_deposit(
+        &mut self,
+        account_id: Option<AccountId>,
+        registration_only: Option<bool>,
+    ) -> StorageBalance {
+        let amount: Balance = env::attached_deposit();
+        let account_id = account_id.unwrap_or_else(env::predecessor_account_id);
+        if self.token.accounts.contains_key(&account_id) {
+            log!("The account is already registered, refunding the deposit");
+            if amount > 0 {
+                Promise::new(env::predecessor_account_id()).transfer(amount);
+            }
+        } else {
+            let min_balance = self.storage_balance_bounds().min.0;
+            if amount < min_balance {
+                env::panic_str("The attached deposit is less than the minimum storage balance");
+            }
+
+            self.token.internal_register_account(&account_id);
+            let refund = amount - min_balance;
+            if refund > 0 {
+                Promise::new(env::predecessor_account_id()).transfer(refund);
+            }
+        }
+        self.token.storage_balance_of(account_id).unwrap()
+    }
+
+    #[payable]
+    fn storage_withdraw(&mut self, amount: Option<U128>) -> StorageBalance {
+        self.token.storage_withdraw(amount)
+    }
+
+    #[payable]
+    fn storage_unregister(&mut self, force: Option<bool>) -> bool {
+        #[allow(unused_variables)]
+        if let Some((account_id, balance)) = self.token.internal_storage_unregister(force) {
+            true
+        } else {
+            false
+        }
+    }
+
+    fn storage_balance_bounds(&self) -> StorageBalanceBounds {
+        if let Some(storage_deposit) = self.storage_deposit {
+            StorageBalanceBounds {
+                min: storage_deposit,
+                max: Some(storage_deposit),
+            }
+        } else {
+            self.token.storage_balance_bounds()
+        }
+    }
+
+    fn storage_balance_of(&self, account_id: AccountId) -> Option<StorageBalance> {
+        self.token.storage_balance_of(account_id)
     }
 }
 
