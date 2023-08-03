@@ -68,7 +68,7 @@ contract SiloToSilo is AccessControl {
         string calldata message
     ) external {
         string storage tokenAccountId = registeredTokens[token];
-        require(address(token) != address(0), "The token is not registered!");
+        require(bytes(tokenAccountId).length > 0, "The token is not registered!");
 
         token.transferFrom(msg.sender, address(this), amount);
         // WARNING: The `withdrawToNear` method works asynchronously.

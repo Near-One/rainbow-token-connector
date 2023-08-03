@@ -393,6 +393,31 @@ mod tests {
         infra.check_user_balance_engine(0).await;
     }
 
+    #[tokio::test]
+    async fn transfer_not_register_tokens() {
+        let infra = TestsInfrastructure::init().await;
+
+        mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
+        infra.mint_wnear_engine(None).await;
+        infra.approve_spend_wnear_engine(None).await;
+
+        infra.check_token_is_regester_engine(false).await;
+
+        storage_deposit(&infra.mock_token, infra.engine.inner.id()).await;
+        storage_deposit(&infra.mock_token, infra.silo.inner.id()).await;
+
+        engine_mint_tokens(infra.user_address, &infra.engine_mock_token, &infra.engine).await;
+        infra.approve_spend_mock_tokens_engine().await;
+
+        let balance_engine_before = infra.get_mock_token_balance_engine().await;
+
+        infra.engine_to_silo_transfer(true).await;
+
+        let balance_engine_after = infra.get_mock_token_balance_engine().await;
+        assert_eq!(balance_engine_before, balance_engine_after);
+    }
+
+
     async fn deploy_silo_to_silo_sol_contract(
         engine: &AuroraEngine,
         user_account: &workspaces::Account,
