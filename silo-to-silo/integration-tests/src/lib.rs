@@ -6,7 +6,7 @@ mod tests {
     };
     use aurora_sdk_integration_tests::aurora_engine_types::H160;
     use aurora_sdk_integration_tests::workspaces::result::ExecutionFinalResult;
-    use aurora_sdk_integration_tests::workspaces::{Account, Contract};
+    use aurora_sdk_integration_tests::workspaces::{Account, Contract, Worker};
     use aurora_sdk_integration_tests::{
         aurora_engine::{self, AuroraEngine},
         aurora_engine_types::{
@@ -20,6 +20,8 @@ mod tests {
         workspaces::{self, AccountId},
     };
     use std::path::Path;
+    use aurora_sdk_integration_tests::wnear::Wnear;
+    use aurora_sdk_integration_tests::workspaces::network::Sandbox;
 
     const ATTACHED_NEAR: u128 = 5_000_000_000_000_000_000_000_000;
     const NEAR_DEPOSIT: u128 = 2_000_000_000_000_000_000_000_000;
@@ -27,319 +29,307 @@ mod tests {
     const TRANSFER_TOKENS_AMOUNT: u64 = 100;
     const TOKEN_SUPPLY: u64 = 1000000000;
 
-    #[tokio::test]
-    async fn test_ft_transfer_to_silo() {
-        let worker = workspaces::sandbox().await.unwrap();
-        let engine = aurora_engine::deploy_latest(&worker, "aurora.test.near")
-            .await
-            .unwrap();
-        let silo = aurora_engine::deploy_latest(&worker, "silo.test.near")
-            .await
-            .unwrap();
+    struct TestsInfrastructure {
+        _worker: Worker<Sandbox>,
+        engine: AuroraEngine,
+        silo: AuroraEngine,
+        engine_wnear: Wnear,
+        silo_wnear: Wnear,
+        user_account: Account,
+        user_address: Address,
+        engine_silo_to_silo_contract: DeployedContract,
+        silo_silo_to_silo_contract: DeployedContract,
+        mock_token: Contract,
+        engine_mock_token: ERC20,
+        silo_mock_token: ERC20
+    }
 
-        let engine_wnear = wnear::Wnear::deploy(&worker, &engine).await.unwrap();
+    impl TestsInfrastructure {
+        pub async fn init() -> Self {
+            let worker = workspaces::sandbox().await.unwrap();
+            let engine = aurora_engine::deploy_latest(&worker, "aurora.test.near")
+                .await
+                .unwrap();
+            let silo = aurora_engine::deploy_latest(&worker, "silo.test.near")
+                .await
+                .unwrap();
 
-        let user_account = worker.dev_create_account().await.unwrap();
-        let user_address =
-            aurora_sdk_integration_tests::aurora_engine_sdk::types::near_account_to_evm_address(
+            let engine_wnear = wnear::Wnear::deploy(&worker, &engine).await.unwrap();
+            let silo_wnear = wnear::Wnear::deploy(&worker, &silo).await.unwrap();
+            let user_account = worker.dev_create_account().await.unwrap();
+            let user_address = aurora_sdk_integration_tests::aurora_engine_sdk::types::near_account_to_evm_address(
                 user_account.id().as_bytes(),
             );
 
-        let engine_silo_to_silo_contract = deploy_silo_to_silo_sol_contract(
-            &engine,
-            &user_account,
-            engine_wnear.aurora_token.address,
-        )
-        .await;
-
-        let mock_token = deploy_mock_token(&worker, user_account.id()).await;
-        let engine_mock_token = engine.bridge_nep141(mock_token.id()).await.unwrap();
-        let silo_mock_token = silo.bridge_nep141(mock_token.id()).await.unwrap();
-
-        engine
-            .mint_wnear(
-                &engine_wnear,
-                user_address,
-                2 * (ATTACHED_NEAR + NEAR_DEPOSIT),
+            let engine_silo_to_silo_contract = deploy_silo_to_silo_sol_contract(
+                &engine,
+                &user_account,
+                engine_wnear.aurora_token.address,
             )
-            .await
-            .unwrap();
+                .await;
 
-        approve_spend_tokens(
-            &engine_wnear.aurora_token,
-            engine_silo_to_silo_contract.address,
-            &user_account,
-            &engine,
-        )
-        .await;
-        mint_tokens_near(&mock_token, engine.inner.id()).await;
+            let mock_token = deploy_mock_token(&worker, user_account.id()).await;
+            let engine_mock_token = engine.bridge_nep141(mock_token.id()).await.unwrap();
+            let silo_mock_token = silo.bridge_nep141(mock_token.id()).await.unwrap();
 
-        silo_to_silo_register_token(
-            &engine_silo_to_silo_contract,
-            engine_mock_token.address.raw(),
-            mock_token.id().to_string(),
-            &user_account,
-            &engine,
-        )
-        .await;
-        check_token_account_id(
-            &engine_silo_to_silo_contract,
-            engine_mock_token.address.raw(),
-            mock_token.id().to_string(),
-            &user_account,
-            &engine,
-        )
-        .await;
-        check_near_account_id(&engine_silo_to_silo_contract, &user_account, &engine).await;
+            let silo_silo_to_silo_contract =
+                deploy_silo_to_silo_sol_contract(&silo, &user_account, silo_wnear.aurora_token.address)
+                    .await;
 
-        storage_deposit(&mock_token, engine.inner.id()).await;
-        storage_deposit(&mock_token, silo.inner.id()).await;
 
-        engine_mint_tokens(user_address, &engine_mock_token, &engine).await;
-        approve_spend_tokens(
-            &engine_mock_token,
-            engine_silo_to_silo_contract.address,
-            &user_account,
-            &engine,
-        )
-        .await;
+            TestsInfrastructure {
+                _worker: worker,
+                engine,
+                silo,
+                engine_wnear,
+                silo_wnear,
+                user_account,
+                user_address,
+                engine_silo_to_silo_contract,
+                silo_silo_to_silo_contract,
+                mock_token,
+                engine_mock_token,
+                silo_mock_token
+            }
+        }
 
-        let balance_engine_before = engine
-            .erc20_balance_of(&engine_mock_token, user_address)
-            .await
-            .unwrap();
-        silo_to_silo_transfer(
-            &engine_silo_to_silo_contract,
-            &engine_mock_token,
-            engine.inner.id(),
-            silo.inner.id(),
-            user_account.clone(),
-            user_address.encode(),
-            true
-        )
-        .await;
+        pub async fn mint_wnear_engine(&self) {
+            self.engine
+                .mint_wnear(
+                    &self.engine_wnear,
+                    self.user_address,
+                    2 * (ATTACHED_NEAR + NEAR_DEPOSIT),
+                )
+                .await
+                .unwrap();
+        }
 
-        let balance_engine_after = engine
-            .erc20_balance_of(&engine_mock_token, user_address)
-            .await
-            .unwrap();
+        pub async fn mint_wnear_silo(&self) {
+            self.silo
+                .mint_wnear(
+                    &self.silo_wnear,
+                    self.user_address,
+                    2 * (ATTACHED_NEAR + NEAR_DEPOSIT),
+                )
+                .await
+                .unwrap();
+        }
+
+        pub async fn approve_spend_wnear_engine(&self) {
+            approve_spend_tokens(
+                &self.engine_wnear.aurora_token,
+                self.engine_silo_to_silo_contract.address,
+                &self.user_account,
+                &self.engine,
+            ).await;
+        }
+
+        pub async fn silo_to_silo_register_token_engine(&self) {
+            silo_to_silo_register_token(
+                &self.engine_silo_to_silo_contract,
+                self.engine_mock_token.address.raw(),
+                self.mock_token.id().to_string(),
+                &self.user_account,
+                &self.engine,
+            ).await;
+        }
+
+        pub async fn silo_to_silo_register_token_silo(&self) {
+            silo_to_silo_register_token(
+                &self.silo_silo_to_silo_contract,
+                self.silo_mock_token.address.raw(),
+                self.mock_token.id().to_string(),
+                &self.user_account,
+                &self.silo,
+            ).await;
+        }
+
+        pub async fn check_token_account_id_engine(&self) {
+            check_token_account_id(
+                &self.engine_silo_to_silo_contract,
+                self.engine_mock_token.address.raw(),
+                self.mock_token.id().to_string(),
+                &self.user_account,
+                &self.engine,
+            ).await;
+        }
+
+        pub async fn approve_spend_mock_tokens_engine(&self) {
+            approve_spend_tokens(
+                &self.engine_mock_token,
+                self.engine_silo_to_silo_contract.address,
+                &self.user_account,
+                &self.engine,
+            ).await;
+        }
+
+        pub async fn get_mock_token_balance_engine(&self) -> U256 {
+            self.engine
+                .erc20_balance_of(&self.engine_mock_token, self.user_address)
+                .await
+                .unwrap()
+        }
+
+        pub async fn get_mock_token_balance_silo(&self) -> U256 {
+            self.silo
+                .erc20_balance_of(&self.silo_mock_token, self.user_address)
+                .await
+                .unwrap()
+        }
+
+        pub async fn engine_to_silo_transfer(&self, check_output: bool) {
+            silo_to_silo_transfer(
+                &self.engine_silo_to_silo_contract,
+                &self.engine_mock_token,
+                self.engine.inner.id(),
+                self.silo.inner.id(),
+                self.user_account.clone(),
+                self.user_address.encode(),
+                check_output
+            ).await;
+        }
+
+        pub async fn silo_to_engine_transfer(&self) {
+            silo_to_silo_transfer(
+                &self.silo_silo_to_silo_contract,
+                &self.silo_mock_token,
+                self.silo.inner.id(),
+                self.engine.inner.id(),
+                self.user_account.clone(),
+                self.user_address.encode(),
+                true
+            )
+                .await;
+        }
+
+        pub async fn approve_spend_tokens_silo(&self) {
+            approve_spend_tokens(
+                &self.silo_mock_token,
+                self.silo_silo_to_silo_contract.address,
+                &self.user_account,
+                &self.silo,
+            ).await;
+        }
+
+        pub async fn check_token_account_id_silo(&self) {
+            check_token_account_id(
+                &self.silo_silo_to_silo_contract,
+                self.silo_mock_token.address.raw(),
+                self.mock_token.id().to_string(),
+                &self.user_account,
+                &self.silo,
+            ).await;
+        }
+
+        pub async fn approve_spend_wnear_silo(&self) {
+            approve_spend_tokens(
+                &self.silo_wnear.aurora_token,
+                self.silo_silo_to_silo_contract.address,
+                &self.user_account,
+                &self.silo,
+            ).await;
+        }
+
+        pub async fn check_user_balance_engine(&self, expected_value: u8) {
+            check_get_user_balance(
+                &self.engine_silo_to_silo_contract,
+                &self.user_account,
+                self.engine_mock_token.address.raw(),
+                self.user_address.raw(),
+                &self.engine,
+                expected_value
+            ).await;
+        }
+    }
+
+    #[tokio::test]
+    async fn test_ft_transfer_to_silo() {
+        let infra = TestsInfrastructure::init().await;
+
+        mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
+
+        infra.mint_wnear_engine().await;
+        infra.approve_spend_wnear_engine().await;
+
+        infra.silo_to_silo_register_token_engine().await;
+        infra.check_token_account_id_engine().await;
+        check_near_account_id(&infra.engine_silo_to_silo_contract, &infra.user_account, &infra.engine).await;
+
+        storage_deposit(&infra.mock_token, infra.engine.inner.id()).await;
+        storage_deposit(&infra.mock_token, infra.silo.inner.id()).await;
+
+        engine_mint_tokens(infra.user_address, &infra.engine_mock_token, &infra.engine).await;
+        infra.approve_spend_mock_tokens_engine().await;
+
+        let balance_engine_before = infra.get_mock_token_balance_engine().await;
+        infra.engine_to_silo_transfer(true).await;
+
+        let balance_engine_after = infra.get_mock_token_balance_engine().await;
         assert_eq!(
             (balance_engine_before - balance_engine_after).as_u64(),
             TRANSFER_TOKENS_AMOUNT
         );
 
-        let balance_silo = silo
-            .erc20_balance_of(&silo_mock_token, user_address)
-            .await
-            .unwrap();
+        let balance_silo = infra.get_mock_token_balance_silo().await;
         assert_eq!(balance_silo.as_u64(), TRANSFER_TOKENS_AMOUNT);
 
         // Transfer from silo back to aurora
-        let silo_wnear = wnear::Wnear::deploy(&worker, &silo).await.unwrap();
-        let silo_silo_to_silo_contract =
-            deploy_silo_to_silo_sol_contract(&silo, &user_account, silo_wnear.aurora_token.address)
-                .await;
+        infra.mint_wnear_silo().await;
+        infra.approve_spend_wnear_silo().await;
 
-        silo.mint_wnear(
-            &silo_wnear,
-            user_address,
-            2 * (ATTACHED_NEAR + NEAR_DEPOSIT),
-        )
-        .await
-        .unwrap();
+        infra.silo_to_silo_register_token_silo().await;
+        infra.check_token_account_id_silo().await;
 
-        approve_spend_tokens(
-            &silo_wnear.aurora_token,
-            silo_silo_to_silo_contract.address,
-            &user_account,
-            &silo,
-        )
-        .await;
+        infra.approve_spend_tokens_silo().await;
+        infra.silo_to_engine_transfer().await;
 
-        silo_to_silo_register_token(
-            &silo_silo_to_silo_contract,
-            silo_mock_token.address.raw(),
-            mock_token.id().to_string(),
-            &user_account,
-            &silo,
-        )
-        .await;
-
-        check_token_account_id(
-            &silo_silo_to_silo_contract,
-            silo_mock_token.address.raw(),
-            mock_token.id().to_string(),
-            &user_account,
-            &silo,
-        )
-        .await;
-
-        approve_spend_tokens(
-            &silo_mock_token,
-            silo_silo_to_silo_contract.address,
-            &user_account,
-            &silo,
-        )
-        .await;
-
-        silo_to_silo_transfer(
-            &silo_silo_to_silo_contract,
-            &silo_mock_token,
-            silo.inner.id(),
-            engine.inner.id(),
-            user_account.clone(),
-            user_address.encode(),
-            true
-        )
-        .await;
-
-        let balance_engine_after_silo = engine
-            .erc20_balance_of(&engine_mock_token, user_address)
-            .await
-            .unwrap();
+        let balance_engine_after_silo = infra.get_mock_token_balance_engine().await;
         assert_eq!(
             (balance_engine_after_silo - balance_engine_after).as_u64(),
             TRANSFER_TOKENS_AMOUNT
         );
 
-        let balance_silo = silo
-            .erc20_balance_of(&silo_mock_token, user_address)
-            .await
-            .unwrap();
+        let balance_silo = infra.get_mock_token_balance_silo().await;
         assert_eq!(balance_silo.as_u64(), 0);
     }
 
     #[tokio::test]
     async fn test_withdraw() {
-        let worker = workspaces::sandbox().await.unwrap();
-        let engine = aurora_engine::deploy_latest(&worker, "aurora.test.near")
-            .await
-            .unwrap();
-        let silo = aurora_engine::deploy_latest(&worker, "silo.test.near")
-            .await
-            .unwrap();
+        let infra = TestsInfrastructure::init().await;
+        infra.mint_wnear_engine().await;
+        infra.approve_spend_wnear_engine().await;
 
-        let engine_wnear = wnear::Wnear::deploy(&worker, &engine).await.unwrap();
+        mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
 
-        let user_account = worker.dev_create_account().await.unwrap();
-        let user_address =
-            aurora_sdk_integration_tests::aurora_engine_sdk::types::near_account_to_evm_address(
-                user_account.id().as_bytes(),
-            );
+        infra.silo_to_silo_register_token_engine().await;
+        infra.check_token_account_id_engine().await;
+        check_near_account_id(&infra.engine_silo_to_silo_contract, &infra.user_account, &infra.engine).await;
 
-        let engine_silo_to_silo_contract = deploy_silo_to_silo_sol_contract(
-            &engine,
-            &user_account,
-            engine_wnear.aurora_token.address,
-        )
-            .await;
+        storage_deposit(&infra.mock_token, infra.engine.inner.id()).await;
 
-        let mock_token = deploy_mock_token(&worker, user_account.id()).await;
-        let engine_mock_token = engine.bridge_nep141(mock_token.id()).await.unwrap();
-        let silo_mock_token = silo.bridge_nep141(mock_token.id()).await.unwrap();
+        engine_mint_tokens(infra.user_address, &infra.engine_mock_token, &infra.engine).await;
+        infra.approve_spend_mock_tokens_engine().await;
 
-        engine
-            .mint_wnear(
-                &engine_wnear,
-                user_address,
-                2 * (ATTACHED_NEAR + NEAR_DEPOSIT),
-            )
-            .await
-            .unwrap();
+        let balance_engine_before = infra.get_mock_token_balance_engine().await;
+        infra.engine_to_silo_transfer(false).await;
 
-        approve_spend_tokens(
-            &engine_wnear.aurora_token,
-            engine_silo_to_silo_contract.address,
-            &user_account,
-            &engine,
-        )
-            .await;
-        mint_tokens_near(&mock_token, engine.inner.id()).await;
+        let balance_engine_after = infra.get_mock_token_balance_engine().await;
 
-        silo_to_silo_register_token(
-            &engine_silo_to_silo_contract,
-            engine_mock_token.address.raw(),
-            mock_token.id().to_string(),
-            &user_account,
-            &engine,
-        )
-            .await;
-        check_token_account_id(
-            &engine_silo_to_silo_contract,
-            engine_mock_token.address.raw(),
-            mock_token.id().to_string(),
-            &user_account,
-            &engine,
-        )
-            .await;
-        check_near_account_id(&engine_silo_to_silo_contract, &user_account, &engine).await;
-
-        storage_deposit(&mock_token, engine.inner.id()).await;
-
-        engine_mint_tokens(user_address, &engine_mock_token, &engine).await;
-        approve_spend_tokens(
-            &engine_mock_token,
-            engine_silo_to_silo_contract.address,
-            &user_account,
-            &engine,
-        ).await;
-
-        let balance_engine_before = engine
-            .erc20_balance_of(&engine_mock_token, user_address)
-            .await
-            .unwrap();
-        silo_to_silo_transfer(
-            &engine_silo_to_silo_contract,
-            &engine_mock_token,
-            engine.inner.id(),
-            silo.inner.id(),
-            user_account.clone(),
-            user_address.encode(),
-            false
-        )
-            .await;
-
-        let balance_engine_after = engine
-            .erc20_balance_of(&engine_mock_token, user_address)
-            .await
-            .unwrap();
         assert_eq!(
             (balance_engine_before - balance_engine_after).as_u64(),
             TRANSFER_TOKENS_AMOUNT
         );
 
-        let balance_silo = silo
-            .erc20_balance_of(&silo_mock_token, user_address)
-            .await
-            .unwrap();
+        let balance_silo = infra.get_mock_token_balance_silo().await;
         assert_eq!(balance_silo.as_u64(), 0);
 
-        check_get_user_balance(
-            &engine_silo_to_silo_contract,
-            &user_account,
-            engine_mock_token.address.raw(),
-            user_address.raw(),
-            &engine,
-            100
-        ).await;
+        infra.check_user_balance_engine(100).await;
+        withdraw(&infra.engine_silo_to_silo_contract, &infra.engine_mock_token, infra.engine.inner.id(), infra.user_account.clone()).await;
 
-        withdraw(&engine_silo_to_silo_contract, &engine_mock_token, engine.inner.id(), user_account.clone()).await;
-
-        let balance_engine_after_withdraw = engine
-            .erc20_balance_of(&engine_mock_token, user_address)
-            .await
-            .unwrap();
-
+        let balance_engine_after_withdraw = infra.get_mock_token_balance_engine().await;
         assert_eq!(balance_engine_before, balance_engine_after_withdraw);
 
-        check_get_user_balance(
-            &engine_silo_to_silo_contract,
-            &user_account,
-            engine_mock_token.address.raw(),
-            user_address.raw(),
-            &engine,
-            0
-        ).await;
+        infra.check_user_balance_engine(0).await;
     }
 
     async fn deploy_silo_to_silo_sol_contract(
