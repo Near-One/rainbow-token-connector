@@ -20,8 +20,6 @@ contract SiloToSilo is AccessControl {
     uint64 constant WITHDRAW_NEAR_GAS = 50_000_000_000_000;
     uint64 constant FT_TRANSFER_CALL_NEAR_GAS = 200_000_000_000_000;
 
-    uint128 constant NEAR_STORAGE_DEPOSIT = 12_500_000_000_000_000_000_000;
-
     NEAR public near;
     string siloAccountId;
 
@@ -42,8 +40,12 @@ contract SiloToSilo is AccessControl {
     }
 
     // TODO: make it trustless
-    function registerToken(IEvmErc20 token, string memory nearTokenAccountId) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        near.wNEAR.transferFrom(msg.sender, address(this), uint256(NEAR_STORAGE_DEPOSIT));
+    function registerToken(
+        IEvmErc20 token,
+        string memory nearTokenAccountId,
+        uint128 storageDepositAmount
+    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        near.wNEAR.transferFrom(msg.sender, address(this), uint256(storageDepositAmount));
         bytes memory args = bytes(
             string.concat('{"account_id": "', getNearAccountId(), '", "registration_only": true }')
         );
@@ -52,7 +54,7 @@ contract SiloToSilo is AccessControl {
             nearTokenAccountId,
             "storage_deposit",
             args,
-            NEAR_STORAGE_DEPOSIT,
+            storageDepositAmount,
             BASE_NEAR_GAS
         );
         callStorageDeposit.transact();
@@ -112,7 +114,7 @@ contract SiloToSilo is AccessControl {
         balance[token][sender] += (amount - transferredAmount);
     }
 
-    function withdraw(IEvmErc20 token) public {
+    function withdraw(IEvmErc20 token) external {
         string storage tokenAccountId = registeredTokens[token];
         uint128 senderBalance = balance[token][msg.sender];
 
