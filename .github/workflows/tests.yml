@@ -101,4 +101,5 @@ jobs:
         uses: foundry-rs/foundry-toolchain@v1    
       - name: Test
         run: |
+          make prepare
           make test-token-silo-to-silo
