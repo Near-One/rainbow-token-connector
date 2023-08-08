@@ -47,7 +47,9 @@ test-token-locker:
 	cargo test --all
 
 test-token-silo-to-silo:
-	cd silo-to-silo/integration-tests && \
+	cd silo-to-silo && \
+	yarn && \
+	cd integration-tests && \
 	cargo test --all
 
 # <--
