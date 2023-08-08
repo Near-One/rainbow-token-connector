@@ -96,7 +96,7 @@ jobs:
       - name: Clone the repository
         uses: actions/checkout@v2
         with:
-          submodules: "true"
+          submodules: recursive
       - name: Test
         run: |
           make test-token-silo-to-silo
