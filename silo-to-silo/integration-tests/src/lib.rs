@@ -29,6 +29,8 @@ mod tests {
     const TRANSFER_TOKENS_AMOUNT: u64 = 100;
     const TOKEN_SUPPLY: u64 = 1000000000;
 
+    const NEP141_STORAGE_DEPOSIT: u128 = 12_500_000_000_000_000_000_000;
+
     struct TestsInfrastructure {
         worker: Worker<Sandbox>,
         engine: AuroraEngine,
@@ -589,6 +591,7 @@ mod tests {
             &[
                 ethabi::Token::Address(engine_mock_token_address),
                 ethabi::Token::String(near_mock_token_account_id),
+                ethabi::Token::Uint(NEP141_STORAGE_DEPOSIT.into()),
             ],
         );
 
