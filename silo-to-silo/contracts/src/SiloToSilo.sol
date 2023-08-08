@@ -29,7 +29,7 @@ contract SiloToSilo is AccessControl {
     mapping(IEvmErc20 => string) registeredTokens;
 
     //[auroraErc20Token][userAddressOnAurora] => userBalance
-    mapping(IEvmErc20 => mapping(address => uint128)) balance;
+    mapping(IEvmErc20 => mapping(address => uint256)) balance;
 
     event TokenRegistered(IEvmErc20 token, string nearAccountId);
 
@@ -63,7 +63,7 @@ contract SiloToSilo is AccessControl {
 
     function ftTransferCallToNear(
         IEvmErc20 token,
-        uint128 amount,
+        uint256 amount,
         string calldata receiverId,
         string calldata message
     ) external {
@@ -103,8 +103,8 @@ contract SiloToSilo is AccessControl {
         callFtTransfer.then(callback).transact();
     }
 
-    function ftTransferCallCallback(address sender, IEvmErc20 token, uint128 amount) public onlyRole(CALLBACK_ROLE) {
-        uint128 transferredAmount = 0;
+    function ftTransferCallCallback(address sender, IEvmErc20 token, uint256 amount) public onlyRole(CALLBACK_ROLE) {
+        uint256 transferredAmount = 0;
 
         if (AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful) {
             transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
@@ -115,7 +115,7 @@ contract SiloToSilo is AccessControl {
 
     function withdraw(IEvmErc20 token) public {
         string storage tokenAccountId = registeredTokens[token];
-        uint128 senderBalance = balance[token][msg.sender];
+        uint256 senderBalance = balance[token][msg.sender];
 
         require(senderBalance > 0, "The signer token balance = 0");
 
@@ -150,7 +150,7 @@ contract SiloToSilo is AccessControl {
             "ERROR: The `Withdraw` XCC is fail"
         );
 
-        uint128 transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
+        uint256 transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
         balance[token][sender] -= transferredAmount;
     }
 
@@ -162,7 +162,7 @@ contract SiloToSilo is AccessControl {
         return registeredTokens[token];
     }
 
-    function getUserBalance(IEvmErc20 token, address userAddress) public view returns (uint128) {
+    function getUserBalance(IEvmErc20 token, address userAddress) public view returns (uint256) {
         return balance[token][userAddress];
     }
 
@@ -170,12 +170,13 @@ contract SiloToSilo is AccessControl {
         return Utils.bytesToHex(abi.encodePacked(auroraAddress));
     }
 
-    function _stringToUint(bytes memory b) private pure returns (uint128) {
-        uint128 result = 0;
+    function _stringToUint(bytes memory b) private pure returns (uint256) {
+        uint256 result = 0;
         
         for (uint256 i = 0; i < b.length; i++) {
-            if (uint8(b[i]) > uint8(47) && uint8(b[i]) < uint8(58)) {
-                result = result * 10 + (uint128(uint8(b[i])) - 48);
+            uint256 v = uint256(uint8(b[i]));
+            if (v >= 48 && v <= 57) {
+                result = result * 10 + (v - 48);
             }
         }
         
