@@ -471,16 +471,18 @@ mod tests {
     ) -> DeployedContract {
         let project_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let aurora_sdk_path = project_dir.join("aurora-contracts-sdk/aurora-solidity-sdk");
+        assert!(aurora_sdk_path.exists(), "The path isn't exist: {}", aurora_sdk_path.to_string_lossy());
+
         let codec_lib = forge::deploy_codec_lib(&aurora_sdk_path, engine)
             .await
-            .expect(&format!("Failed to read codec_lib from {}", &aurora_sdk_path.to_string_lossy()));
+            .unwrap();
         let utils_lib = forge::deploy_utils_lib(&aurora_sdk_path, engine)
             .await
-            .expect(&format!("Failed to read utils_lib from {}", &aurora_sdk_path.to_string_lossy()));
+            .unwrap();
         let aurora_sdk_lib =
             forge::deploy_aurora_sdk_lib(&aurora_sdk_path, engine, codec_lib, utils_lib)
                 .await
-                .expect(&format!("Failed to read aurora_sdk_lib from {}", &aurora_sdk_path.to_string_lossy()));
+                .unwrap();
 
         let contract_path = project_dir.join("../contracts");        
         let constructor = forge::forge_build(
