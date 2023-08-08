@@ -46,6 +46,10 @@ test-token-locker:
 	cd token-locker && \
 	cargo test --all
 
+test-token-silo-to-silo:
+	cd silo-to-silo/integration-tests && \
+	cargo test --all
+
 # <--
 # For testing purposes only (can be removed at any moment)
 no_icon: res/bridge_token_no_icon.wasm res/bridge_token_factory_no_icon.wasm

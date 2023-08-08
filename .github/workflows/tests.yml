@@ -88,3 +88,15 @@ jobs:
       - name: Test
         run: |
           make test-token-locker
+
+  test-silo-to-silo:
+    runs-on: self-hosted
+    name: Test silo-to-silo
+    steps:
+      - name: Clone the repository
+        uses: actions/checkout@v2
+        with:
+          submodules: "true"
+      - name: Test
+        run: |
+          make test-token-silo-to-silo
