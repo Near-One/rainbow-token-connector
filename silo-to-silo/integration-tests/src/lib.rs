@@ -47,10 +47,10 @@ mod tests {
     impl TestsInfrastructure {
         pub async fn init(storage_deposit: Option<u128>) -> Self {
             let worker = workspaces::sandbox().await.unwrap();
-            let engine = aurora_engine::deploy_latest(&worker, "aurora.test.near")
+            let engine = aurora_engine::deploy_latest_silo(&worker, "aurora.test.near")
                 .await
                 .unwrap();
-            let silo = aurora_engine::deploy_latest(&worker, "silo.test.near")
+            let silo = aurora_engine::deploy_latest_silo(&worker, "silo.test.near")
                 .await
                 .unwrap();
 
