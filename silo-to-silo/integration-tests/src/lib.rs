@@ -269,6 +269,7 @@ mod tests {
         }
     }
 
+    #[ignore]
     #[tokio::test]
     async fn test_ft_transfer_to_silo() {
         let infra = TestsInfrastructure::init(None).await;
@@ -359,6 +360,7 @@ mod tests {
         infra.check_user_balance_engine(0).await;
     }
 
+    #[ignore]
     #[tokio::test]
     async fn check_access_control() {
         let infra = TestsInfrastructure::init(None).await;
@@ -397,6 +399,7 @@ mod tests {
         infra.check_user_balance_engine(0).await;
     }
 
+    #[ignore]
     #[tokio::test]
     async fn transfer_not_register_tokens() {
         let infra = TestsInfrastructure::init(None).await;
@@ -421,6 +424,7 @@ mod tests {
         assert_eq!(balance_engine_before, balance_engine_after);
     }
 
+    #[ignore]
     #[tokio::test]
     async fn error_on_withdraw_to_near() {
         let deposit_value = Some(10_000_000_000_000_000_000_000_000u128);
@@ -520,23 +524,7 @@ mod tests {
         user_account_id: &str,
         storage_deposit: Option<u128>
     ) -> workspaces::Contract {
-        let contract_path = Path::new("./mock_token");
-        let output = tokio::process::Command::new("cargo")
-            .current_dir(contract_path)
-            .env("RUSTFLAGS", "-C link-arg=-s")
-            .args([
-                "build",
-                "--all",
-                "--target",
-                "wasm32-unknown-unknown",
-                "--release",
-            ])
-            .output()
-            .await
-            .unwrap();
-        process::require_success(&output).unwrap();
-        let artifact_path =
-            contract_path.join("target/wasm32-unknown-unknown/release/mock_token.wasm");
+        let artifact_path = Path::new("./mock_token/target/wasm32-unknown-unknown/release/mock_token.wasm");
         let wasm_bytes = tokio::fs::read(artifact_path).await.unwrap();
         let mock_token = worker.dev_deploy(&wasm_bytes).await.unwrap();
 

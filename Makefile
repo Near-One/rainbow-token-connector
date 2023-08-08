@@ -50,6 +50,8 @@ test-token-silo-to-silo:
 	cd silo-to-silo && \
 	yarn && \
 	cd integration-tests && \
+	export RUSTFLAGS='-C link-arg=-s' && \
+	$(CARGO) build --target wasm32-unknown-unknown --release --manifest-path mock_token/Cargo.toml && \
 	cargo test --all
 
 # <--
