@@ -90,7 +90,7 @@ jobs:
           make test-token-locker
 
   test-silo-to-silo:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     name: Test silo-to-silo
     steps:
       - uses: actions-rs/toolchain@v1
