@@ -15,7 +15,7 @@ mod tests {
             U256,
         },
         ethabi, tokio,
-        utils::{ethabi::DeployedContract, forge, process},
+        utils::{ethabi::DeployedContract, forge},
         wnear,
         workspaces::{self, AccountId},
     };

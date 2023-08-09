@@ -48,6 +48,7 @@ test-token-locker:
 
 test-token-silo-to-silo:
 	cd silo-to-silo && \
+	rustup target add wasm32-unknown-unknown && \
 	yarn && \
 	cd integration-tests && \
 	export RUSTFLAGS='-C link-arg=-s' && \

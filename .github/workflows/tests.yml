@@ -104,5 +104,4 @@ jobs:
           submodules: recursive
       - name: Test
         run: |
-          make prepare
           make test-token-silo-to-silo
