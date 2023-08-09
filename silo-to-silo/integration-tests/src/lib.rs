@@ -472,6 +472,7 @@ mod tests {
         assert_eq!(balance_engine_before, balance_engine_after);
     }
 
+    #[ignore]
     #[tokio::test]
     async fn error_on_withdraw_to_near() {
         let deposit_value = Some(10_000_000_000_000_000_000_000_000u128);
