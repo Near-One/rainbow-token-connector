@@ -90,6 +90,7 @@ impl StorageManagement for Contract {
     fn storage_deposit(
         &mut self,
         account_id: Option<AccountId>,
+        #[allow(unused_variables)]
         registration_only: Option<bool>,
     ) -> StorageBalance {
         let amount: Balance = env::attached_deposit();

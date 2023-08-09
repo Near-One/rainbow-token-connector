@@ -269,7 +269,6 @@ mod tests {
         }
     }
 
-    #[ignore]
     #[tokio::test]
     async fn test_ft_transfer_to_silo() {
         let infra = TestsInfrastructure::init(None).await;
@@ -360,7 +359,6 @@ mod tests {
         infra.check_user_balance_engine(0).await;
     }
 
-    #[ignore]
     #[tokio::test]
     async fn check_access_control() {
         let infra = TestsInfrastructure::init(None).await;
@@ -399,7 +397,6 @@ mod tests {
         infra.check_user_balance_engine(0).await;
     }
 
-    #[ignore]
     #[tokio::test]
     async fn transfer_not_register_tokens() {
         let infra = TestsInfrastructure::init(None).await;
@@ -424,7 +421,6 @@ mod tests {
         assert_eq!(balance_engine_before, balance_engine_after);
     }
 
-    #[ignore]
     #[tokio::test]
     async fn error_on_withdraw_to_near() {
         let deposit_value = Some(10_000_000_000_000_000_000_000_000u128);
@@ -473,8 +469,7 @@ mod tests {
         user_account: &workspaces::Account,
         wnear_address: Address,
     ) -> DeployedContract {
-        let project_dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let aurora_sdk_path = project_dir.join("aurora-contracts-sdk/aurora-solidity-sdk");
+        let aurora_sdk_path = Path::new("./aurora-contracts-sdk/aurora-solidity-sdk");
         assert!(aurora_sdk_path.exists(), "The path isn't exist: {}", aurora_sdk_path.to_string_lossy());
 
         let codec_lib = forge::deploy_codec_lib(&aurora_sdk_path, engine)
@@ -488,7 +483,7 @@ mod tests {
                 .await
                 .unwrap();
 
-        let contract_path = project_dir.join("../contracts");        
+        let contract_path = Path::new("../contracts");        
         let constructor = forge::forge_build(
             contract_path,
             &[
