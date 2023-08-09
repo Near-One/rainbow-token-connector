@@ -2,19 +2,21 @@ use near_contract_standards::fungible_token::metadata::{
     FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC,
 };
 use near_contract_standards::fungible_token::FungibleToken;
-use near_contract_standards::storage_management::{StorageBalance, StorageBalanceBounds, StorageManagement};
+use near_contract_standards::storage_management::{
+    StorageBalance, StorageBalanceBounds, StorageManagement,
+};
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::LazyOption;
 use near_sdk::json_types::U128;
-use near_sdk::{Balance, log, Promise, require};
 use near_sdk::{env, near_bindgen, AccountId, PanicOnDefault, PromiseOrValue};
+use near_sdk::{log, require, Balance, Promise};
 
 #[near_bindgen]
 #[derive(BorshSerialize, BorshDeserialize, PanicOnDefault)]
 pub struct Contract {
     token: FungibleToken,
     metadata: LazyOption<FungibleTokenMetadata>,
-    storage_deposit: Option<U128>
+    storage_deposit: Option<U128>,
 }
 
 // example from near
@@ -28,7 +30,7 @@ impl Contract {
         name: String,
         symbol: String,
         total_supply: U128,
-        storage_deposit: Option<U128>
+        storage_deposit: Option<U128>,
     ) -> Self {
         Self::new(
             owner_id,
@@ -42,19 +44,24 @@ impl Contract {
                 reference_hash: None,
                 decimals: 24,
             },
-            storage_deposit
+            storage_deposit,
         )
     }
 
     #[init]
-    pub fn new(owner_id: AccountId, total_supply: U128, metadata: FungibleTokenMetadata, storage_deposit: Option<U128>) -> Self {
+    pub fn new(
+        owner_id: AccountId,
+        total_supply: U128,
+        metadata: FungibleTokenMetadata,
+        storage_deposit: Option<U128>,
+    ) -> Self {
         require!(!env::state_exists(), "Already initialized");
 
         metadata.assert_valid();
         let mut this = Self {
             token: FungibleToken::new(b"a".to_vec()),
             metadata: LazyOption::new(b"m".to_vec(), Some(&metadata)),
-            storage_deposit
+            storage_deposit,
         };
         this.token.internal_register_account(&owner_id);
         this.token.internal_deposit(&owner_id, total_supply.into());
@@ -90,8 +97,7 @@ impl StorageManagement for Contract {
     fn storage_deposit(
         &mut self,
         account_id: Option<AccountId>,
-        #[allow(unused_variables)]
-        registration_only: Option<bool>,
+        #[allow(unused_variables)] registration_only: Option<bool>,
     ) -> StorageBalance {
         let amount: Balance = env::attached_deposit();
         let account_id = account_id.unwrap_or_else(env::predecessor_account_id);
