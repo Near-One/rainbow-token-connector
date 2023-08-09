@@ -53,7 +53,7 @@ test-token-silo-to-silo:
 	rustup target add wasm32-unknown-unknown && \
 	export RUSTFLAGS='-C link-arg=-s' && \
 	$(CARGO) build --target wasm32-unknown-unknown --release --manifest-path mock_token/Cargo.toml && \
-	cargo test --all
+	cargo test --all --jobs 4 -- --test-threads 4
 
 # <--
 # For testing purposes only (can be removed at any moment)
