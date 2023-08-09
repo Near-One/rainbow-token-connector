@@ -90,12 +90,9 @@ jobs:
           make test-token-locker
 
   test-silo-to-silo:
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     name: Test silo-to-silo
     steps:
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
       - name: Install Foundry
         uses: foundry-rs/foundry-toolchain@v1        
       - name: Clone the repository
