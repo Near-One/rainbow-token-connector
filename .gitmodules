@@ -1,0 +1,3 @@
+[submodule "silo-to-silo/integration-tests/aurora-contracts-sdk"]
+	path = silo-to-silo/integration-tests/aurora-contracts-sdk
+	url = https://github.com/aurora-is-near/aurora-contracts-sdk.git

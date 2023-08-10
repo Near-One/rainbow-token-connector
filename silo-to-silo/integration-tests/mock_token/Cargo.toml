@@ -1,0 +1,13 @@
+[package]
+name = "mock_token"
+version = "0.0.1"
+authors = ["mark.ts@blaize.tech", "tymofii.s@blaize.tech"]
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+near-sdk = "4.1.1"
+near-contract-standards = "4.1.1"

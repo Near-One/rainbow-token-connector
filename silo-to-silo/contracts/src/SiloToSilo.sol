@@ -18,7 +18,7 @@ contract SiloToSilo is AccessControl {
 
     uint64 constant BASE_NEAR_GAS = 10_000_000_000_000;
     uint64 constant WITHDRAW_NEAR_GAS = 50_000_000_000_000;
-    uint64 constant FT_TRANSFER_CALL_NEAR_GAS = 200_000_000_000_000;
+    uint64 constant FT_TRANSFER_CALL_NEAR_GAS = 150_000_000_000_000;
 
     NEAR public near;
     string siloAccountId;
@@ -27,7 +27,7 @@ contract SiloToSilo is AccessControl {
     mapping(IEvmErc20 => string) registeredTokens;
 
     //[auroraErc20Token][userAddressOnAurora] => userBalance
-    mapping(IEvmErc20 => mapping(address => uint128)) balance;
+    mapping(IEvmErc20 => mapping(address => uint256)) balance;
 
     event TokenRegistered(IEvmErc20 token, string nearAccountId);
 
@@ -65,12 +65,12 @@ contract SiloToSilo is AccessControl {
 
     function ftTransferCallToNear(
         IEvmErc20 token,
-        uint128 amount,
+        uint256 amount,
         string calldata receiverId,
         string calldata message
     ) external {
         string storage tokenAccountId = registeredTokens[token];
-        require(address(token) != address(0), "The token is not registered!");
+        require(bytes(tokenAccountId).length > 0, "The token is not registered!");
 
         token.transferFrom(msg.sender, address(this), amount);
         // WARNING: The `withdrawToNear` method works asynchronously.
@@ -98,14 +98,15 @@ contract SiloToSilo is AccessControl {
             1,
             FT_TRANSFER_CALL_NEAR_GAS
         );
-        bytes memory callbackArg = abi.encodeWithSelector(this.ftTransferCallCallback.selector, msg.sender, amount);
+        
+        bytes memory callbackArg = abi.encodeWithSelector(this.ftTransferCallCallback.selector, msg.sender, token, amount);
         PromiseCreateArgs memory callback = near.auroraCall(address(this), callbackArg, 0, BASE_NEAR_GAS);
 
         callFtTransfer.then(callback).transact();
     }
 
-    function ftTransferCallCallback(address sender, IEvmErc20 token, uint128 amount) public onlyRole(CALLBACK_ROLE) {
-        uint128 transferredAmount = 0;
+    function ftTransferCallCallback(address sender, IEvmErc20 token, uint256 amount) public onlyRole(CALLBACK_ROLE) {
+        uint256 transferredAmount = 0;
 
         if (AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful) {
             transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
@@ -116,16 +117,16 @@ contract SiloToSilo is AccessControl {
 
     function withdraw(IEvmErc20 token) external {
         string storage tokenAccountId = registeredTokens[token];
-        uint128 senderBalance = balance[token][msg.sender];
+        uint256 senderBalance = balance[token][msg.sender];
 
         require(senderBalance > 0, "The signer token balance = 0");
 
         near.wNEAR.transferFrom(msg.sender, address(this), uint256(1));
         bytes memory args = bytes(
             string.concat(
-                '{"receiver_id":',
+                '{"receiver_id": "',
                 siloAccountId,
-                '"amount": "',
+                '", "amount": "',
                 Strings.toString(senderBalance),
                 '", "msg": "',
                 _addressToString(msg.sender),
@@ -151,11 +152,8 @@ contract SiloToSilo is AccessControl {
             "ERROR: The `Withdraw` XCC is fail"
         );
 
-        uint128 transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
-
-        if (transferredAmount > 0) {
-            balance[token][sender] -= transferredAmount;
-        }
+        uint256 transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
+        balance[token][sender] -= transferredAmount;
     }
 
     function getNearAccountId() public view returns (string memory) {
@@ -166,7 +164,7 @@ contract SiloToSilo is AccessControl {
         return registeredTokens[token];
     }
 
-    function getUserBalance(IEvmErc20 token, address userAddress) public view returns (uint128) {
+    function getUserBalance(IEvmErc20 token, address userAddress) public view returns (uint256) {
         return balance[token][userAddress];
     }
 
@@ -174,11 +172,16 @@ contract SiloToSilo is AccessControl {
         return Utils.bytesToHex(abi.encodePacked(auroraAddress));
     }
 
-    function _stringToUint(bytes memory b) private pure returns (uint128) {
-        uint128 result = 0;
+    function _stringToUint(bytes memory b) private pure returns (uint256) {
+        uint256 result = 0;
+        
         for (uint256 i = 0; i < b.length; i++) {
-            result = result * 10 + (uint128(uint8(b[i])) - 48);
+            uint256 v = uint256(uint8(b[i]));
+            if (v >= 48 && v <= 57) {
+                result = result * 10 + (v - 48);
+            }
         }
+        
         return result;
     }
 }
