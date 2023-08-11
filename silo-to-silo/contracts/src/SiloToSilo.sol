@@ -9,6 +9,11 @@ import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts/access/AccessControl.sol";
 import "./IEvmErc20.sol";
 
+struct TokenInfo {
+    string nearTokenAccountId;
+    bool isStorageRegistered;
+}
+
 contract SiloToSilo is AccessControl {
     using AuroraSdk for NEAR;
     using AuroraSdk for PromiseCreateArgs;
@@ -21,10 +26,10 @@ contract SiloToSilo is AccessControl {
     uint64 constant FT_TRANSFER_CALL_NEAR_GAS = 150_000_000_000_000;
 
     NEAR public near;
-    string siloAccountId;
+    string public siloAccountId;
 
     //[auroraErc20Token] => tokenAccountIdOnNear
-    mapping(IEvmErc20 => string) registeredTokens;
+    mapping(IEvmErc20 => TokenInfo) registeredTokens;
 
     //[auroraErc20Token][userAddressOnAurora] => userBalance
     mapping(IEvmErc20 => mapping(address => uint256)) balance;
@@ -39,28 +44,65 @@ contract SiloToSilo is AccessControl {
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
     }
 
-    // TODO: make it trustless
-    function registerToken(
-        IEvmErc20 token,
-        string memory nearTokenAccountId,
-        uint128 storageDepositAmount
-    ) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        near.wNEAR.transferFrom(msg.sender, address(this), uint256(storageDepositAmount));
-        bytes memory args = bytes(
-            string.concat('{"account_id": "', getNearAccountId(), '", "registration_only": true }')
+    function registerToken(IEvmErc20 token) external {
+        PromiseCreateArgs memory callGetNep141FromErc20 = near.call(
+            siloAccountId,
+            "get_nep141_from_erc20",
+            abi.encodePacked(address(token)),
+            0,
+            BASE_NEAR_GAS
         );
 
+        PromiseCreateArgs memory callback = near.auroraCall(
+            address(this),
+            abi.encodeWithSelector(this.getNep141FromErc20Callback.selector, token),
+            0,
+            BASE_NEAR_GAS
+        );
+
+        callGetNep141FromErc20.then(callback).transact();
+    }
+
+    function getNep141FromErc20Callback(IEvmErc20 token) external onlyRole(CALLBACK_ROLE) {
+        require(
+            AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful,
+            "ERROR: The `get_nep141_from_erc20` XCC is fail"
+        );
+
+        string memory nearTokenAccountId = string(AuroraSdk.promiseResult(0).output);
+        registeredTokens[token] = TokenInfo(nearTokenAccountId, false);
+        emit TokenRegistered(token, nearTokenAccountId);
+    }
+
+    function storageDeposit(IEvmErc20 token, uint128 storageDepositAmount) external {
+        string storage tokenAccountId = registeredTokens[token].nearTokenAccountId;
+        require(bytes(tokenAccountId).length > 0, "The token is not registered!");
+
+        near.wNEAR.transferFrom(msg.sender, address(this), uint256(storageDepositAmount));
+
         PromiseCreateArgs memory callStorageDeposit = near.call(
-            nearTokenAccountId,
+            tokenAccountId,
             "storage_deposit",
-            args,
+            bytes(string.concat('{"account_id": "', getNearAccountId(), '", "registration_only": true }')),
             storageDepositAmount,
             BASE_NEAR_GAS
         );
-        callStorageDeposit.transact();
 
-        registeredTokens[token] = nearTokenAccountId;
-        emit TokenRegistered(token, nearTokenAccountId);
+        PromiseCreateArgs memory callback = near.auroraCall(
+            address(this),
+            abi.encodeWithSelector(this.storageDepositCallback.selector, token),
+            0,
+            BASE_NEAR_GAS
+        );
+        callStorageDeposit.then(callback).transact();
+    }
+
+    function storageDepositCallback(IEvmErc20 token) external onlyRole(CALLBACK_ROLE) {
+        require(
+            AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful,
+            "ERROR: The `storage_deposit` XCC is fail"
+        );
+        registeredTokens[token].isStorageRegistered = true;
     }
 
     function ftTransferCallToNear(
@@ -69,8 +111,10 @@ contract SiloToSilo is AccessControl {
         string calldata receiverId,
         string calldata message
     ) external {
-        string storage tokenAccountId = registeredTokens[token];
-        require(bytes(tokenAccountId).length > 0, "The token is not registered!");
+        require(near.wNEAR.balanceOf(address(this)) > 0, "Not enough wNEAR balance");
+
+        TokenInfo storage tokenInfo = registeredTokens[token];
+        require(tokenInfo.isStorageRegistered, "The token storage is not registered!");
 
         token.transferFrom(msg.sender, address(this), amount);
         // WARNING: The `withdrawToNear` method works asynchronously.
@@ -79,33 +123,35 @@ contract SiloToSilo is AccessControl {
         // We expect such an error not to happen as long as transactions were executed in one shard.
         token.withdrawToNear(bytes(getNearAccountId()), amount);
 
-        bytes memory args = bytes(
-            string.concat(
-                '{"receiver_id": "',
-                receiverId,
-                '", "amount": "',
-                Strings.toString(amount),
-                '", "msg": "',
-                message,
-                '"}'
-            )
-        );
-
         PromiseCreateArgs memory callFtTransfer = near.call(
-            tokenAccountId,
+            tokenInfo.nearTokenAccountId,
             "ft_transfer_call",
-            args,
+            bytes(
+                string.concat(
+                    '{"receiver_id": "',
+                    receiverId,
+                    '", "amount": "',
+                    Strings.toString(amount),
+                    '", "msg": "',
+                    message,
+                    '"}'
+                )
+            ),
             1,
             FT_TRANSFER_CALL_NEAR_GAS
         );
-        
-        bytes memory callbackArg = abi.encodeWithSelector(this.ftTransferCallCallback.selector, msg.sender, token, amount);
-        PromiseCreateArgs memory callback = near.auroraCall(address(this), callbackArg, 0, BASE_NEAR_GAS);
+
+        PromiseCreateArgs memory callback = near.auroraCall(
+            address(this),
+            abi.encodeWithSelector(this.ftTransferCallCallback.selector, msg.sender, token, amount),
+            0,
+            BASE_NEAR_GAS
+        );
 
         callFtTransfer.then(callback).transact();
     }
 
-    function ftTransferCallCallback(address sender, IEvmErc20 token, uint256 amount) public onlyRole(CALLBACK_ROLE) {
+    function ftTransferCallCallback(address sender, IEvmErc20 token, uint256 amount) external onlyRole(CALLBACK_ROLE) {
         uint256 transferredAmount = 0;
 
         if (AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful) {
@@ -116,37 +162,43 @@ contract SiloToSilo is AccessControl {
     }
 
     function withdraw(IEvmErc20 token) external {
-        string storage tokenAccountId = registeredTokens[token];
-        uint256 senderBalance = balance[token][msg.sender];
+        require(near.wNEAR.balanceOf(address(this)) > 0, "Not enough wNEAR balance");
 
+        string storage tokenAccountId = registeredTokens[token].nearTokenAccountId;
+        require(bytes(tokenAccountId).length > 0, "The token is not registered!");
+
+        uint256 senderBalance = balance[token][msg.sender];
         require(senderBalance > 0, "The signer token balance = 0");
 
-        near.wNEAR.transferFrom(msg.sender, address(this), uint256(1));
-        bytes memory args = bytes(
-            string.concat(
-                '{"receiver_id": "',
-                siloAccountId,
-                '", "amount": "',
-                Strings.toString(senderBalance),
-                '", "msg": "',
-                _addressToString(msg.sender),
-                '"}'
-            )
-        );
         PromiseCreateArgs memory callWithdraw = near.call(
             tokenAccountId,
             "ft_transfer_call",
-            args,
+            bytes(
+                string.concat(
+                    '{"receiver_id": "',
+                    siloAccountId,
+                    '", "amount": "',
+                    Strings.toString(senderBalance),
+                    '", "msg": "',
+                    _addressToString(msg.sender),
+                    '"}'
+                )
+            ),
             1,
             WITHDRAW_NEAR_GAS
         );
-        bytes memory callbackArg = abi.encodeWithSelector(this.withdrawCallback.selector, msg.sender, token);
-        PromiseCreateArgs memory callback = near.auroraCall(address(this), callbackArg, 0, BASE_NEAR_GAS);
+
+        PromiseCreateArgs memory callback = near.auroraCall(
+            address(this),
+            abi.encodeWithSelector(this.withdrawCallback.selector, msg.sender, token),
+            0,
+            BASE_NEAR_GAS
+        );
 
         callWithdraw.then(callback).transact();
     }
 
-    function withdrawCallback(address sender, IEvmErc20 token) public onlyRole(CALLBACK_ROLE) {
+    function withdrawCallback(address sender, IEvmErc20 token) external onlyRole(CALLBACK_ROLE) {
         require(
             AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful,
             "ERROR: The `Withdraw` XCC is fail"
@@ -161,7 +213,11 @@ contract SiloToSilo is AccessControl {
     }
 
     function getTokenAccountId(IEvmErc20 token) public view returns (string memory) {
-        return registeredTokens[token];
+        return registeredTokens[token].nearTokenAccountId;
+    }
+
+    function isStorageRegistered(IEvmErc20 token) public view returns (bool) {
+        return registeredTokens[token].isStorageRegistered;
     }
 
     function getUserBalance(IEvmErc20 token, address userAddress) public view returns (uint256) {
@@ -174,14 +230,14 @@ contract SiloToSilo is AccessControl {
 
     function _stringToUint(bytes memory b) private pure returns (uint256) {
         uint256 result = 0;
-        
+
         for (uint256 i = 0; i < b.length; i++) {
             uint256 v = uint256(uint8(b[i]));
             if (v >= 48 && v <= 57) {
                 result = result * 10 + (v - 48);
             }
         }
-        
+
         return result;
     }
 }

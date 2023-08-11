@@ -138,7 +138,6 @@ mod tests {
             silo_to_silo_register_token(
                 &self.engine_silo_to_silo_contract,
                 self.engine_mock_token.address.raw(),
-                self.mock_token.id().to_string(),
                 &user_account.unwrap_or(self.user_account.clone()),
                 &self.engine,
                 check_result,
@@ -150,7 +149,6 @@ mod tests {
             silo_to_silo_register_token(
                 &self.silo_silo_to_silo_contract,
                 self.silo_mock_token.address.raw(),
-                self.mock_token.id().to_string(),
                 &self.user_account,
                 &self.silo,
                 true,
@@ -399,35 +397,6 @@ mod tests {
         let infra = TestsInfrastructure::init(None).await;
         //create new user
         let regular_user_account = infra.worker.dev_create_account().await.unwrap();
-        let regular_user_address =
-            aurora_sdk_integration_tests::aurora_engine_sdk::types::near_account_to_evm_address(
-                regular_user_account.id().as_bytes(),
-            );
-
-        //error on call registerToken by regular user
-        infra.mint_wnear_engine(Some(regular_user_address)).await;
-        infra
-            .approve_spend_wnear_engine(Some(regular_user_account.clone()))
-            .await;
-
-        infra
-            .silo_to_silo_register_token_engine(Some(regular_user_account.clone()), true)
-            .await;
-        infra.check_token_is_regester_engine(false).await;
-
-        //error on call registerToken by aurora account
-        let aurora_address =
-            aurora_sdk_integration_tests::aurora_engine_sdk::types::near_account_to_evm_address(
-                infra.engine.inner.id().as_bytes(),
-            );
-        infra.mint_wnear_engine(Some(aurora_address)).await;
-        infra
-            .approve_spend_wnear_engine(Some(infra.engine.inner.as_account().clone()))
-            .await;
-        infra
-            .silo_to_silo_register_token_engine(Some(infra.engine.inner.as_account().clone()), true)
-            .await;
-        infra.check_token_is_regester_engine(false).await;
 
         //error on call ftTransferCallCallback by regular user
         infra
@@ -638,7 +607,6 @@ mod tests {
     async fn silo_to_silo_register_token(
         silo_to_silo_contract: &DeployedContract,
         engine_mock_token_address: H160,
-        near_mock_token_account_id: String,
         user_account: &Account,
         engine: &AuroraEngine,
         check_result: bool,
@@ -647,7 +615,23 @@ mod tests {
             "registerToken",
             &[
                 ethabi::Token::Address(engine_mock_token_address),
-                ethabi::Token::String(near_mock_token_account_id),
+            ],
+        );
+
+        call_aurora_contract(
+            silo_to_silo_contract.address,
+            contract_args,
+            user_account,
+            engine.inner.id(),
+            check_result,
+        )
+        .await
+        .unwrap();
+
+        let contract_args = silo_to_silo_contract.create_call_method_bytes_with_args(
+            "storageDeposit",
+            &[
+                ethabi::Token::Address(engine_mock_token_address),
                 ethabi::Token::Uint(NEP141_STORAGE_DEPOSIT.into()),
             ],
         );
