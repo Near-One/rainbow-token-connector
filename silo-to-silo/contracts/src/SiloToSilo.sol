@@ -24,6 +24,10 @@ contract SiloToSilo is AccessControl {
     uint64 constant BASE_NEAR_GAS = 10_000_000_000_000;
     uint64 constant WITHDRAW_NEAR_GAS = 50_000_000_000_000;
     uint64 constant FT_TRANSFER_CALL_NEAR_GAS = 150_000_000_000_000;
+    uint128 constant ASCII_0 = 48;
+    uint128 constant ASCII_9 = 57;
+    uint128 constant ONE_YOCTO = 1;
+    uint128 constant NO_DEPOSIT = 0;
 
     NEAR public near;
     string public siloAccountId;
@@ -49,14 +53,14 @@ contract SiloToSilo is AccessControl {
             siloAccountId,
             "get_nep141_from_erc20",
             abi.encodePacked(address(token)),
-            0,
+            NO_DEPOSIT,
             BASE_NEAR_GAS
         );
 
         PromiseCreateArgs memory callback = near.auroraCall(
             address(this),
             abi.encodeWithSelector(this.getNep141FromErc20Callback.selector, token),
-            0,
+            NO_DEPOSIT,
             BASE_NEAR_GAS
         );
 
@@ -78,8 +82,6 @@ contract SiloToSilo is AccessControl {
         string storage tokenAccountId = registeredTokens[token].nearTokenAccountId;
         require(bytes(tokenAccountId).length > 0, "The token is not registered!");
 
-        near.wNEAR.transferFrom(msg.sender, address(this), uint256(storageDepositAmount));
-
         PromiseCreateArgs memory callStorageDeposit = near.call(
             tokenAccountId,
             "storage_deposit",
@@ -91,7 +93,7 @@ contract SiloToSilo is AccessControl {
         PromiseCreateArgs memory callback = near.auroraCall(
             address(this),
             abi.encodeWithSelector(this.storageDepositCallback.selector, token),
-            0,
+            NO_DEPOSIT,
             BASE_NEAR_GAS
         );
         callStorageDeposit.then(callback).transact();
@@ -111,7 +113,7 @@ contract SiloToSilo is AccessControl {
         string calldata receiverId,
         string calldata message
     ) external {
-        require(near.wNEAR.balanceOf(address(this)) > 0, "Not enough wNEAR balance");
+        require(near.wNEAR.balanceOf(address(this)) >= ONE_YOCTO, "Not enough wNEAR balance");
 
         TokenInfo storage tokenInfo = registeredTokens[token];
         require(tokenInfo.isStorageRegistered, "The token storage is not registered!");
@@ -123,7 +125,8 @@ contract SiloToSilo is AccessControl {
         // We expect such an error not to happen as long as transactions were executed in one shard.
         token.withdrawToNear(bytes(getNearAccountId()), amount);
 
-        PromiseCreateArgs memory callFtTransfer = near.call(
+        PromiseCreateArgs memory callFtTransfer = _callWithoutTransferWNear(
+            near,
             tokenInfo.nearTokenAccountId,
             "ft_transfer_call",
             bytes(
@@ -137,14 +140,14 @@ contract SiloToSilo is AccessControl {
                     '"}'
                 )
             ),
-            1,
+            ONE_YOCTO,
             FT_TRANSFER_CALL_NEAR_GAS
         );
 
         PromiseCreateArgs memory callback = near.auroraCall(
             address(this),
             abi.encodeWithSelector(this.ftTransferCallCallback.selector, msg.sender, token, amount),
-            0,
+            NO_DEPOSIT,
             BASE_NEAR_GAS
         );
 
@@ -162,7 +165,7 @@ contract SiloToSilo is AccessControl {
     }
 
     function withdraw(IEvmErc20 token) external {
-        require(near.wNEAR.balanceOf(address(this)) > 0, "Not enough wNEAR balance");
+        require(near.wNEAR.balanceOf(address(this)) >= ONE_YOCTO, "Not enough wNEAR balance");
 
         string storage tokenAccountId = registeredTokens[token].nearTokenAccountId;
         require(bytes(tokenAccountId).length > 0, "The token is not registered!");
@@ -170,7 +173,8 @@ contract SiloToSilo is AccessControl {
         uint256 senderBalance = balance[token][msg.sender];
         require(senderBalance > 0, "The signer token balance = 0");
 
-        PromiseCreateArgs memory callWithdraw = near.call(
+        PromiseCreateArgs memory callWithdraw = _callWithoutTransferWNear(
+            near,
             tokenAccountId,
             "ft_transfer_call",
             bytes(
@@ -184,14 +188,14 @@ contract SiloToSilo is AccessControl {
                     '"}'
                 )
             ),
-            1,
+            ONE_YOCTO,
             WITHDRAW_NEAR_GAS
         );
 
         PromiseCreateArgs memory callback = near.auroraCall(
             address(this),
             abi.encodeWithSelector(this.withdrawCallback.selector, msg.sender, token),
-            0,
+            NO_DEPOSIT,
             BASE_NEAR_GAS
         );
 
@@ -233,11 +237,29 @@ contract SiloToSilo is AccessControl {
 
         for (uint256 i = 0; i < b.length; i++) {
             uint256 v = uint256(uint8(b[i]));
-            if (v >= 48 && v <= 57) {
-                result = result * 10 + (v - 48);
+            if (v >= ASCII_0 && v <= ASCII_9) {
+                result = result * 10 + (v - ASCII_0);
             }
         }
 
         return result;
+    }
+
+    /// Creates a base promise. This is not immediately scheduled for execution
+    /// until transact is called. It can be combined with other promises using
+    /// `then` combinator.
+    ///
+    /// Input is not checekd during promise creation. If it is invalid, the
+    /// transaction will be scheduled either way, but it will fail during execution.
+    function _callWithoutTransferWNear(
+        NEAR storage _near,
+        string memory targetAccountId,
+        string memory method,
+        bytes memory args,
+        uint128 nearBalance,
+        uint64 nearGas
+    ) private view returns (PromiseCreateArgs memory) {
+        require(_near.initialized, "Near isn't initialized");
+        return PromiseCreateArgs(targetAccountId, method, args, nearBalance, nearGas);
     }
 }

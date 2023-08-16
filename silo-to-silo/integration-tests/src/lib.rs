@@ -22,9 +22,12 @@ mod tests {
         workspaces::{self, AccountId},
     };
     use std::path::Path;
+    const ONE_NEAR: u128 = 1_000_000_000_000_000_000_000_000;
 
     const ATTACHED_NEAR: u128 = 5_000_000_000_000_000_000_000_000;
     const NEAR_DEPOSIT: u128 = 2_000_000_000_000_000_000_000_000;
+    // This deposit is required to subsidise the ONE_YOCTO deposit on call `ft_transfer_call`
+    const ATTACHED_NEAR_TO_INIT_CONTRACT: u128 = 10 * ONE_NEAR;
 
     const TRANSFER_TOKENS_AMOUNT: u64 = 100;
     const TOKEN_SUPPLY: u64 = 1000000000;
@@ -64,23 +67,15 @@ mod tests {
                     user_account.id().as_bytes(),
                 );
 
-            let engine_silo_to_silo_contract = deploy_silo_to_silo_sol_contract(
-                &engine,
-                &user_account,
-                engine_wnear.aurora_token.address,
-            )
-            .await;
+            let engine_silo_to_silo_contract =
+                deploy_silo_to_silo_sol_contract(&engine, &user_account, &engine_wnear).await;
 
             let mock_token = deploy_mock_token(&worker, user_account.id(), storage_deposit).await;
             let engine_mock_token = engine.bridge_nep141(mock_token.id()).await.unwrap();
             let silo_mock_token = silo.bridge_nep141(mock_token.id()).await.unwrap();
 
-            let silo_silo_to_silo_contract = deploy_silo_to_silo_sol_contract(
-                &silo,
-                &user_account,
-                silo_wnear.aurora_token.address,
-            )
-            .await;
+            let silo_silo_to_silo_contract =
+                deploy_silo_to_silo_sol_contract(&silo, &user_account, &silo_wnear).await;
 
             TestsInfrastructure {
                 worker: worker,
@@ -503,7 +498,7 @@ mod tests {
     async fn deploy_silo_to_silo_sol_contract(
         engine: &AuroraEngine,
         user_account: &workspaces::Account,
-        wnear_address: Address,
+        wnear: &Wnear,
     ) -> DeployedContract {
         let aurora_sdk_path = Path::new("./aurora-contracts-sdk/aurora-solidity-sdk");
         assert!(
@@ -542,7 +537,7 @@ mod tests {
         .unwrap();
 
         let deploy_bytes = constructor.create_deploy_bytes_with_args(&[
-            ethabi::Token::Address(wnear_address.raw()),
+            ethabi::Token::Address(wnear.aurora_token.address.raw()),
             ethabi::Token::String(engine.inner.id().to_string()),
         ]);
 
@@ -551,6 +546,10 @@ mod tests {
             .await
             .unwrap();
 
+        engine
+            .mint_wnear(&wnear, address, ATTACHED_NEAR_TO_INIT_CONTRACT)
+            .await
+            .unwrap();
         constructor.deployed_at(address)
     }
 
@@ -613,9 +612,7 @@ mod tests {
     ) {
         let contract_args = silo_to_silo_contract.create_call_method_bytes_with_args(
             "registerToken",
-            &[
-                ethabi::Token::Address(engine_mock_token_address),
-            ],
+            &[ethabi::Token::Address(engine_mock_token_address)],
         );
 
         call_aurora_contract(
