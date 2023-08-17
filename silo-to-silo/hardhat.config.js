@@ -8,17 +8,34 @@ task("deploy", "Deploy silo to silo proxy contract")
   .addParam("silo", "Config file name without extension")
   .setAction(async (taskArgs, hre) => {
     const { deploy } = require("./utils/scripts.js");
-    const [deployer] = await hre.ethers.getSigners();
+    const [signer] = await hre.ethers.getSigners();
     const config = require(`./configs/${taskArgs.silo}.json`);
 
     await hre.run("compile");
-    await deploy(
-      deployer,
-      config.wNearAddress,
-      config.siloAccountId,
-      config.auroraSdkAddress,
-      config.auroraUtilsAddress,
-    );
+    await deploy({
+      signer,
+      wNearAddress: config.wNearAddress,
+      siloAccountId: config.siloAccountId,
+      auroraSdkAddress: config.auroraSdkAddress,
+      auroraUtilsAddress: config.auroraUtilsAddress,
+    });
+  });
+
+task("upgrade", "Upgrade silo to silo proxy contract")
+  .addParam("silo", "Config file name without extension")
+  .addParam("proxy", "Current proxy address of the SiloToSilo contract")
+  .setAction(async (taskArgs, hre) => {
+    const { upgrade } = require("./utils/scripts.js");
+    const [signer] = await hre.ethers.getSigners();
+    const config = require(`./configs/${taskArgs.silo}.json`);
+
+    await hre.run("compile");
+    await upgrade({
+      signer,
+      proxyAddress: taskArgs.proxy,
+      auroraSdkAddress: config.auroraSdkAddress,
+      auroraUtilsAddress: config.auroraUtilsAddress,
+    });
   });
 
 module.exports = {
