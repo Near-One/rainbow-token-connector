@@ -536,21 +536,36 @@ mod tests {
         .await
         .unwrap();
 
-        let deploy_bytes = constructor.create_deploy_bytes_with_args(&[
-            ethabi::Token::Address(wnear.aurora_token.address.raw()),
-            ethabi::Token::String(engine.inner.id().to_string()),
-        ]);
-
+        let deploy_bytes = constructor.create_deploy_bytes_without_constructor();
         let address = engine
             .deploy_evm_contract_with(user_account, deploy_bytes)
             .await
             .unwrap();
 
+        let contract_impl = constructor.deployed_at(address);
+        let contract_args = contract_impl.create_call_method_bytes_with_args(
+            "initialize",
+            &[
+                ethabi::Token::Address(wnear.aurora_token.address.raw()),
+                ethabi::Token::String(engine.inner.id().to_string()),
+            ],
+        );
+        call_aurora_contract(
+            contract_impl.address,
+            contract_args,
+            &user_account,
+            engine.inner.id(),
+            true,
+        )
+        .await
+        .unwrap();
+
         engine
             .mint_wnear(&wnear, address, ATTACHED_NEAR_TO_INIT_CONTRACT)
             .await
             .unwrap();
-        constructor.deployed_at(address)
+
+        contract_impl
     }
 
     async fn deploy_mock_token(
