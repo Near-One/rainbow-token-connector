@@ -6,7 +6,10 @@ import {AuroraSdk, NEAR, PromiseCreateArgs, PromiseResultStatus, PromiseWithCall
 import "@auroraisnear/aurora-sdk/aurora-sdk/Utils.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
-import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
 import "./IEvmErc20.sol";
 
 struct TokenInfo {
@@ -14,7 +17,7 @@ struct TokenInfo {
     bool isStorageRegistered;
 }
 
-contract SiloToSilo is AccessControl {
+contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable, PausableUpgradeable {
     using AuroraSdk for NEAR;
     using AuroraSdk for PromiseCreateArgs;
     using AuroraSdk for PromiseWithCallback;
@@ -40,7 +43,7 @@ contract SiloToSilo is AccessControl {
 
     event TokenRegistered(IEvmErc20 token, string nearAccountId);
 
-    constructor(address wnearAddress, string memory _siloAccountId) {
+    function initialize(address wnearAddress, string memory _siloAccountId) external initializer {
         near = AuroraSdk.initNear(IERC20_NEAR(wnearAddress));
         siloAccountId = _siloAccountId;
 
@@ -264,4 +267,14 @@ contract SiloToSilo is AccessControl {
         require(_near.initialized, "Near isn't initialized");
         return PromiseCreateArgs(targetAccountId, method, args, nearBalance, nearGas);
     }
+
+    /**
+     * @dev Internal function called by the proxy contract to authorize an upgrade to a new implementation address
+     * using the UUPS proxy upgrade pattern. Overrides the default `_authorizeUpgrade` function from the `UUPSUpgradeable` contract.
+     * This function does not need to perform any extra authorization checks other than restricting the execution of the function to the admin and reverting otherwise.
+     * @param newImplementation Address of the new implementation contract.
+     * Requirements:
+     * - The caller must have the `DEFAULT_ADMIN_ROLE`.
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }
