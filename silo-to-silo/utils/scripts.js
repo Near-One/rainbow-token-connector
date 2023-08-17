@@ -14,15 +14,17 @@ async function deploy(
     (await deployer.provider.getBalance(deployer.address)).toString(),
   );
 
-  const AuroraErc20FastBridge = await ethers.getContractFactory("SiloToSilo", {
-    libraries: {
-      AuroraSdk: auroraSdkAddress,
-      Utils: auroraUtilsAddress,
-    },
-  });
-  const fastbridge = AuroraErc20FastBridge.connect(deployer);
+  const SiloToSiloContract = (
+    await ethers.getContractFactory("SiloToSilo", {
+      libraries: {
+        AuroraSdk: auroraSdkAddress,
+        Utils: auroraUtilsAddress,
+      },
+    })
+  ).connect(deployer);
+
   let proxy = await upgrades.deployProxy(
-    fastbridge,
+    SiloToSiloContract,
     [wnearAuroraAddress, siloAccountId],
     {
       initializer: "initialize",
