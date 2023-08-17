@@ -33,10 +33,10 @@ contract SiloToSilo is AccessControl {
     string public siloAccountId;
 
     //[auroraErc20Token] => tokenAccountIdOnNear
-    mapping(IEvmErc20 => TokenInfo) registeredTokens;
+    mapping(IEvmErc20 => TokenInfo) public registeredTokens;
 
     //[auroraErc20Token][userAddressOnAurora] => userBalance
-    mapping(IEvmErc20 => mapping(address => uint256)) balance;
+    mapping(IEvmErc20 => mapping(address => uint128)) public balance;
 
     event TokenRegistered(IEvmErc20 token, string nearAccountId);
 
@@ -109,7 +109,7 @@ contract SiloToSilo is AccessControl {
 
     function ftTransferCallToNear(
         IEvmErc20 token,
-        uint256 amount,
+        uint128 amount,
         string calldata receiverId,
         string calldata message
     ) external {
@@ -154,14 +154,16 @@ contract SiloToSilo is AccessControl {
         callFtTransfer.then(callback).transact();
     }
 
-    function ftTransferCallCallback(address sender, IEvmErc20 token, uint256 amount) external onlyRole(CALLBACK_ROLE) {
-        uint256 transferredAmount = 0;
-
+    function ftTransferCallCallback(address sender, IEvmErc20 token, uint128 amount) external onlyRole(CALLBACK_ROLE) {
+        uint128 transferredAmount = 0;
         if (AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful) {
             transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
         }
 
-        balance[token][sender] += (amount - transferredAmount);
+        uint128 refund_amount = amount - transferredAmount;
+        if (refund_amount > 0) {
+            balance[token][sender] += refund_amount;
+        }
     }
 
     function withdraw(IEvmErc20 token) external {
@@ -170,7 +172,7 @@ contract SiloToSilo is AccessControl {
         string storage tokenAccountId = registeredTokens[token].nearTokenAccountId;
         require(bytes(tokenAccountId).length > 0, "The token is not registered!");
 
-        uint256 senderBalance = balance[token][msg.sender];
+        uint128 senderBalance = balance[token][msg.sender];
         require(senderBalance > 0, "The signer token balance = 0");
 
         PromiseCreateArgs memory callWithdraw = _callWithoutTransferWNear(
@@ -208,7 +210,7 @@ contract SiloToSilo is AccessControl {
             "ERROR: The `Withdraw` XCC is fail"
         );
 
-        uint256 transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
+        uint128 transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
         balance[token][sender] -= transferredAmount;
     }
 
@@ -224,7 +226,7 @@ contract SiloToSilo is AccessControl {
         return registeredTokens[token].isStorageRegistered;
     }
 
-    function getUserBalance(IEvmErc20 token, address userAddress) public view returns (uint256) {
+    function getUserBalance(IEvmErc20 token, address userAddress) public view returns (uint128) {
         return balance[token][userAddress];
     }
 
@@ -232,11 +234,11 @@ contract SiloToSilo is AccessControl {
         return Utils.bytesToHex(abi.encodePacked(auroraAddress));
     }
 
-    function _stringToUint(bytes memory b) private pure returns (uint256) {
-        uint256 result = 0;
+    function _stringToUint(bytes memory b) private pure returns (uint128) {
+        uint128 result = 0;
 
-        for (uint256 i = 0; i < b.length; i++) {
-            uint256 v = uint256(uint8(b[i]));
+        for (uint128 i = 0; i < b.length; i++) {
+            uint128 v = uint128(uint8(b[i]));
             if (v >= ASCII_0 && v <= ASCII_9) {
                 result = result * 10 + (v - ASCII_0);
             }
