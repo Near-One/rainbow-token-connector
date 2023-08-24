@@ -1,8 +1,8 @@
 [profile.default]
 src = 'src'
 out = 'out'
-libs = ['lib', '../node_modules', '../integration-tests/aurora-contracts-sdk/aurora-solidity-sdk/lib']
-allow_paths = ['../node_modules', '../integration-tests/aurora-contracts-sdk/aurora-solidity-sdk/']
+libs = ['../node_modules', '../integration-tests/aurora-contracts-sdk/aurora-solidity-sdk/lib']
+allow_paths = []
 solc = "0.8.17"
 
 # See more config options https://github.com/foundry-rs/foundry/tree/master/config
