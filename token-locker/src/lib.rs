@@ -49,14 +49,19 @@ enum StorageKey {
     WhitelistAccounts,
 }
 
+/// Contract for Bridge Token-Locker which responsible for
+/// (1) locking tokens on NEAR side
+/// (2) unlocking tokens in case corresponding tokens were burned on Ethereum side
+/// Only way to unlock locked tokens is to mint corresponded tokens on Ethereum side and after to burn them.
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct Contract {
-    /// The account of the prover that we can use to prove.
+    /// The account of the prover that we can use
+    /// to prove the authenticity of events generated on Ethereum side.
     pub prover_account: AccountId,
     /// Ethereum address of the token factory contract, in hex.
     pub eth_factory_address: EthAddress,
-    /// Hashes of the events that were already used.
+    /// Hashes of the Ethereum `Withdraw` events that were already used for unlock tokens.
     pub used_events: UnorderedSet<Vec<u8>>,
     /// Mask determining all paused functions
     paused: Mask,
@@ -68,8 +73,16 @@ pub struct Contract {
     pub is_whitelist_mode_enabled: bool,
 }
 
+/// Interface for Bridge Token-Locker Contract
 #[ext_contract(ext_self)]
 pub trait ExtContract {
+    /// The method which called on the last step of the deposit procedure (locking tokens)
+    ///
+    /// # Arguments
+    ///
+    /// * `token` - Token NEAR address
+    /// * `amount` - Amount of tokens to transfer
+    /// * `recipient` - The Ethereum address of the tokens recipient
     #[result_serializer(borsh)]
     fn finish_deposit(
         &self,
@@ -78,6 +91,16 @@ pub trait ExtContract {
         #[serializer(borsh)] recipient: EthAddress,
     ) -> result_types::Lock;
 
+    /// The method which called on the last step of the `withdraw` procedure (unlocking tokens)
+    ///
+    /// # Arguments
+    ///
+    /// * `verification_success` - This method is called as a callback after `burn` event verification.
+    /// `verification_success` is a result of verification the proof of the Ethereum `burn` event
+    /// * `token` - Account Id of the token on NEAR
+    /// * `new_owner_id` - Account Id of the token recipient on NEAR
+    /// * `amount` - The amount of the burned tokens
+    /// * `proof` - The proof of the Ethereum `burn` event
     #[result_serializer(borsh)]
     fn finish_withdraw(
         &self,
@@ -90,6 +113,13 @@ pub trait ExtContract {
         #[serializer(borsh)] proof: Proof,
     ) -> Promise;
 
+    /// The last step of logging token metadata (the token name, symbols etc).
+    /// This logging is necessary for transferring information about token to Ethereum
+    ///
+    /// # Arguments
+    ///
+    /// * `metadata` - The information about token (name, symbols etc)
+    /// * `token_id` - NEAR account id of the token
     #[result_serializer(borsh)]
     fn finish_log_metadata(
         &self,
@@ -97,6 +127,16 @@ pub trait ExtContract {
         token_id: AccountId,
     ) -> result_types::Metadata;
 
+    /// The method which called after checking the token Storage Balance of recipient
+    /// during the `withdraw` procedure
+    ///
+    /// # Arguments
+    ///
+    /// * `storage_balance` - The result of checking token Storage Balance ot the recipient
+    /// * `proof` - The proof of the Ethereum `burn` event.
+    /// * `token` - The NEAR account id of the token
+    /// * `recipient` - The NEAR account id of the token recipient
+    /// * `amount` - The amount of burned tokens
     fn storage_balance_callback(
         &self,
         #[callback] storage_balance: Option<StorageBalance>,
@@ -107,8 +147,10 @@ pub trait ExtContract {
     );
 }
 
+/// Interface for the ERC20 Bridge Tokens
 #[ext_contract(ext_token)]
 pub trait ExtToken {
+    /// Transfer tokens to receiver NEAR account
     fn ft_transfer(
         &mut self,
         receiver_id: AccountId,
@@ -116,6 +158,7 @@ pub trait ExtToken {
         memo: Option<String>,
     ) -> PromiseOrValue<U128>;
 
+    /// Transfer tokens to receiver NEAR account with specific message
     fn ft_transfer_call(
         &mut self,
         receiver_id: AccountId,
@@ -124,16 +167,22 @@ pub trait ExtToken {
         msg: String,
     ) -> PromiseOrValue<U128>;
 
+    /// Get the information about token (name, symbols etc)
     fn ft_metadata(&self) -> FungibleTokenMetadata;
 
+    /// Get the storage balance for the specific account
     fn storage_balance_of(&mut self, account_id: Option<AccountId>) -> Option<StorageBalance>;
 }
 
 #[near_bindgen]
 impl Contract {
+    /// The Bridge Token-Locker initialization.
+    ///
+    /// # Arguments
+    ///
+    /// * `prover_account`: NEAR account of the Near Prover contract which check the correctness of the Ethereum Events;
+    /// * `factory_address`: Ethereum address of the token factory contract, in hex.
     #[init]
-    /// `prover_account`: NEAR account of the Near Prover contract;
-    /// `factory_address`: Ethereum address of the token factory contract, in hex.
     pub fn new(prover_account: AccountId, factory_address: String) -> Self {
         Self {
             prover_account,
@@ -274,8 +323,10 @@ impl Contract {
         #[serializer(borsh)] proof: Proof,
     ) -> Promise {
         assert!(verification_success, "Failed to verify the proof");
-        let required_deposit = self.record_proof(&proof);
 
+        // The deposit required to cover the cost
+        // of additional storage of used proof
+        let required_deposit = self.record_proof(&proof);
         assert!(env::attached_deposit() >= required_deposit);
 
         let Recipient { target, message } = parse_recipient(new_owner_id);
@@ -300,7 +351,7 @@ impl Contract {
         }
     }
 
-    /// Checks whether the provided proof is already used.
+    /// Checks whether the provided proof of Ethereum `burn` event is already used for unlocking tokens
     pub fn is_used_proof(&self, #[serializer(borsh)] proof: Proof) -> bool {
         self.used_events.contains(&proof.get_key())
     }
@@ -326,6 +377,7 @@ impl Contract {
         required_deposit
     }
 
+    /// Update Ethereum Address of the Bridge Token Factory
     #[private]
     pub fn update_factory_address(&mut self, factory_address: String) {
         self.eth_factory_address = validate_eth_address(factory_address);
