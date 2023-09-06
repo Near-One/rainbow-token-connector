@@ -82,13 +82,16 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     }
 
     function storageDeposit(IEvmErc20 token, uint128 storageDepositAmount) external {
+        require(registeredTokens[token].isStorageRegistered == false, "The token's storage is already registered");
         string storage tokenAccountId = registeredTokens[token].nearTokenAccountId;
-        require(bytes(tokenAccountId).length > 0, "The token is not registered!");
+        require(bytes(tokenAccountId).length > 0, "The token is not registered");
 
         PromiseCreateArgs memory callStorageDeposit = near.call(
             tokenAccountId,
             "storage_deposit",
-            bytes(string.concat('{"account_id": "', getNearAccountId(), '", "registration_only": true }')),
+            bytes(
+                string.concat('{"account_id": "', getImplicitNearAccountIdForSelf(), '", "registration_only": true }')
+            ),
             storageDepositAmount,
             BASE_NEAR_GAS
         );
@@ -126,7 +129,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         // As a result, there is no guarantee that this method will be completed before `initTransfer()`.
         // In case of such an error, the user will be able to call the `withdraw()` method and get his tokens back.
         // We expect such an error not to happen as long as transactions are executed in one shard.
-        token.withdrawToNear(bytes(getNearAccountId()), amount);
+        token.withdrawToNear(bytes(getImplicitNearAccountIdForSelf()), amount);
 
         PromiseCreateArgs memory callFtTransfer = _callWithoutTransferWNear(
             near,
