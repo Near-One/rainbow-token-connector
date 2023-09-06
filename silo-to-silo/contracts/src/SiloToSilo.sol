@@ -35,10 +35,10 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     NEAR public near;
     string public siloAccountId;
 
-    //[auroraErc20Token] => tokenAccountIdOnNear
+    // auroraErc20Token => TokenInfo { nearTokenAccountId, isStorageRegistered }
     mapping(IEvmErc20 => TokenInfo) public registeredTokens;
 
-    //[auroraErc20Token][userAddressOnAurora] => userBalance
+    // auroraErc20Token => (userAddressOnAurora => userBalance)
     mapping(IEvmErc20 => mapping(address => uint128)) public balance;
 
     event TokenRegistered(IEvmErc20 token, string nearAccountId);
@@ -73,7 +73,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     function getNep141FromErc20Callback(IEvmErc20 token) external onlyRole(CALLBACK_ROLE) {
         require(
             AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful,
-            "ERROR: The `get_nep141_from_erc20` XCC is fail"
+            "ERROR: The `get_nep141_from_erc20()` XCC call failed"
         );
 
         string memory nearTokenAccountId = string(AuroraSdk.promiseResult(0).output);
@@ -105,7 +105,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     function storageDepositCallback(IEvmErc20 token) external onlyRole(CALLBACK_ROLE) {
         require(
             AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful,
-            "ERROR: The `storage_deposit` XCC is fail"
+            "ERROR: The `storage_deposit()` XCC call failed"
         );
         registeredTokens[token].isStorageRegistered = true;
     }
@@ -119,13 +119,13 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         require(near.wNEAR.balanceOf(address(this)) >= ONE_YOCTO, "Not enough wNEAR balance");
 
         TokenInfo storage tokenInfo = registeredTokens[token];
-        require(tokenInfo.isStorageRegistered, "The token storage is not registered!");
+        require(tokenInfo.isStorageRegistered, "The token storage is not registered");
 
         token.transferFrom(msg.sender, address(this), amount);
-        // WARNING: The `withdrawToNear` method works asynchronously.
-        // As a result, there is no guarantee that this method will be completed before `initTransfer`.
-        // In case of such an error, the user will be able to call `withdraw` method and get his/her tokens back.
-        // We expect such an error not to happen as long as transactions were executed in one shard.
+        // WARNING: The `withdrawToNear()` method works asynchronously.
+        // As a result, there is no guarantee that this method will be completed before `initTransfer()`.
+        // In case of such an error, the user will be able to call the `withdraw()` method and get his tokens back.
+        // We expect such an error not to happen as long as transactions are executed in one shard.
         token.withdrawToNear(bytes(getNearAccountId()), amount);
 
         PromiseCreateArgs memory callFtTransfer = _callWithoutTransferWNear(
@@ -173,7 +173,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         require(near.wNEAR.balanceOf(address(this)) >= ONE_YOCTO, "Not enough wNEAR balance");
 
         string storage tokenAccountId = registeredTokens[token].nearTokenAccountId;
-        require(bytes(tokenAccountId).length > 0, "The token is not registered!");
+        require(bytes(tokenAccountId).length > 0, "The token is not registered");
 
         uint128 senderBalance = balance[token][msg.sender];
         require(senderBalance > 0, "The signer token balance = 0");
@@ -210,14 +210,14 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     function withdrawCallback(address sender, IEvmErc20 token) external onlyRole(CALLBACK_ROLE) {
         require(
             AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful,
-            "ERROR: The `Withdraw` XCC is fail"
+            "ERROR: The `withdrawFromNear()` XCC call failed"
         );
 
         uint128 transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
         balance[token][sender] -= transferredAmount;
     }
 
-    function getNearAccountId() public view returns (string memory) {
+    function getImplicitNearAccountIdForSelf() public view returns (string memory) {
         return string.concat(_addressToString(address(this)), ".", siloAccountId);
     }
 
