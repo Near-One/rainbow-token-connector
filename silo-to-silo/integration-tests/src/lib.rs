@@ -24,15 +24,15 @@ mod tests {
     use std::path::Path;
     const ONE_NEAR: u128 = 1_000_000_000_000_000_000_000_000;
 
-    const ATTACHED_NEAR: u128 = 5_000_000_000_000_000_000_000_000;
-    const NEAR_DEPOSIT: u128 = 2_000_000_000_000_000_000_000_000;
+    const ATTACHED_NEAR: u128 = 5 * ONE_NEAR;
+    const NEAR_DEPOSIT: u128 = 2 * ONE_NEAR;
     // This deposit is required to subsidise the ONE_YOCTO deposit on call `ft_transfer_call`
     const ATTACHED_NEAR_TO_INIT_CONTRACT: u128 = 10 * ONE_NEAR;
 
     const TRANSFER_TOKENS_AMOUNT: u64 = 100;
     const TOKEN_SUPPLY: u64 = 1000000000;
 
-    const NEP141_STORAGE_DEPOSIT: u128 = 12_500_000_000_000_000_000_000;
+    const NEP141_STORAGE_DEPOSIT: u128 = (0.0125 * ONE_NEAR as f64) as u128;
 
     struct TestsInfrastructure {
         worker: Worker<Sandbox>,
