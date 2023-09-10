@@ -82,12 +82,12 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     }
 
     function storageDeposit(IEvmErc20 token, uint128 storageDepositAmount) external {
-        require(registeredTokens[token].isStorageRegistered == false, "The token's storage is already registered");
-        string storage tokenAccountId = registeredTokens[token].nearTokenAccountId;
-        require(bytes(tokenAccountId).length > 0, "The token is not registered");
+        TokenInfo storage token_info = registeredTokens[token];
+        require(token_info.isStorageRegistered == false, "The token's storage is already registered");
+        require(bytes(token_info.nearTokenAccountId).length > 0, "The token is not registered");
 
         PromiseCreateArgs memory callStorageDeposit = near.call(
-            tokenAccountId,
+            token_info.nearTokenAccountId,
             "storage_deposit",
             bytes(
                 string.concat('{"account_id": "', getImplicitNearAccountIdForSelf(), '", "registration_only": true }')
