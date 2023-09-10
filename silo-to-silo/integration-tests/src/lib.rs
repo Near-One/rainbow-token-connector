@@ -697,7 +697,7 @@ mod tests {
         engine: &AuroraEngine,
     ) {
         let contract_args =
-            silo_to_silo_contract.create_call_method_bytes_with_args("getNearAccountId", &[]);
+            silo_to_silo_contract.create_call_method_bytes_with_args("getImplicitNearAccountIdForSelf", &[]);
 
         let outcome = call_aurora_contract(
             silo_to_silo_contract.address,
