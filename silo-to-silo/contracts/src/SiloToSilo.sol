@@ -203,11 +203,12 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     function withdraw(IEvmErc20 token) external {
         require(near.wNEAR.balanceOf(address(this)) >= ONE_YOCTO, "Not enough wNEAR balance");
 
-        string storage tokenAccountId = registeredTokens[token].nearTokenAccountId;
+        string memory tokenAccountId = registeredTokens[token].nearTokenAccountId;
         require(bytes(tokenAccountId).length > 0, "The token is not registered");
 
         uint128 senderBalance = balance[token][msg.sender];
         require(senderBalance > 0, "The signer token balance = 0");
+        balance[token][msg.sender] -= senderBalance;
 
         PromiseCreateArgs memory callWithdraw = _callWithoutTransferWNear(
             near,
@@ -230,7 +231,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
 
         PromiseCreateArgs memory callback = near.auroraCall(
             address(this),
-            abi.encodeWithSelector(this.withdrawCallback.selector, msg.sender, token),
+            abi.encodeWithSelector(this.withdrawCallback.selector, msg.sender, token, senderBalance),
             NO_DEPOSIT,
             BASE_NEAR_GAS
         );
@@ -238,14 +239,19 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         callWithdraw.then(callback).transact();
     }
 
-    function withdrawCallback(address sender, IEvmErc20 token) external onlyRole(CALLBACK_ROLE) {
+    function withdrawCallback(address sender, IEvmErc20 token, uint128 amount) external onlyRole(CALLBACK_ROLE) {
         require(
             AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful,
             "ERROR: The `withdrawFromNear()` XCC call failed"
         );
 
         uint128 transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
-        balance[token][sender] -= transferredAmount;
+        uint128 refundAmount = amount - transferredAmount;
+
+        if (refundAmount > 0) {
+            balance[token][sender] += refundAmount;
+        }
+
         emit Withdraw(token, sender, transferredAmount);
     }
 
