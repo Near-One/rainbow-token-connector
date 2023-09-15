@@ -42,6 +42,15 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     mapping(IEvmErc20 => mapping(address => uint128)) public balance;
 
     event TokenRegistered(IEvmErc20 token, string nearAccountId);
+    event TokenStorageRegistered(IEvmErc20 token, string nearAccountId);
+    event Withdraw(IEvmErc20 token, address recipient, uint128 transferedAmount);
+    event FtTransferCall(
+        IEvmErc20 indexed token,
+        string indexed receiverId,
+        uint128 amount,
+        uint128 transferedAmount,
+        string message
+    );
 
     function initialize(address wnearAddress, string memory _siloAccountId) external initializer {
         near = AuroraSdk.initNear(IERC20_NEAR(wnearAddress));
@@ -52,6 +61,8 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     }
 
     function registerToken(IEvmErc20 token) external {
+        require(bytes(registeredTokens[token].nearTokenAccountId).length == 0, "The token is already registered");
+
         PromiseCreateArgs memory callGetNep141FromErc20 = near.call(
             siloAccountId,
             "get_nep141_from_erc20",
@@ -77,12 +88,12 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         );
 
         string memory nearTokenAccountId = string(AuroraSdk.promiseResult(0).output);
-        registeredTokens[token] = TokenInfo(nearTokenAccountId, false);
+        registeredTokens[token].nearTokenAccountId = nearTokenAccountId;
         emit TokenRegistered(token, nearTokenAccountId);
     }
 
     function storageDeposit(IEvmErc20 token, uint128 storageDepositAmount) external {
-        TokenInfo storage tokenInfo = registeredTokens[token];
+        TokenInfo memory tokenInfo = registeredTokens[token];
         require(tokenInfo.isStorageRegistered == false, "The token's storage is already registered");
         require(bytes(tokenInfo.nearTokenAccountId).length > 0, "The token is not registered");
 
@@ -110,7 +121,9 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
             AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful,
             "ERROR: The `storage_deposit()` XCC call failed"
         );
-        registeredTokens[token].isStorageRegistered = true;
+        TokenInfo storage tokenInfo = registeredTokens[token];
+        tokenInfo.isStorageRegistered = true;
+        emit TokenStorageRegistered(token, tokenInfo.nearTokenAccountId);
     }
 
     function ftTransferCallToNear(
@@ -152,7 +165,14 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
 
         PromiseCreateArgs memory callback = near.auroraCall(
             address(this),
-            abi.encodeWithSelector(this.ftTransferCallCallback.selector, msg.sender, token, amount),
+            abi.encodeWithSelector(
+                this.ftTransferCallCallback.selector,
+                msg.sender,
+                token,
+                amount,
+                receiverId,
+                message
+            ),
             NO_DEPOSIT,
             BASE_NEAR_GAS
         );
@@ -160,7 +180,13 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         callFtTransfer.then(callback).transact();
     }
 
-    function ftTransferCallCallback(address sender, IEvmErc20 token, uint128 amount) external onlyRole(CALLBACK_ROLE) {
+    function ftTransferCallCallback(
+        address sender,
+        IEvmErc20 token,
+        uint128 amount,
+        string calldata receiverId,
+        string calldata message
+    ) external onlyRole(CALLBACK_ROLE) {
         uint128 transferredAmount = 0;
         if (AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful) {
             transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
@@ -170,6 +196,8 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         if (refund_amount > 0) {
             balance[token][sender] += refund_amount;
         }
+
+        emit FtTransferCall(token, receiverId, amount, transferredAmount, message);
     }
 
     function withdraw(IEvmErc20 token) external {
@@ -218,6 +246,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
 
         uint128 transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
         balance[token][sender] -= transferredAmount;
+        emit Withdraw(token, sender, transferredAmount);
     }
 
     function getImplicitNearAccountIdForSelf() public view returns (string memory) {

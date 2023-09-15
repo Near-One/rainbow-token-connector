@@ -266,6 +266,8 @@ mod tests {
                         ethabi::Token::Address(self.user_address.raw()),
                         ethabi::Token::Address(self.engine_mock_token.address.raw()),
                         ethabi::Token::Uint(U256::from(TRANSFER_TOKENS_AMOUNT)),
+                        ethabi::Token::String("receiverId".into()),
+                        ethabi::Token::String("message".into())
                     ],
                 );
 
