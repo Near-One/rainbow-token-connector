@@ -133,16 +133,24 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         string calldata message
     ) external {
         require(near.wNEAR.balanceOf(address(this)) >= ONE_YOCTO, "Not enough wNEAR balance");
-
         TokenInfo memory tokenInfo = registeredTokens[token];
         require(tokenInfo.isStorageRegistered, "The token storage is not registered");
 
         token.transferFrom(msg.sender, address(this), amount);
         token.withdrawToNear(bytes(getImplicitNearAccountIdForSelf()), amount);
+        _ftTransferCallToNear(token, tokenInfo.nearTokenAccountId, amount, receiverId, message);
+    }
 
+    function _ftTransferCallToNear(
+        IEvmErc20 token,
+        string memory nearTokenAccountId,
+        uint128 amount,
+        string memory receiverId,
+        string memory message
+    ) private {
         PromiseCreateArgs memory callFtTransfer = _callWithoutTransferWNear(
             near,
-            tokenInfo.nearTokenAccountId,
+            nearTokenAccountId,
             "ft_transfer_call",
             bytes(
                 string.concat(
@@ -196,57 +204,24 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         emit FtTransferCall(token, receiverId, amount, transferredAmount, message);
     }
 
-    function withdraw(IEvmErc20 token) external {
-        require(near.wNEAR.balanceOf(address(this)) >= ONE_YOCTO, "Not enough wNEAR balance");
-
-        string memory tokenAccountId = registeredTokens[token].nearTokenAccountId;
-        require(bytes(tokenAccountId).length > 0, "The token is not registered");
-
-        uint128 senderBalance = balance[token][msg.sender];
-        require(senderBalance > 0, "The signer token balance = 0");
-        balance[token][msg.sender] -= senderBalance;
-
-        PromiseCreateArgs memory callWithdraw = _callWithoutTransferWNear(
-            near,
-            tokenAccountId,
-            "ft_transfer_call",
-            bytes(
-                string.concat(
-                    '{"receiver_id": "',
-                    siloAccountId,
-                    '", "amount": "',
-                    Strings.toString(senderBalance),
-                    '", "msg": "',
-                    _addressToString(msg.sender),
-                    '"}'
-                )
-            ),
-            ONE_YOCTO,
-            WITHDRAW_NEAR_GAS
-        );
-
-        PromiseCreateArgs memory callback = near.auroraCall(
-            address(this),
-            abi.encodeWithSelector(this.withdrawCallback.selector, msg.sender, token, senderBalance),
-            NO_DEPOSIT,
-            BASE_NEAR_GAS
-        );
-
-        callWithdraw.then(callback).transact();
+    function withdrawTo(IEvmErc20 token, string calldata receiverId, string calldata message) external {
+        _withdraw(token, receiverId, message);
     }
 
-    function withdrawCallback(address sender, IEvmErc20 token, uint128 amount) external onlyRole(CALLBACK_ROLE) {
-        uint128 transferredAmount = 0;
-        if (AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful) {
-            transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
-        }
+    function withdraw(IEvmErc20 token) external {
+        _withdraw(token, siloAccountId, _addressToString(msg.sender));
+    }
 
-        uint128 refundAmount = amount - transferredAmount;
-        if (refundAmount > 0) {
-            balance[token][sender] += refundAmount;
-        }
+    function _withdraw(IEvmErc20 token, string memory receiverId, string memory message) private {
+        require(near.wNEAR.balanceOf(address(this)) >= ONE_YOCTO, "Not enough wNEAR balance");
+        TokenInfo memory tokenInfo = registeredTokens[token];
+        require(tokenInfo.isStorageRegistered, "The token storage is not registered");
 
-        emit Withdraw(token, sender, transferredAmount);
+        uint128 senderBalance = balance[token][msg.sender];
+        require(senderBalance > 0, "The signer balance = 0");
+        balance[token][msg.sender] -= senderBalance;
+
+        _ftTransferCallToNear(token, tokenInfo.nearTokenAccountId, senderBalance, receiverId, message);
     }
 
     function getImplicitNearAccountIdForSelf() public view returns (string memory) {
