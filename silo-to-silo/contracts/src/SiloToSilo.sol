@@ -36,6 +36,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
 
     NEAR public near;
     string public siloAccountId;
+    uint256 public ftTransferCallCounter;
 
     // auroraErc20Token => TokenInfo { nearTokenAccountId, isStorageRegistered }
     mapping(IEvmErc20 => TokenInfo) public registeredTokens;
@@ -46,7 +47,15 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     event TokenRegistered(IEvmErc20 token, string nearAccountId);
     event TokenStorageRegistered(IEvmErc20 token, string nearAccountId);
     event Withdraw(IEvmErc20 token, address recipient, uint128 transferedAmount);
+    event InitFtTransferCall(
+        uint256 indexed nonce,
+        IEvmErc20 indexed token,
+        string indexed receiverId,
+        uint128 amount,
+        string message
+    );
     event FtTransferCall(
+        uint256 indexed nonce,
         IEvmErc20 indexed token,
         string indexed receiverId,
         uint128 amount,
@@ -152,6 +161,9 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         string memory receiverId,
         string memory message
     ) private {
+        ftTransferCallCounter += 1;
+        emit InitFtTransferCall(ftTransferCallCounter, token, receiverId, amount, message);
+
         PromiseCreateArgs memory callFtTransfer = _callWithoutTransferWNear(
             near,
             nearTokenAccountId,
@@ -175,6 +187,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
             address(this),
             abi.encodeWithSelector(
                 this.ftTransferCallCallback.selector,
+                ftTransferCallCounter,
                 msg.sender,
                 token,
                 amount,
@@ -189,6 +202,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     }
 
     function ftTransferCallCallback(
+        uint256 nonce,
         address sender,
         IEvmErc20 token,
         uint128 amount,
@@ -205,7 +219,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
             balance[token][sender] += refundAmount;
         }
 
-        emit FtTransferCall(token, receiverId, amount, transferredAmount, message);
+        emit FtTransferCall(nonce, token, receiverId, amount, transferredAmount, message);
     }
 
     function withdrawTo(IEvmErc20 token, string calldata receiverId, string calldata message) external whenNotPaused {
