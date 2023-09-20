@@ -23,6 +23,8 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     using AuroraSdk for PromiseWithCallback;
 
     bytes32 public constant CALLBACK_ROLE = keccak256("CALLBACK_ROLE");
+    bytes32 public constant PAUSE_ADMIN_ROLE = keccak256("PAUSE_ADMIN_ROLE");
+    bytes32 public constant UNPAUSE_ADMIN_ROLE = keccak256("UNPAUSE_ADMIN_ROLE");
 
     uint64 constant BASE_NEAR_GAS = 10_000_000_000_000;
     uint64 constant WITHDRAW_NEAR_GAS = 50_000_000_000_000;
@@ -58,9 +60,11 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
 
         _grantRole(CALLBACK_ROLE, AuroraSdk.nearRepresentitiveImplicitAddress(address(this)));
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
+        _grantRole(PAUSE_ADMIN_ROLE, msg.sender);
+        _grantRole(UNPAUSE_ADMIN_ROLE, msg.sender);
     }
 
-    function registerToken(IEvmErc20 token) external {
+    function registerToken(IEvmErc20 token) external whenNotPaused {
         require(bytes(registeredTokens[token].nearTokenAccountId).length == 0, "The token is already registered");
 
         PromiseCreateArgs memory callGetNep141FromErc20 = near.call(
@@ -92,7 +96,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         emit TokenRegistered(token, nearTokenAccountId);
     }
 
-    function storageDeposit(IEvmErc20 token, uint128 storageDepositAmount) external {
+    function storageDeposit(IEvmErc20 token, uint128 storageDepositAmount) external whenNotPaused {
         TokenInfo memory tokenInfo = registeredTokens[token];
         require(tokenInfo.isStorageRegistered == false, "The token's storage is already registered");
         require(bytes(tokenInfo.nearTokenAccountId).length > 0, "The token is not registered");
@@ -131,7 +135,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         uint128 amount,
         string calldata receiverId,
         string calldata message
-    ) external {
+    ) external whenNotPaused {
         require(near.wNEAR.balanceOf(address(this)) >= ONE_YOCTO, "Not enough wNEAR balance");
         TokenInfo memory tokenInfo = registeredTokens[token];
         require(tokenInfo.isStorageRegistered, "The token storage is not registered");
@@ -204,11 +208,11 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         emit FtTransferCall(token, receiverId, amount, transferredAmount, message);
     }
 
-    function withdrawTo(IEvmErc20 token, string calldata receiverId, string calldata message) external {
+    function withdrawTo(IEvmErc20 token, string calldata receiverId, string calldata message) external whenNotPaused {
         _withdraw(token, receiverId, message);
     }
 
-    function withdraw(IEvmErc20 token) external {
+    function withdraw(IEvmErc20 token) external whenNotPaused {
         _withdraw(token, siloAccountId, _addressToString(msg.sender));
     }
 
@@ -238,6 +242,14 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
 
     function getUserBalance(IEvmErc20 token, address userAddress) public view returns (uint128) {
         return balance[token][userAddress];
+    }
+
+    function pause() external onlyRole(PAUSE_ADMIN_ROLE) {
+        _pause();
+    }
+
+    function unpause() external onlyRole(UNPAUSE_ADMIN_ROLE) {
+        _unpause();
     }
 
     function _addressToString(address auroraAddress) private pure returns (string memory) {
