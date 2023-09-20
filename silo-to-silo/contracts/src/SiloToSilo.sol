@@ -135,7 +135,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         require(near.wNEAR.balanceOf(address(this)) >= ONE_YOCTO, "Not enough wNEAR balance");
 
         TokenInfo storage tokenInfo = registeredTokens[token];
-        require(tokenInfo.isStorageRegistered, "The token storage is not registered");
+        // require(tokenInfo.isStorageRegistered, "The token storage is not registered");
 
         token.transferFrom(msg.sender, address(this), amount);
         // WARNING: The `withdrawToNear()` method works asynchronously.
@@ -174,7 +174,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
                 message
             ),
             NO_DEPOSIT,
-            BASE_NEAR_GAS
+            BASE_NEAR_GAS * 2 + WITHDRAW_NEAR_GAS
         );
 
         callFtTransfer.then(callback).transact();
@@ -193,14 +193,14 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         }
 
         uint128 refund_amount = amount - transferredAmount;
-        if (refund_amount > 0) {
-            balance[token][sender] += refund_amount;
-        }
-
         emit FtTransferCall(token, receiverId, amount, transferredAmount, message);
+
+        if (refund_amount > 0) {
+            _withdrawFromImplicitNearAccount(token, registeredTokens[token].nearTokenAccountId, sender, refund_amount);
+        }
     }
 
-    function withdraw(IEvmErc20 token) external {
+    function withdraw(IEvmErc20 token) public {
         require(near.wNEAR.balanceOf(address(this)) >= ONE_YOCTO, "Not enough wNEAR balance");
 
         string memory tokenAccountId = registeredTokens[token].nearTokenAccountId;
@@ -210,6 +210,15 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         require(senderBalance > 0, "The signer token balance = 0");
         balance[token][msg.sender] -= senderBalance;
 
+        _withdrawFromImplicitNearAccount(token, tokenAccountId, msg.sender, senderBalance);
+    }
+
+    function _withdrawFromImplicitNearAccount(
+        IEvmErc20 token,
+        string memory tokenAccountId,
+        address recipient,
+        uint128 amount
+    ) private {
         PromiseCreateArgs memory callWithdraw = _callWithoutTransferWNear(
             near,
             tokenAccountId,
@@ -219,9 +228,9 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
                     '{"receiver_id": "',
                     siloAccountId,
                     '", "amount": "',
-                    Strings.toString(senderBalance),
+                    Strings.toString(amount),
                     '", "msg": "',
-                    _addressToString(msg.sender),
+                    _addressToString(recipient),
                     '"}'
                 )
             ),
@@ -231,7 +240,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
 
         PromiseCreateArgs memory callback = near.auroraCall(
             address(this),
-            abi.encodeWithSelector(this.withdrawCallback.selector, msg.sender, token, senderBalance),
+            abi.encodeWithSelector(this.withdrawCallback.selector, recipient, token, amount),
             NO_DEPOSIT,
             BASE_NEAR_GAS
         );
