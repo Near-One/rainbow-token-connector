@@ -138,10 +138,6 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         require(tokenInfo.isStorageRegistered, "The token storage is not registered");
 
         token.transferFrom(msg.sender, address(this), amount);
-        // WARNING: The `withdrawToNear()` method works asynchronously.
-        // As a result, there is no guarantee that this method will be completed before `initTransfer()`.
-        // In case of such an error, the user will be able to call the `withdraw()` method and get his tokens back.
-        // We expect such an error not to happen as long as transactions are executed in one shard.
         token.withdrawToNear(bytes(getImplicitNearAccountIdForSelf()), amount);
 
         PromiseCreateArgs memory callFtTransfer = _callWithoutTransferWNear(
