@@ -134,7 +134,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     ) external {
         require(near.wNEAR.balanceOf(address(this)) >= ONE_YOCTO, "Not enough wNEAR balance");
 
-        TokenInfo storage tokenInfo = registeredTokens[token];
+        TokenInfo memory tokenInfo = registeredTokens[token];
         require(tokenInfo.isStorageRegistered, "The token storage is not registered");
 
         token.transferFrom(msg.sender, address(this), amount);
@@ -192,9 +192,9 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
             transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
         }
 
-        uint128 refund_amount = amount - transferredAmount;
-        if (refund_amount > 0) {
-            balance[token][sender] += refund_amount;
+        uint128 refundAmount = amount - transferredAmount;
+        if (refundAmount > 0) {
+            balance[token][sender] += refundAmount;
         }
 
         emit FtTransferCall(token, receiverId, amount, transferredAmount, message);
@@ -240,14 +240,12 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     }
 
     function withdrawCallback(address sender, IEvmErc20 token, uint128 amount) external onlyRole(CALLBACK_ROLE) {
-        require(
-            AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful,
-            "ERROR: The `withdrawFromNear()` XCC call failed"
-        );
+        uint128 transferredAmount = 0;
+        if (AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful) {
+            transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
+        }
 
-        uint128 transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
         uint128 refundAmount = amount - transferredAmount;
-
         if (refundAmount > 0) {
             balance[token][sender] += refundAmount;
         }
