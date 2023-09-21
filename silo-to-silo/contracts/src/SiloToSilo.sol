@@ -25,8 +25,8 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     bytes32 public constant CALLBACK_ROLE = keccak256("CALLBACK_ROLE");
 
     uint64 constant BASE_NEAR_GAS = 10_000_000_000_000;
-    uint64 constant WITHDRAW_NEAR_GAS = 50_000_000_000_000;
-    uint64 constant FT_TRANSFER_CALL_NEAR_GAS = 150_000_000_000_000;
+    uint64 constant WITHDRAW_NEAR_GAS = 31_000_000_000_000;
+    uint64 constant FT_TRANSFER_CALL_NEAR_GAS = 31_000_000_000_000;
     uint128 constant ASCII_0 = 48;
     uint128 constant ASCII_9 = 57;
     uint128 constant ONE_YOCTO = 1;
@@ -174,7 +174,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
                 message
             ),
             NO_DEPOSIT,
-            BASE_NEAR_GAS * 2 + WITHDRAW_NEAR_GAS
+            300_000_000_000_000 - FT_TRANSFER_CALL_NEAR_GAS - 130_000_000_000_000
         );
 
         callFtTransfer.then(callback).transact();
@@ -238,14 +238,14 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
             WITHDRAW_NEAR_GAS
         );
 
-        PromiseCreateArgs memory callback = near.auroraCall(
+        /*PromiseCreateArgs memory callback = near.auroraCall(
             address(this),
             abi.encodeWithSelector(this.withdrawCallback.selector, recipient, token, amount),
             NO_DEPOSIT,
-            BASE_NEAR_GAS
-        );
+            WITHDRAW_CALLBACK_NEAR_GAS
+        );*/
 
-        callWithdraw.then(callback).transact();
+        callWithdraw/*.then(callback)*/.transact();
     }
 
     function withdrawCallback(address sender, IEvmErc20 token, uint128 amount) external onlyRole(CALLBACK_ROLE) {

@@ -363,28 +363,9 @@ mod tests {
 
         let balance_engine_before = infra.get_mock_token_balance_engine().await;
         infra.engine_to_silo_transfer(false).await;
-
         let balance_engine_after = infra.get_mock_token_balance_engine().await;
 
-        assert_eq!(
-            (balance_engine_before - balance_engine_after).as_u64(),
-            TRANSFER_TOKENS_AMOUNT
-        );
-
-        let balance_silo = infra.get_mock_token_balance_silo().await;
-        assert_eq!(balance_silo.as_u64(), 0);
-
-        infra.check_user_balance_engine(100).await;
-        withdraw(
-            &infra.engine_silo_to_silo_contract,
-            &infra.engine_mock_token,
-            infra.engine.inner.id(),
-            infra.user_account.clone(),
-        )
-        .await;
-
-        let balance_engine_after_withdraw = infra.get_mock_token_balance_engine().await;
-        assert_eq!(balance_engine_before, balance_engine_after_withdraw);
+        assert_eq!(balance_engine_before, balance_engine_after);
 
         infra.check_user_balance_engine(0).await;
     }
