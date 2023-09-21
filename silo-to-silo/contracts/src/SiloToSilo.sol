@@ -297,7 +297,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         uint128 nearBalance,
         uint64 nearGas
     ) private view returns (PromiseCreateArgs memory) {
-        require(_near.initialized, "Near isn't initialized");
+        require(_near.initialized, "Near is not initialized");
         return PromiseCreateArgs(targetAccountId, method, args, nearBalance, nearGas);
     }
 
