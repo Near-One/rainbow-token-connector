@@ -44,8 +44,12 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     // auroraErc20Token => (userAddressOnAurora => userBalance)
     mapping(IEvmErc20 => mapping(address => uint128)) public balance;
 
+    // auroraErc20Token => (nearAccountId => isStorageRegistered)
+    mapping(IEvmErc20 => mapping(string => bool)) public registeredRecipients;
+
     event TokenRegistered(IEvmErc20 token, string nearAccountId);
     event TokenStorageRegistered(IEvmErc20 token, string nearAccountId);
+    event RecipientStorageRegistered(IEvmErc20 token, string recipientId);
     event Withdraw(IEvmErc20 token, address recipient, uint128 transferedAmount);
     event InitFtTransferCall(
         uint256 indexed nonce,
@@ -106,37 +110,63 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     }
 
     function storageDeposit(IEvmErc20 token, uint128 storageDepositAmount) external whenNotPaused {
-        TokenInfo memory tokenInfo = registeredTokens[token];
-        require(tokenInfo.isStorageRegistered == false, "The storage is already registered");
-        require(bytes(tokenInfo.nearTokenAccountId).length > 0, "The token is not registered");
+        require(registeredTokens[token].isStorageRegistered == false, "The storage is already registered");
+        _storageDeposit(token, storageDepositAmount, getImplicitNearAccountIdForSelf(), false);
+    }
+
+    function recipientStorageDeposit(
+        IEvmErc20 token,
+        uint128 storageDepositAmount,
+        string memory recipientId
+    ) external whenNotPaused {
+        require(registeredRecipients[token][recipientId] == false, "The storage is already registered");
+        _storageDeposit(token, storageDepositAmount, recipientId, true);
+    }
+
+    function _storageDeposit(
+        IEvmErc20 token,
+        uint128 storageDepositAmount,
+        string memory recipientId,
+        bool isRecipientStorageDeposit
+    ) private {
+        string memory nearTokenAccountId = registeredTokens[token].nearTokenAccountId;
+        require(bytes(nearTokenAccountId).length > 0, "The token is not registered");
 
         PromiseCreateArgs memory callStorageDeposit = near.call(
-            tokenInfo.nearTokenAccountId,
+            nearTokenAccountId,
             "storage_deposit",
-            bytes(
-                string.concat('{"account_id": "', getImplicitNearAccountIdForSelf(), '", "registration_only": true }')
-            ),
+            bytes(string.concat('{"account_id": "', recipientId, '", "registration_only": true }')),
             storageDepositAmount,
             BASE_NEAR_GAS
         );
 
         PromiseCreateArgs memory callback = near.auroraCall(
             address(this),
-            abi.encodeWithSelector(this.storageDepositCallback.selector, token),
+            abi.encodeWithSelector(this.storageDepositCallback.selector, token, recipientId, isRecipientStorageDeposit),
             NO_DEPOSIT,
             BASE_NEAR_GAS
         );
         callStorageDeposit.then(callback).transact();
     }
 
-    function storageDepositCallback(IEvmErc20 token) external onlyRole(CALLBACK_ROLE) {
+    function storageDepositCallback(
+        IEvmErc20 token,
+        string memory recipientId,
+        bool isRecipientStorageDeposit
+    ) external onlyRole(CALLBACK_ROLE) {
         require(
             AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful,
             "ERROR: The `storage_deposit()` XCC call failed"
         );
-        TokenInfo storage tokenInfo = registeredTokens[token];
-        tokenInfo.isStorageRegistered = true;
-        emit TokenStorageRegistered(token, tokenInfo.nearTokenAccountId);
+
+        if (isRecipientStorageDeposit) {
+            registeredRecipients[token][recipientId] = true;
+            emit RecipientStorageRegistered(token, recipientId);
+        } else {
+            TokenInfo storage tokenInfo = registeredTokens[token];
+            tokenInfo.isStorageRegistered = true;
+            emit TokenStorageRegistered(token, tokenInfo.nearTokenAccountId);
+        }
     }
 
     function ftTransferCallToNear(
@@ -144,7 +174,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         uint128 amount,
         string calldata receiverId,
         string calldata message
-    ) external whenNotPaused {
+    ) public whenNotPaused {
         require(near.wNEAR.balanceOf(address(this)) >= ONE_YOCTO, "Not enough wNEAR balance");
         TokenInfo memory tokenInfo = registeredTokens[token];
         require(tokenInfo.isStorageRegistered, "The token storage is not registered");
@@ -152,6 +182,16 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         token.transferFrom(msg.sender, address(this), amount);
         token.withdrawToNear(bytes(getImplicitNearAccountIdForSelf()), amount);
         _ftTransferCallToNear(token, tokenInfo.nearTokenAccountId, amount, receiverId, message);
+    }
+
+    function safeFtTransferCallToNear(
+        IEvmErc20 token,
+        uint128 amount,
+        string calldata receiverId,
+        string calldata message
+    ) external whenNotPaused {
+        require(registeredRecipients[token][receiverId], "The storage is not registered for the recipient");
+        ftTransferCallToNear(token, amount, receiverId, message);
     }
 
     function _ftTransferCallToNear(
