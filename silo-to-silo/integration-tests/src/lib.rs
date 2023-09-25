@@ -258,11 +258,13 @@ mod tests {
         }
 
         pub async fn call_ft_transfer_call_callback_engine(&self, user_account: Account) {
+            let nonce = 0;
             let contract_args = self
                 .engine_silo_to_silo_contract
                 .create_call_method_bytes_with_args(
                     "ftTransferCallCallback",
                     &[
+                        ethabi::Token::Uint(U256::from(nonce)),
                         ethabi::Token::Address(self.user_address.raw()),
                         ethabi::Token::Address(self.engine_mock_token.address.raw()),
                         ethabi::Token::Uint(U256::from(TRANSFER_TOKENS_AMOUNT)),
