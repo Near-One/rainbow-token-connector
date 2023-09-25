@@ -51,15 +51,10 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     event TokenStorageRegistered(IEvmErc20 token, string nearAccountId);
     event RecipientStorageRegistered(IEvmErc20 token, string recipientId);
     event Withdraw(IEvmErc20 token, address recipient, uint128 transferedAmount);
-    event InitFtTransferCall(
-        uint256 indexed nonce,
-        IEvmErc20 indexed token,
-        string indexed receiverId,
-        uint128 amount,
-        string message
-    );
+    event InitFtTransferCall(uint256 nonce, address indexed sender, IEvmErc20 indexed token, string indexed receiverId);
     event FtTransferCall(
-        uint256 indexed nonce,
+        uint256 nonce,
+        address indexed sender,
         IEvmErc20 indexed token,
         string indexed receiverId,
         uint128 amount,
@@ -202,7 +197,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         string memory message
     ) private {
         ftTransferCallCounter += 1;
-        emit InitFtTransferCall(ftTransferCallCounter, token, receiverId, amount, message);
+        emit InitFtTransferCall(ftTransferCallCounter, msg.sender, token, receiverId);
 
         PromiseCreateArgs memory callFtTransfer = _callWithoutTransferWNear(
             near,
@@ -259,7 +254,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
             balance[token][sender] += refundAmount;
         }
 
-        emit FtTransferCall(nonce, token, receiverId, amount, transferredAmount, message);
+        emit FtTransferCall(nonce, sender, token, receiverId, amount, transferredAmount, message);
     }
 
     function withdrawTo(IEvmErc20 token, string calldata receiverId, string calldata message) external whenNotPaused {
