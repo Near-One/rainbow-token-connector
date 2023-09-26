@@ -289,6 +289,10 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         return registeredTokens[token].isStorageRegistered;
     }
 
+    function isRecipientStorageRegistered(IEvmErc20 token, string calldata recipient) public view returns (bool) {
+        return registeredRecipients[token][recipient];
+    }
+
     function getUserBalance(IEvmErc20 token, address userAddress) public view returns (uint128) {
         return balance[token][userAddress];
     }
