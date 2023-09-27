@@ -3136,7 +3136,6 @@ name = "silo-to-silo-integration-tests"
 version = "0.1.0"
 dependencies = [
  "aurora-sdk-integration-tests",
- "hex 0.4.3",
  "serde",
  "serde_json",
 ]
