@@ -68,9 +68,14 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         string message
     );
 
-    function initialize(address wnearAddress, string memory _siloAccountId) external initializer {
+    function initialize(
+        address wnearAddress,
+        string memory _siloAccountId,
+        string memory _nativeTokenAccountId
+    ) external initializer {
         near = AuroraSdk.initNear(IERC20_NEAR(wnearAddress));
         siloAccountId = _siloAccountId;
+        registeredTokens[IEvmErc20(address(0))].nearTokenAccountId = _nativeTokenAccountId;
 
         _grantRole(CALLBACK_ROLE, AuroraSdk.nearRepresentitiveImplicitAddress(address(this)));
         _grantRole(DEFAULT_ADMIN_ROLE, msg.sender);
@@ -175,13 +180,19 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         uint128 amount,
         string calldata receiverId,
         string calldata message
-    ) public whenNotPaused {
+    ) public payable whenNotPaused {
         require(near.wNEAR.balanceOf(address(this)) >= ONE_YOCTO, "Not enough wNEAR balance");
         TokenInfo memory tokenInfo = registeredTokens[token];
         require(tokenInfo.isStorageRegistered, "The token storage is not registered");
 
-        token.transferFrom(msg.sender, address(this), amount);
-        token.withdrawToNear(bytes(getImplicitNearAccountIdForSelf()), amount);
+        if (address(token) == address(0)) {
+            require(msg.value == amount, "Incorrect attached value");
+            _withdrawNativeTokenToNear(bytes(getImplicitNearAccountIdForSelf()), msg.value);
+        } else {
+            token.transferFrom(msg.sender, address(this), amount);
+            token.withdrawToNear(bytes(getImplicitNearAccountIdForSelf()), amount);
+        }
+
         _ftTransferCallToNear(token, tokenInfo.nearTokenAccountId, amount, receiverId, message);
     }
 
@@ -190,7 +201,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         uint128 amount,
         string calldata receiverId,
         string calldata message
-    ) external whenNotPaused {
+    ) external payable whenNotPaused {
         require(registeredRecipients[token][receiverId], "The storage is not registered for the recipient");
         ftTransferCallToNear(token, amount, receiverId, message);
     }
@@ -268,7 +279,15 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     }
 
     function withdraw(IEvmErc20 token) external whenNotPaused {
-        _withdraw(token, siloAccountId, _addressToString(msg.sender));
+        string memory messageStr = _addressToString(msg.sender);
+        if (address(token) == address(0)) {
+            messageStr = string.concat(
+                "fake.near:0000000000000000000000000000000000000000000000000000000000000000",
+                messageStr
+            );
+        }
+
+        _withdraw(token, siloAccountId, messageStr);
     }
 
     function _withdraw(IEvmErc20 token, string memory receiverId, string memory message) private {
@@ -326,6 +345,22 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         }
 
         return result;
+    }
+
+    function _withdrawNativeTokenToNear(bytes memory recipient, uint256 amount) private {
+        bytes memory input = abi.encodePacked("\x00", recipient);
+        uint input_size = 1 + recipient.length;
+        assembly {
+            let res := call(
+                gas(),
+                0xe9217bc70b7ed1f598ddd3199e80b093fa71124f,
+                amount,
+                add(input, 32),
+                input_size,
+                0,
+                32
+            )
+        }
     }
 
     /// Creates a base promise. This is not immediately scheduled for execution
