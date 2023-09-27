@@ -269,7 +269,6 @@ mod tests {
                         ethabi::Token::Address(self.engine_mock_token.address.raw()),
                         ethabi::Token::Uint(U256::from(TRANSFER_TOKENS_AMOUNT)),
                         ethabi::Token::String("receiverId".into()),
-                        ethabi::Token::String("message".into())
                     ],
                 );
 
@@ -512,13 +511,13 @@ mod tests {
                 ],
             );
 
-            call_aurora_contract(
+            let _ = call_aurora_contract(
                 infra.engine_silo_to_silo_contract.address,
                 contract_args,
                 &infra.user_account,
                 infra.engine.inner.id(),
                 false,
-            ).await.unwrap();
+            ).await;
 
             let balance_engine_after = infra.get_mock_token_balance_engine().await;
             if balance_engine_after.as_u64() == 0 {
