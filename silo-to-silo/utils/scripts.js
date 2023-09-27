@@ -5,6 +5,7 @@ async function deploy({
   signer,
   wNearAddress,
   siloAccountId,
+  nativeTokenAccountId,
   auroraSdkAddress,
   auroraUtilsAddress,
 }) {
@@ -25,7 +26,7 @@ async function deploy({
 
   let proxy = await upgrades.deployProxy(
     SiloToSiloContract,
-    [wNearAddress, siloAccountId],
+    [wNearAddress, siloAccountId, nativeTokenAccountId],
     {
       initializer: "initialize",
       unsafeAllowLinkedLibraries: true,

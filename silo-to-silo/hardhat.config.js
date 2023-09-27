@@ -16,6 +16,7 @@ task("deploy", "Deploy silo to silo proxy contract")
       signer,
       wNearAddress: config.wNearAddress,
       siloAccountId: config.siloAccountId,
+      nativeTokenAccountId: config.siloAccountId,
       auroraSdkAddress: config.auroraSdkAddress,
       auroraUtilsAddress: config.auroraUtilsAddress,
     });
