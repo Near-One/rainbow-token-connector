@@ -51,12 +51,12 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     event TokenStorageRegistered(IEvmErc20 token, string nearAccountId);
     event RecipientStorageRegistered(IEvmErc20 token, string recipientId);
     event Withdraw(IEvmErc20 token, address recipient, uint128 transferedAmount);
-    event InitFtTransferCall(uint256 nonce, address indexed sender, IEvmErc20 indexed token, string indexed receiverId);
+    event InitFtTransferCall(uint256 indexed nonce, address indexed sender, IEvmErc20 indexed token, string receiverId);
     event FtTransferCall(
-        uint256 nonce,
+        uint256 indexed nonce,
         address indexed sender,
         IEvmErc20 indexed token,
-        string indexed receiverId,
+        string receiverId,
         uint128 amount,
         uint128 transferedAmount,
         string message
