@@ -245,7 +245,7 @@ mod tests {
             .await;
         }
 
-        pub async fn check_user_balance_engine(&self, expected_value: u8) {
+        pub async fn check_user_balance_engine(&self, expected_value: u64) {
             check_get_user_balance(
                 &self.engine_silo_to_silo_contract,
                 &self.user_account,
@@ -450,7 +450,7 @@ mod tests {
         infra.approve_spend_wnear_engine(None).await;
 
         let implicit_account = infra.engine_silo_to_silo_contract.address.encode() + "." + infra.engine.inner.id();
-        
+
         storage_deposit(&infra.mock_token, infra.engine.inner.id(), None).await;
         storage_deposit(&infra.mock_token, infra.silo.inner.id(), None).await;
         storage_deposit(&infra.mock_token, &implicit_account, None).await;
@@ -471,6 +471,70 @@ mod tests {
 
         let balance_silo = infra.get_mock_token_balance_silo().await;
         assert_eq!(balance_silo.as_u64(), TRANSFER_TOKENS_AMOUNT);
+    }
+
+    #[tokio::test]
+    async fn long_msg_test() {
+        let infra = TestsInfrastructure::init(None).await;
+
+        mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
+        infra.mint_wnear_engine(None).await;
+        infra.approve_spend_wnear_engine(None).await;
+        storage_deposit(&infra.mock_token, infra.engine.inner.id(), None).await;
+        storage_deposit(&infra.mock_token, infra.silo.inner.id(), None).await;
+        infra.silo_to_silo_register_token_engine(None, true).await;
+
+        let mut msg_len = 1;
+        let mut step = 1;
+
+        for i in 0..17 {
+            let mut msg = String::with_capacity(msg_len);
+            for _ in 0..msg_len {
+                msg.push('?');
+            }
+
+            println!("{}", msg_len);
+
+            engine_mint_tokens(infra.user_address, &infra.engine_mock_token, &infra.engine).await;
+
+            let balance_engine_before = infra.get_mock_token_balance_engine().await;
+            assert_eq!(balance_engine_before.as_u64(), TRANSFER_TOKENS_AMOUNT);
+
+            infra.approve_spend_mock_tokens_engine().await;
+
+            let contract_args = infra.engine_silo_to_silo_contract.create_call_method_bytes_with_args(
+                "ftTransferCallToNear",
+                &[
+                    ethabi::Token::Address(infra.engine_mock_token.address.raw()),
+                    ethabi::Token::Uint(U256::from(TRANSFER_TOKENS_AMOUNT)),
+                    ethabi::Token::String(infra.silo.inner.id().to_string()),
+                    ethabi::Token::String(msg),
+                ],
+            );
+
+            call_aurora_contract(
+                infra.engine_silo_to_silo_contract.address,
+                contract_args,
+                &infra.user_account,
+                infra.engine.inner.id(),
+                false,
+            ).await.unwrap();
+
+            let balance_engine_after = infra.get_mock_token_balance_engine().await;
+            if balance_engine_after.as_u64() == 0 {
+                let balance_silo = infra.get_mock_token_balance_silo().await;
+                assert_eq!(balance_silo.as_u64(), 0);
+                infra.check_user_balance_engine((i + 1) * TRANSFER_TOKENS_AMOUNT).await;
+                step = step * 2;
+                msg_len += step;
+            } else {
+                assert_eq!(balance_engine_after.as_u64(), TRANSFER_TOKENS_AMOUNT);
+                let balance_silo = infra.get_mock_token_balance_silo().await;
+                assert_eq!(balance_silo.as_u64(), 0);
+                infra.check_user_balance_engine(i * TRANSFER_TOKENS_AMOUNT).await;
+                break;
+            }
+        }
     }
 
     #[ignore]
@@ -507,7 +571,7 @@ mod tests {
         assert_eq!(balance_silo.as_u64(), 0);
 
         infra
-            .check_user_balance_engine(TRANSFER_TOKENS_AMOUNT as u8)
+            .check_user_balance_engine(TRANSFER_TOKENS_AMOUNT)
             .await;
 
         storage_deposit(
@@ -758,7 +822,7 @@ mod tests {
         engine_mock_token_address: H160,
         user_address: H160,
         engine: &AuroraEngine,
-        expected_value: u8,
+        expected_value: u64,
     ) {
         let contract_args = silo_to_silo_contract.create_call_method_bytes_with_args(
             "getUserBalance",
@@ -778,7 +842,9 @@ mod tests {
 
         let result = outcome.unwrap().borsh::<SubmitResult>().unwrap();
         if let TransactionStatus::Succeed(res) = result.status {
-            assert_eq!(res[res.len() - 1], expected_value);
+            let mut buf = [0u8; 8];
+            buf.copy_from_slice(&res.as_slice()[res.len() - 8..res.len()]);
+            assert_eq!(u64::from_be_bytes(buf), expected_value);
         }
     }
 
