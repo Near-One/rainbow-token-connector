@@ -51,7 +51,13 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     event TokenStorageRegistered(IEvmErc20 token, string nearAccountId);
     event RecipientStorageRegistered(IEvmErc20 token, string recipientId);
     event Withdraw(IEvmErc20 token, address recipient, uint128 transferedAmount);
-    event InitFtTransferCall(uint256 indexed nonce, address indexed sender, IEvmErc20 indexed token, string receiverId);
+    event InitFtTransferCall(
+        uint256 indexed nonce,
+        address indexed sender,
+        IEvmErc20 indexed token,
+        string receiverId,
+        uint128 amount
+    );
     event FtTransferCall(
         uint256 indexed nonce,
         address indexed sender,
@@ -197,7 +203,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         string memory message
     ) private {
         ftTransferCallCounter += 1;
-        emit InitFtTransferCall(ftTransferCallCounter, msg.sender, token, receiverId);
+        emit InitFtTransferCall(ftTransferCallCounter, msg.sender, token, receiverId, amount);
 
         PromiseCreateArgs memory callFtTransfer = _callWithoutTransferWNear(
             near,
