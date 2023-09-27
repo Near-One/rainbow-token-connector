@@ -440,6 +440,39 @@ mod tests {
         assert_eq!(balance_engine_before, balance_engine_after);
     }
 
+    #[tokio::test]
+    async fn storage_deposit_outside_contract_test() {
+        let infra = TestsInfrastructure::init(None).await;
+
+        mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
+
+        infra.mint_wnear_engine(None).await;
+        infra.approve_spend_wnear_engine(None).await;
+
+        let implicit_account = infra.engine_silo_to_silo_contract.address.encode() + "." + infra.engine.inner.id();
+        
+        storage_deposit(&infra.mock_token, infra.engine.inner.id(), None).await;
+        storage_deposit(&infra.mock_token, infra.silo.inner.id(), None).await;
+        storage_deposit(&infra.mock_token, &implicit_account, None).await;
+
+        infra.silo_to_silo_register_token_engine(None, true).await;
+
+        engine_mint_tokens(infra.user_address, &infra.engine_mock_token, &infra.engine).await;
+        infra.approve_spend_mock_tokens_engine().await;
+
+        let balance_engine_before = infra.get_mock_token_balance_engine().await;
+        infra.engine_to_silo_transfer(true).await;
+
+        let balance_engine_after = infra.get_mock_token_balance_engine().await;
+        assert_eq!(
+            (balance_engine_before - balance_engine_after).as_u64(),
+            TRANSFER_TOKENS_AMOUNT
+        );
+
+        let balance_silo = infra.get_mock_token_balance_silo().await;
+        assert_eq!(balance_silo.as_u64(), TRANSFER_TOKENS_AMOUNT);
+    }
+
     #[ignore]
     #[tokio::test]
     async fn error_on_withdraw_to_near() {
