@@ -99,12 +99,23 @@ task('safe_ft_transfer_call_to_near', 'Init ft transfer call on Near')
         const { safeFtTransferCallToNear } = require('./utils/scripts.js');
         const [signer] = await hre.ethers.getSigners();
         const config = require(`./configs/${taskArgs.silo}.json`);
-
-        if (taskArgs.msg == "") {
-            taskArgs.msg = signer.address.substring(2);
-        }
-
+        
         await safeFtTransferCallToNear(signer, config, taskArgs.proxy, taskArgs.auroraTokenAddress, taskArgs.receiverId, taskArgs.amount, taskArgs.msg);
+    });
+
+task('ft_transfer_call_to_near', 'Init ft transfer call on Near')
+    .addParam("silo", "Config file name without extension")
+    .addParam("proxy", "Current proxy address of the SiloToSilo contract")
+    .addParam("receiverId", "Receiver Id")
+    .addParam("amount", "Transferred tokens amount")
+    .addParam('msg', "Msg for ft_transfer_call")
+    .addParam('auroraTokenAddress', "Token address on Aurora")
+    .setAction(async taskArgs => {
+        const { ftTransferCallToNear } = require('./utils/scripts.js');
+        const [signer] = await hre.ethers.getSigners();
+        const config = require(`./configs/${taskArgs.silo}.json`);
+
+        await ftTransferCallToNear(signer, config, taskArgs.proxy, taskArgs.auroraTokenAddress, taskArgs.receiverId, taskArgs.amount, taskArgs.msg);
     });
 
 task('recipient_storage_deposit', "Storage Deposit for Recipient")

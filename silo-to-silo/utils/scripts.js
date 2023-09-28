@@ -142,6 +142,18 @@ async function safeFtTransferCallToNear(signer, config, proxy, auroraTokenAddres
   await siloToSilo.safeFtTransferCallToNear(auroraTokenAddress, amount, receiverId, msg);
 }
 
+async function ftTransferCallToNear(signer, config, proxy, auroraTokenAddress, receiverId, amount, msg) {
+  const siloToSilo = await getSiloToSiloContract(signer, config, proxy);
+
+  const wnear = await hre.ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", config.wNearAddress);
+  await wnear.transfer(siloToSilo, 1);
+
+  const token = await hre.ethers.getContractAt("@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20", auroraTokenAddress);
+  await token.approve(proxy, amount);
+
+  await siloToSilo.ftTransferCallToNear(auroraTokenAddress, amount, receiverId, msg);
+}
+
 async function recipientStorageDeposit(signer, config, proxy, auroraTokenAddress, receiverId) {
   const siloToSilo = await getSiloToSiloContract(signer, config, proxy);
 
@@ -194,6 +206,7 @@ exports.getTokenNearAccountId = getTokenNearAccountId;
 exports.storageDeposit = storageDeposit;
 exports.isStorageRegistered = isStorageRegistered;
 exports.safeFtTransferCallToNear = safeFtTransferCallToNear;
+exports.ftTransferCallToNear = ftTransferCallToNear;
 exports.recipientStorageDeposit = recipientStorageDeposit;
 exports.isRecipientStorageRegistered = isRecipientStorageRegistered;
 exports.getUserBalance = getUserBalance;
