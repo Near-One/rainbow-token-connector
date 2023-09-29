@@ -648,6 +648,7 @@ mod tests {
             &[
                 ethabi::Token::Address(wnear.aurora_token.address.raw()),
                 ethabi::Token::String(engine.inner.id().to_string()),
+                ethabi::Token::String(engine.inner.id().to_string())
             ],
         );
         call_aurora_contract(
