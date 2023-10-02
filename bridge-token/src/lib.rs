@@ -27,7 +27,6 @@ pub struct BridgeToken {
     reference_hash: Base64VecU8,
     decimals: u8,
     paused: Mask,
-    #[cfg(feature = "migrate_icon")]
     icon: Option<String>,
 }
 
@@ -67,7 +66,6 @@ impl BridgeToken {
             reference_hash: Base64VecU8(vec![]),
             decimals: 0,
             paused: Mask::default(),
-            #[cfg(feature = "migrate_icon")]
             icon: None,
         }
     }
@@ -89,12 +87,7 @@ impl BridgeToken {
         reference.map(|reference| self.reference = reference);
         reference_hash.map(|reference_hash| self.reference_hash = reference_hash);
         decimals.map(|decimals| self.decimals = decimals);
-        #[cfg(feature = "migrate_icon")]
         icon.map(|icon| self.icon = Some(icon));
-        #[cfg(not(feature = "migrate_icon"))]
-        icon.map(|_| {
-            env::log("Icon was provided, but it's not supported for the token".as_bytes())
-        });
     }
 
     #[payable]
@@ -183,10 +176,7 @@ impl FungibleTokenMetadataProvider for BridgeToken {
             spec: FT_METADATA_SPEC.to_string(),
             name: self.name.clone(),
             symbol: self.symbol.clone(),
-            #[cfg(feature = "migrate_icon")]
             icon: self.icon.clone(),
-            #[cfg(not(feature = "migrate_icon"))]
-            icon: None,
             reference: Some(self.reference.clone()),
             reference_hash: Some(self.reference_hash.clone()),
             decimals: self.decimals,
@@ -196,7 +186,6 @@ impl FungibleTokenMetadataProvider for BridgeToken {
 
 // Migration
 
-#[cfg(feature = "migrate_icon")]
 #[derive(BorshDeserialize, BorshSerialize)]
 pub struct BridgeTokenV0 {
     controller: AccountId,
@@ -209,7 +198,6 @@ pub struct BridgeTokenV0 {
     paused: Mask,
 }
 
-#[cfg(feature = "migrate_icon")]
 impl From<BridgeTokenV0> for BridgeToken {
     fn from(obj: BridgeTokenV0) -> Self {
         #[allow(deprecated)]
@@ -227,7 +215,6 @@ impl From<BridgeTokenV0> for BridgeToken {
     }
 }
 
-#[cfg(feature = "migrate_icon")]
 #[near_bindgen]
 impl BridgeToken {
     /// This function can only be called from the factory or from the contract itself.
