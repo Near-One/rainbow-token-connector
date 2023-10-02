@@ -1,6 +1,5 @@
 use near_plugins::{
     access_control, access_control_any, pause, AccessControlRole, AccessControllable, Pausable,
-    Upgradable,
 };
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap, UnorderedSet};
@@ -69,28 +68,19 @@ pub type Mask = u128;
 #[derive(AccessControlRole, Deserialize, Serialize, Copy, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub enum Role {
+    DAO,
     PauseManager,
     UpgradableManager,
-    UpgradableCodeStager,
-    UpgradableCodeDeployer,
-    UpgradableDurationManager,
-    ConfigManager,
+    MetadataManager,
     UnrestrictedDeposit,
     UnrestrictedDeployBridgeToken,
-    MetadataManager,
+    UnrestrictedUpdateMetadata,
 }
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Pausable, Upgradable)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Pausable)]
 #[access_control(role_type(Role))]
-#[pausable(manager_roles(Role::PauseManager))]
-#[upgradable(access_control_roles(
-    code_stagers(Role::UpgradableCodeStager, Role::UpgradableManager),
-    code_deployers(Role::UpgradableCodeDeployer, Role::UpgradableManager),
-    duration_initializers(Role::UpgradableDurationManager, Role::UpgradableManager),
-    duration_update_stagers(Role::UpgradableDurationManager, Role::UpgradableManager),
-    duration_update_appliers(Role::UpgradableDurationManager, Role::UpgradableManager),
-))]
+#[pausable(manager_roles(Role::PauseManager, Role::DAO))]
 pub struct BridgeTokenFactory {
     /// The account of the prover that we can use to prove
     pub prover_account: AccountId,
@@ -192,6 +182,7 @@ impl BridgeTokenFactory {
         contract
     }
 
+    #[pause(except(roles(Role::DAO, Role::UnrestrictedUpdateMetadata)))]
     pub fn update_metadata(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
         let event = TokenMetadataEvent::from_log_entry_data(&proof.log_entry_data);
 
@@ -250,7 +241,7 @@ impl BridgeTokenFactory {
     /// Deposit from Ethereum to NEAR based on the proof of the locked tokens.
     /// Must attach enough NEAR funds to cover for storage of the proof.
     #[payable]
-    #[pause(except(roles(Role::UnrestrictedDeposit)))]
+    #[pause(except(roles(Role::DAO, Role::UnrestrictedDeposit)))]
     pub fn deposit(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
         let event = EthLockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
@@ -417,7 +408,7 @@ impl BridgeTokenFactory {
     }
 
     #[payable]
-    #[pause(except(roles(Role::UnrestrictedDeployBridgeToken)))]
+    #[pause(except(roles(Role::DAO, Role::UnrestrictedDeployBridgeToken)))]
     pub fn deploy_bridge_token(&mut self, address: String) -> Promise {
         let address = address.to_lowercase();
         let _ = validate_eth_address(address.clone());
@@ -448,7 +439,7 @@ impl BridgeTokenFactory {
             )
     }
 
-    #[access_control_any(roles(Role::UpgradableCodeDeployer, Role::UpgradableManager))]
+    #[access_control_any(roles(Role::DAO, Role::UpgradableManager))]
     pub fn upgrade_bridge_token(&self, address: String) -> Promise {
         Promise::new(self.get_bridge_token_account_id(address)).function_call(
             "upgrade_and_migrate".to_string(),
@@ -458,7 +449,7 @@ impl BridgeTokenFactory {
         )
     }
 
-    #[access_control_any(roles(Role::PauseManager))]
+    #[access_control_any(roles(Role::DAO, Role::PauseManager))]
     pub fn set_paused_withdraw(&mut self, address: String, paused: bool) -> Promise {
         ext_bridge_token::ext(self.get_bridge_token_account_id(address))
             .with_static_gas(SET_PAUSED_GAS)
@@ -504,7 +495,7 @@ impl BridgeTokenFactory {
     }
 
     /// Admin method to set metadata
-    #[access_control_any(roles(Role::MetadataManager))]
+    #[access_control_any(roles(Role::DAO, Role::MetadataManager))]
     pub fn set_metadata(
         &mut self,
         address: String,
@@ -544,7 +535,7 @@ impl BridgeTokenFactory {
             .map(|value| String::from_utf8(value).expect("Invalid metadata connector address"))
     }
 
-    #[access_control_any(roles(Role::ConfigManager))]
+    #[access_control_any(roles(Role::DAO))]
     pub fn set_metadata_connector(&mut self, metadata_connector: String) {
         validate_eth_address(metadata_connector.clone());
         env::storage_write(

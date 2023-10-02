@@ -589,7 +589,7 @@ async fn test_upgrade() {
     assert!(result);
 
     // Upgrade the bridge token directly because self-upgrade is not supported in version `0.1.6`
-    let token_contract = token_account
+    let _token_contract = token_account
         .deploy(&std::fs::read(BRIDGE_TOKEN_WASM_PATH).unwrap())
         .await
         .unwrap()
