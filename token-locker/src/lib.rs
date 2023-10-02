@@ -1,6 +1,5 @@
 use near_plugins::{
     access_control, access_control_any, pause, AccessControlRole, AccessControllable, Pausable,
-    Upgradable,
 };
 use std::convert::TryInto;
 
@@ -56,27 +55,16 @@ enum StorageKey {
 #[derive(AccessControlRole, Deserialize, Serialize, Copy, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub enum Role {
+    DAO,
     PauseManager,
-    UpgradableManager,
-    UpgradableCodeStager,
-    UpgradableCodeDeployer,
-    UpgradableDurationManager,
-    ConfigManager,
     UnrestrictedDeposit,
     UnrestrictedWithdraw,
 }
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Pausable, Upgradable)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Pausable)]
 #[access_control(role_type(Role))]
-#[pausable(manager_roles(Role::PauseManager))]
-#[upgradable(access_control_roles(
-    code_stagers(Role::UpgradableCodeStager, Role::UpgradableManager),
-    code_deployers(Role::UpgradableCodeDeployer, Role::UpgradableManager),
-    duration_initializers(Role::UpgradableDurationManager, Role::UpgradableManager),
-    duration_update_stagers(Role::UpgradableDurationManager, Role::UpgradableManager),
-    duration_update_appliers(Role::UpgradableDurationManager, Role::UpgradableManager),
-))]
+#[pausable(manager_roles(Role::DAO, Role::PauseManager))]
 pub struct Contract {
     /// The account of the prover that we can use to prove.
     pub prover_account: AccountId,
@@ -209,7 +197,7 @@ impl Contract {
     /// Withdraw funds from NEAR Token Locker.
     /// Receives proof of burning tokens on the other side. Validates it and releases funds.
     #[payable]
-    #[pause(except(roles(Role::UnrestrictedWithdraw)))]
+    #[pause(except(roles(Role::DAO, Role::UnrestrictedWithdraw)))]
     pub fn withdraw(&mut self, #[serializer(borsh)] proof: Proof) -> Promise {
         let event = EthUnlockedEvent::from_log_entry_data(&proof.log_entry_data);
         assert_eq!(
@@ -357,7 +345,7 @@ impl Contract {
         required_deposit
     }
 
-    #[access_control_any(roles(Role::ConfigManager))]
+    #[access_control_any(roles(Role::DAO))]
     pub fn update_factory_address(&mut self, factory_address: String) {
         self.eth_factory_address = validate_eth_address(factory_address);
     }
