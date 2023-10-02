@@ -12,7 +12,7 @@ use near_sdk::{
 
 /// Gas to call finish withdraw method on factory.
 const FINISH_WITHDRAW_GAS: Gas = Gas(Gas::ONE_TERA.0 * 50);
-const MIGRATE_GAS: Gas = Gas(Gas::ONE_TERA.0 * 100);
+const UPGRADE_GAS_LEFTOVER: Gas = Gas(Gas::ONE_TERA.0 * 10);
 const NO_DEPOSIT: Balance = 0;
 const CURRENT_STATE_VERSION: u32 = 1;
 
@@ -142,7 +142,7 @@ impl BridgeToken {
         self.paused = if paused { 1 } else { 0 };
     }
 
-    pub fn upgrade_and_migrate(&self) -> Promise {
+    pub fn upgrade_and_migrate(&self) {
         require!(
             self.controller_or_self(),
             "Only the controller or self can update the code"
@@ -150,20 +150,22 @@ impl BridgeToken {
 
         // Receive the code directly from the input to avoid the
         // GAS overhead of deserializing parameters
-        let code = env::input().expect("Error: No input").to_vec();
-
-        // Deploy the contract on self
-        Promise::new(env::current_account_id())
-            .deploy_contract(code)
-            .function_call(
-                "migrate".to_string(),
-                json!({ "from_version": CURRENT_STATE_VERSION })
-                    .to_string()
-                    .into_bytes(),
-                NO_DEPOSIT,
-                MIGRATE_GAS,
-            )
-            .as_return()
+        let code = env::input().unwrap_or_else(|| panic!("ERR_NO_INPUT"));
+        // Deploy the contract code.
+        let promise_id = env::promise_batch_create(&env::current_account_id());
+        env::promise_batch_action_deploy_contract(promise_id, &code);
+        // Call promise to migrate the state.
+        // Batched together to fail upgrade if migration fails.
+        env::promise_batch_action_function_call(
+            promise_id,
+            "migrate",
+            &json!({ "from_version": CURRENT_STATE_VERSION })
+                .to_string()
+                .into_bytes(),
+            NO_DEPOSIT,
+            env::prepaid_gas() - env::used_gas() - UPGRADE_GAS_LEFTOVER,
+        );
+        env::promise_return(promise_id);
     }
 
     pub fn version(&self) -> String {
@@ -228,11 +230,11 @@ impl From<BridgeTokenV0> for BridgeToken {
 #[cfg(feature = "migrate_icon")]
 #[near_bindgen]
 impl BridgeToken {
-    /// Adding icon as suggested here: https://nomicon.io/Standards/FungibleToken/Metadata.html
     /// This function can only be called from the factory or from the contract itself.
     #[init(ignore_state)]
     pub fn migrate(from_version: u32) -> Self {
         if from_version == 0 {
+            // Adding icon as suggested here: https://nomicon.io/Standards/FungibleToken/Metadata.html
             let old_state: BridgeTokenV0 = env::state_read().expect("Contract isn't initialized");
             let new_state: BridgeToken = old_state.into();
             assert!(new_state.controller_or_self());
