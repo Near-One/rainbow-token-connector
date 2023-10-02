@@ -1176,7 +1176,7 @@ pragma solidity ^0.8.0;
 
 contract BridgeTokenProxy is ERC1967Proxy, AccessControl {
     constructor(address _logic, bytes memory _data)
-        ERC1967Proxy(_logic, _data) AccessControl()
+        ERC1967Proxy(_logic, _data)
     {
         _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
     }
