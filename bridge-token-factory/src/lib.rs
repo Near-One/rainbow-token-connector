@@ -91,6 +91,7 @@ pub struct BridgeTokenFactory {
     /// Hashes of the events that were already used.
     pub used_events: UnorderedSet<Vec<u8>>,
     /// Public key of the account deploying the factory.
+    #[deprecated]
     pub owner_pk: PublicKey,
     /// Balance required to register a new account in the BridgeToken
     pub bridge_token_storage_deposit_required: Balance,
@@ -429,7 +430,6 @@ impl BridgeTokenFactory {
         Promise::new(bridge_token_account_id.parse().unwrap())
             .create_account()
             .transfer(BRIDGE_TOKEN_INIT_BALANCE)
-            .add_full_access_key(self.owner_pk.clone())
             .deploy_contract(BRIDGE_TOKEN_BINARY.to_vec())
             .function_call(
                 "new".to_string(),
