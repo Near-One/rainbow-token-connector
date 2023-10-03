@@ -16,6 +16,8 @@ const UPGRADE_GAS_LEFTOVER: Gas = Gas(Gas::ONE_TERA.0 * 10);
 const NO_DEPOSIT: Balance = 0;
 const CURRENT_STATE_VERSION: u32 = 1;
 
+pub type Mask = u128;
+
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct BridgeToken {
@@ -29,8 +31,6 @@ pub struct BridgeToken {
     paused: Mask,
     icon: Option<String>,
 }
-
-pub type Mask = u128;
 
 #[ext_contract(ext_bridge_token_factory)]
 pub trait ExtBridgeTokenFactory {

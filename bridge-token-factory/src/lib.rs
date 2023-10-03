@@ -449,6 +449,10 @@ impl BridgeTokenFactory {
             )
     }
 
+    /// # Arguments
+    ///
+    /// * `address`: Ethereum address of the token erc20 contract, in hex without `0x`.
+    ///
     #[access_control_any(roles(Role::DAO, Role::TokenUpgradableManager))]
     pub fn upgrade_bridge_token(&self, address: String) -> Promise {
         Promise::new(self.get_bridge_token_account_id(address)).function_call(
