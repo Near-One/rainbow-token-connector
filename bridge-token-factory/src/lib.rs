@@ -1,5 +1,6 @@
 use near_plugins::{
     access_control, access_control_any, pause, AccessControlRole, AccessControllable, Pausable,
+    Upgradable,
 };
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap, UnorderedSet};
@@ -70,17 +71,26 @@ pub type Mask = u128;
 pub enum Role {
     DAO,
     PauseManager,
-    UpgradableManager,
+    TokenUpgradableManager,
     MetadataManager,
     UnrestrictedDeposit,
     UnrestrictedDeployBridgeToken,
     UnrestrictedUpdateMetadata,
+    UpgradableCodeStager,
+    UpgradableCodeDeployer,
 }
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Pausable)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Pausable, Upgradable)]
 #[access_control(role_type(Role))]
 #[pausable(manager_roles(Role::PauseManager, Role::DAO))]
+#[upgradable(access_control_roles(
+    code_stagers(Role::UpgradableCodeStager, Role::DAO),
+    code_deployers(Role::UpgradableCodeDeployer, Role::DAO),
+    duration_initializers(Role::DAO),
+    duration_update_stagers(Role::DAO),
+    duration_update_appliers(Role::DAO),
+))]
 pub struct BridgeTokenFactory {
     /// The account of the prover that we can use to prove
     pub prover_account: AccountId,
@@ -439,7 +449,7 @@ impl BridgeTokenFactory {
             )
     }
 
-    #[access_control_any(roles(Role::DAO, Role::UpgradableManager))]
+    #[access_control_any(roles(Role::DAO, Role::TokenUpgradableManager))]
     pub fn upgrade_bridge_token(&self, address: String) -> Promise {
         Promise::new(self.get_bridge_token_account_id(address)).function_call(
             "upgrade_and_migrate".to_string(),

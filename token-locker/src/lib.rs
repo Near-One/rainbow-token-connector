@@ -1,5 +1,6 @@
 use near_plugins::{
     access_control, access_control_any, pause, AccessControlRole, AccessControllable, Pausable,
+    Upgradable,
 };
 use std::convert::TryInto;
 
@@ -59,12 +60,21 @@ pub enum Role {
     PauseManager,
     UnrestrictedDeposit,
     UnrestrictedWithdraw,
+    UpgradableCodeStager,
+    UpgradableCodeDeployer,
 }
 
 #[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Pausable)]
+#[derive(BorshDeserialize, BorshSerialize, PanicOnDefault, Pausable, Upgradable)]
 #[access_control(role_type(Role))]
-#[pausable(manager_roles(Role::DAO, Role::PauseManager))]
+#[pausable(manager_roles(Role::PauseManager))]
+#[upgradable(access_control_roles(
+    code_stagers(Role::UpgradableCodeStager, Role::DAO),
+    code_deployers(Role::UpgradableCodeDeployer, Role::DAO),
+    duration_initializers(Role::DAO),
+    duration_update_stagers(Role::DAO),
+    duration_update_appliers(Role::DAO),
+))]
 pub struct Contract {
     /// The account of the prover that we can use to prove.
     pub prover_account: AccountId,

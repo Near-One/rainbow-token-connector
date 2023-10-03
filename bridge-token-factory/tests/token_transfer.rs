@@ -484,8 +484,6 @@ async fn test_deploy_failures() {
 #[tokio::test]
 async fn test_upgrade() {
     let (alice, factory, worker) = create_contract(FACTORY_WASM_PATH_V_0_1_6).await;
-    const INIT_ALICE_BALANCE: u64 = 1000;
-    const WITHDRAW_AMOUNT: u64 = 100;
 
     let token_account = Account::from_secret_key(
         format!("{}.{}", DAI_ADDRESS, factory.id()).parse().unwrap(),
@@ -570,12 +568,12 @@ async fn test_upgrade() {
     let result: bool = result.json().unwrap();
     assert!(result);
 
-    // Grant alice the `UpgradableManager` role
+    // Grant alice the `TokenUpgradableManager` role
     let result = alice
         .call(factory.id(), "acl_grant_role")
         .args(
             json!({
-               "role": "UpgradableManager",
+               "role": "TokenUpgradableManager",
                "account_id": alice.id().to_string()
             })
             .to_string()
