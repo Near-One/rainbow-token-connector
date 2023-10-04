@@ -50,8 +50,9 @@ const SET_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 /// Amount of gas used by bridge token to pause withdraw.
 const SET_PAUSED_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 
-/// Amount of gas used upgrade and migrate bridge token.
-const UPGRADE_TOKEN_GAS: Gas = Gas(Gas::ONE_TERA.0 * 200);
+/// Amount of gas used by `upgrade_bridge_token` in the factory, without taking into account
+/// the gas consumed by the promise.
+const OUTER_UPGRADE_TOKEN_GAS: Gas = Gas(Gas::ONE_TERA.0 * 15);
 
 /// Controller storage key.
 const CONTROLLER_STORAGE_KEY: &[u8] = b"aCONTROLLER";
@@ -461,7 +462,7 @@ impl BridgeTokenFactory {
             "upgrade_and_migrate".to_string(),
             BRIDGE_TOKEN_BINARY.into(),
             0,
-            UPGRADE_TOKEN_GAS,
+            env::prepaid_gas() - OUTER_UPGRADE_TOKEN_GAS,
         )
     }
 

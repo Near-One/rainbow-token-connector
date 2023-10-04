@@ -12,7 +12,7 @@ use near_sdk::{
 
 /// Gas to call finish withdraw method on factory.
 const FINISH_WITHDRAW_GAS: Gas = Gas(Gas::ONE_TERA.0 * 50);
-const UPGRADE_GAS_LEFTOVER: Gas = Gas(Gas::ONE_TERA.0 * 10);
+const OUTER_UPGRADE_GAS: Gas = Gas(Gas::ONE_TERA.0 * 15);
 const NO_DEPOSIT: Balance = 0;
 const CURRENT_STATE_VERSION: u32 = 1;
 
@@ -156,7 +156,7 @@ impl BridgeToken {
                 .to_string()
                 .into_bytes(),
             NO_DEPOSIT,
-            env::prepaid_gas() - env::used_gas() - UPGRADE_GAS_LEFTOVER,
+            env::prepaid_gas() - env::used_gas() - OUTER_UPGRADE_GAS,
         );
         env::promise_return(promise_id);
     }
