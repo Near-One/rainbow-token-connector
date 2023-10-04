@@ -449,9 +449,11 @@ impl BridgeTokenFactory {
             )
     }
 
+    /// Upgrades and migrates the bridge token contract to the current version.
+    ///
     /// # Arguments
     ///
-    /// * `address`: Ethereum address of the token erc20 contract, in hex without `0x`.
+    /// * `address`: Ethereum address of the token ERC20 contract, in hexadecimal format without `0x`.
     ///
     #[access_control_any(roles(Role::DAO, Role::TokenUpgradableManager))]
     pub fn upgrade_bridge_token(&self, address: String) -> Promise {
@@ -463,6 +465,13 @@ impl BridgeTokenFactory {
         )
     }
 
+    /// Pause or unpause the withdraw method in the bridge token contract.
+    ///
+    /// # Arguments
+    ///
+    /// * `address`: Ethereum address of the token ERC20 contract, in hexadecimal format without `0x`.
+    /// * `paused`: `true` to pause the withdraw method in the bridge token contract, `false` to unpause.
+    ///
     #[access_control_any(roles(Role::DAO, Role::PauseManager))]
     pub fn set_paused_withdraw(&mut self, address: String, paused: bool) -> Promise {
         ext_bridge_token::ext(self.get_bridge_token_account_id(address))
