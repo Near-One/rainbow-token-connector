@@ -294,6 +294,14 @@ impl BridgeTokenFactory {
         self.tokens.iter().collect::<Vec<_>>()
     }
 
+    /// Return Near accounts ID of all registered tokens
+    pub fn get_tokens_accounts(&self) -> Vec<String> {
+        self.tokens
+            .iter()
+            .map(|address| format!("{}.{}", address, env::current_account_id()))
+            .collect::<Vec<_>>()
+    }
+
     fn set_token_metadata_timestamp(&mut self, token: &String, timestamp: u64) -> Balance {
         let initial_storage = env::storage_usage();
         self.token_metadata_last_update().insert(&token, &timestamp);
@@ -727,6 +735,20 @@ mod tests {
                 uppercase_address.to_lowercase(),
                 bridge_token_factory()
             )
+        );
+
+        let mut tokens_accounts = contract.get_tokens_accounts();
+        assert_eq!(tokens_accounts.len(), 2);
+        tokens_accounts.sort();
+
+        assert_eq!(
+            tokens_accounts,
+            [
+                contract
+                    .get_bridge_token_account_id(uppercase_address.clone())
+                    .to_string(),
+                format!("{}.{}", token_locker(), bridge_token_factory())
+            ]
         );
     }
 
