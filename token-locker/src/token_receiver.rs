@@ -6,13 +6,13 @@ use crate::*;
 impl FungibleTokenReceiver for Contract {
     /// Callback on receiving tokens by this contract.
     /// msg: `Ethereum` address to receive the tokens on.
+    #[pause(except(roles(Role::DAO, Role::UnrestrictedDeposit)))]
     fn ft_on_transfer(
         &mut self,
         sender_id: AccountId,
         amount: U128,
         msg: String,
     ) -> PromiseOrValue<U128> {
-        self.check_not_paused(PAUSE_DEPOSIT);
         self.check_whitelist_token(env::predecessor_account_id(), sender_id);
         // Fails if msg is not a valid Ethereum address.
         let eth_address = validate_eth_address(msg);

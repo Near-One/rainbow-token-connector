@@ -1,6 +1,6 @@
 [package]
 name = "bridge-token"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Near Inc <hello@near.org>"]
 edition = "2021"
 publish = false
@@ -20,8 +20,3 @@ overflow-checks = true
 [dependencies]
 near-sdk = "4.0.0"
 near-contract-standards = "4.0.0"
-admin-controlled = { git = "https://github.com/near/rainbow-bridge", rev = "67966a151122815039f07b02065ab3a2bba09804" }
-
-[features]
-default = ["migrate_icon"]
-migrate_icon = []
