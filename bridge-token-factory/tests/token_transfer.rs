@@ -723,6 +723,7 @@ async fn test_attach_full_access_key() {
     // Check that the access key is added to the factory contract
     assert!(keys.len() == 2 && keys.contains(&ed_pk_str.to_string()));
 
+    // Add new full access key to the bridge token contract
     assert!(alice
         .call(factory.id(), "attach_full_access_key_to_token")
         .args_json(json!({ "public_key": ed_pk_str, "address": DAI_ADDRESS }))
@@ -740,6 +741,6 @@ async fn test_attach_full_access_key() {
         .map(|info| info.public_key.to_string())
         .collect();
 
-    // Check that the access key is added to the bridge contract
+    // Check that the access key is added to the bridge token contract
     assert!(keys.len() == 1 && keys.contains(&ed_pk_str.to_string()));
 }
