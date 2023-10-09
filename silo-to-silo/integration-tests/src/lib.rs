@@ -1,9 +1,7 @@
 #[cfg(test)]
 mod tests {
     use aurora_sdk_integration_tests::aurora_engine::erc20::ERC20;
-    use aurora_sdk_integration_tests::aurora_engine_types::parameters::engine::{
-        SubmitResult, TransactionStatus,
-    };
+    use aurora_sdk_integration_tests::aurora_engine_types::parameters::engine::{FunctionCallArgsV2, SubmitResult, TransactionStatus};
     use aurora_sdk_integration_tests::aurora_engine_types::H160;
     use aurora_sdk_integration_tests::wnear::Wnear;
     use aurora_sdk_integration_tests::workspaces::network::Sandbox;
@@ -22,6 +20,8 @@ mod tests {
         workspaces::{self, AccountId},
     };
     use std::path::Path;
+    use aurora_sdk_integration_tests::aurora_engine_types::types::WeiU256;
+
     const ONE_NEAR: u128 = 1_000_000_000_000_000_000_000_000;
 
     const ATTACHED_NEAR: u128 = 5 * ONE_NEAR;
@@ -111,6 +111,13 @@ mod tests {
                     self.user_address,
                     2 * (ATTACHED_NEAR + NEAR_DEPOSIT),
                 )
+                .await
+                .unwrap();
+        }
+
+        pub async fn mint_eth_engine(&self, user_address: Option<Address>, amount: u64) {
+            self.engine
+                .mint_account(user_address.unwrap_or(self.user_address.clone()), 0, Wei::new_u64(amount))
                 .await
                 .unwrap();
         }
@@ -277,6 +284,7 @@ mod tests {
                 contract_args,
                 &user_account,
                 self.engine.inner.id(),
+                0,
                 true,
             )
             .await
@@ -516,6 +524,7 @@ mod tests {
                 contract_args,
                 &infra.user_account,
                 infra.engine.inner.id(),
+                0,
                 false,
             ).await;
 
@@ -534,6 +543,80 @@ mod tests {
                 break;
             }
         }
+    }
+
+    #[tokio::test]
+    async fn transfer_eth_test() {
+        let infra = TestsInfrastructure::init(None).await;
+
+        mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
+        infra.mint_wnear_engine(None).await;
+        infra.mint_wnear_engine(Some(infra.engine_silo_to_silo_contract.address)).await;
+        infra.approve_spend_wnear_engine(None).await;
+
+        infra.mint_eth_engine(None, 200).await;
+        let silo_eth_token = infra.silo.bridge_nep141(infra.engine.inner.id()).await.unwrap();
+
+        storage_deposit(&infra.engine.inner, infra.engine.inner.id(), None).await;
+        storage_deposit(&infra.engine.inner, infra.silo.inner.id(), None).await;
+
+        let contract_args = infra.engine_silo_to_silo_contract.create_call_method_bytes_with_args(
+            "storageDeposit",
+            &[
+                ethabi::Token::Address("0x0000000000000000000000000000000000000000".parse().unwrap()),
+                ethabi::Token::Uint(NEP141_STORAGE_DEPOSIT.into()),
+            ],
+        );
+
+        call_aurora_contract(
+            infra.engine_silo_to_silo_contract.address,
+            contract_args,
+            &infra.user_account,
+            infra.engine.inner.id(),
+            0,
+            true,
+        )
+            .await
+            .unwrap();
+
+        let user_balance_before = infra.engine.get_balance(infra.user_address).await.unwrap().raw().as_u64();
+        assert_eq!(user_balance_before, 200);
+
+        let user_balance_before_silo = infra.silo
+            .erc20_balance_of(&silo_eth_token, infra.user_address)
+            .await
+            .unwrap();
+
+        assert_eq!(user_balance_before_silo.as_u64(), 0);
+
+        let contract_args = infra.engine_silo_to_silo_contract.create_call_method_bytes_with_args(
+            "ftTransferCallToNear",
+            &[
+                ethabi::Token::Address("0x0000000000000000000000000000000000000000".parse().unwrap()),
+                ethabi::Token::Uint(U256::from(200)),
+                ethabi::Token::String(infra.silo.inner.id().to_string()),
+                ethabi::Token::String(infra.user_address.encode()),
+            ],
+        );
+
+        call_aurora_contract(
+            infra.engine_silo_to_silo_contract.address,
+            contract_args,
+            &infra.user_account,
+            infra.engine.inner.id(),
+            200,
+            true,
+        ).await.unwrap();
+
+        let user_balance_after = infra.engine.get_balance(infra.user_address).await.unwrap().raw().as_u64();
+        assert_eq!(user_balance_after, 0);
+
+        let user_balance_after_silo = infra.silo
+            .erc20_balance_of(&silo_eth_token, infra.user_address)
+            .await
+            .unwrap();
+
+        assert_eq!(user_balance_after_silo.as_u64(), 200);
     }
 
     #[ignore]
@@ -656,6 +739,7 @@ mod tests {
             contract_args,
             &user_account,
             engine.inner.id(),
+            0,
             true,
         )
         .await
@@ -736,6 +820,7 @@ mod tests {
             contract_args,
             user_account,
             engine.inner.id(),
+            0,
             check_result,
         )
         .await
@@ -754,6 +839,7 @@ mod tests {
             contract_args,
             user_account,
             engine.inner.id(),
+            0,
             check_result,
         )
         .await
@@ -778,6 +864,7 @@ mod tests {
             contract_args,
             user_account,
             engine.inner.id(),
+            0,
             true,
         )
         .await;
@@ -805,6 +892,7 @@ mod tests {
             contract_args,
             user_account,
             engine.inner.id(),
+            0,
             true,
         )
         .await;
@@ -836,6 +924,7 @@ mod tests {
             contract_args,
             user_account,
             engine.inner.id(),
+            0,
             true,
         )
         .await;
@@ -923,6 +1012,7 @@ mod tests {
             contract_args,
             &user_account,
             silo1_address,
+            0,
             check_output,
         )
         .await
@@ -945,6 +1035,7 @@ mod tests {
             contract_args,
             &user_account,
             engine_address,
+            0,
             true,
         )
         .await
@@ -956,10 +1047,12 @@ mod tests {
         contract_args: Vec<u8>,
         user_account: &Account,
         engine_account: &AccountId,
+        deposit: u128,
         check_output: bool,
     ) -> ExecutionFinalResult {
-        let call_args = CallArgs::V1(FunctionCallArgsV1 {
+        let call_args = CallArgs::V2(FunctionCallArgsV2 {
             contract: contract_address,
+            value: WeiU256::from(U256::from(deposit)),
             input: contract_args,
         });
 
