@@ -44,6 +44,10 @@ const FINISH_UPDATE_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 /// the gas consumed by the promise.
 const OUTER_SET_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 15);
 
+/// Amount of gas used by attach_full_access_key_to_token in the factory, without taking into account
+/// the gas consumed by the promise.
+const OUTER_ATTACH_KEY_GAS: Gas = Gas(Gas::ONE_TERA.0 * 10);
+
 /// Amount of gas used by bridge token to set the metadata.
 const SET_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 
@@ -162,6 +166,8 @@ pub trait ExtBridgeToken {
     );
 
     fn set_paused(&mut self, paused: bool);
+
+    fn attach_full_access_key(&mut self, public_key: PublicKey) -> Promise;
 }
 
 pub fn assert_self() {
@@ -574,6 +580,30 @@ impl BridgeTokenFactory {
             METADATA_CONNECTOR_ETH_ADDRESS_STORAGE_KEY,
             metadata_connector.as_bytes(),
         );
+    }
+
+    /// Attach a new full access to the current contract.
+    #[access_control_any(roles(Role::DAO))]
+    pub fn attach_full_access_key(&mut self, public_key: PublicKey) -> Promise {
+        Promise::new(env::current_account_id()).add_full_access_key(public_key)
+    }
+
+    /// Attach a new full access to the token contract.
+    ///
+    /// # Arguments
+    ///
+    /// * `address`: Ethereum address of the token ERC20 contract, in hexadecimal format without `0x`.
+    /// * `public_key`: `secp256k1` or `ed25519` public key.
+    ///
+    #[access_control_any(roles(Role::DAO))]
+    pub fn attach_full_access_key_to_token(
+        &mut self,
+        public_key: PublicKey,
+        address: String,
+    ) -> Promise {
+        ext_bridge_token::ext(self.get_bridge_token_account_id(address))
+            .with_static_gas(env::prepaid_gas() - OUTER_ATTACH_KEY_GAS)
+            .attach_full_access_key(public_key)
     }
 
     pub fn version(&self) -> String {
