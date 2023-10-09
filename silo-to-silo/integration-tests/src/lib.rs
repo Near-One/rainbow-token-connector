@@ -617,6 +617,56 @@ mod tests {
             .unwrap();
 
         assert_eq!(user_balance_after_silo.as_u64(), 200);
+
+        // Transfer from silo back to aurora
+        infra.mint_wnear_silo().await;
+        infra.approve_spend_wnear_silo().await;
+
+        silo_to_silo_register_token(
+            &infra.silo_silo_to_silo_contract,
+            silo_eth_token.address.raw(),
+            &infra.user_account,
+            &infra.silo,
+            true,
+        ).await;
+
+        approve_spend_tokens(
+            &silo_eth_token,
+            infra.silo_silo_to_silo_contract.address,
+            &infra.user_account,
+            &infra.silo,
+        ).await;
+
+        infra.silo_to_engine_transfer().await;
+
+        let contract_args = infra.silo_silo_to_silo_contract.create_call_method_bytes_with_args(
+            "ftTransferCallToNear",
+            &[
+                ethabi::Token::Address(silo_eth_token.address.raw()),
+                ethabi::Token::Uint(U256::from(200)),
+                ethabi::Token::String(infra.engine.inner.id().to_string()),
+                ethabi::Token::String("fake.near:0000000000000000000000000000000000000000000000000000000000000000".to_string() + &infra.user_address.encode()),
+            ],
+        );
+
+        call_aurora_contract(
+            infra.silo_silo_to_silo_contract.address,
+            contract_args,
+            &infra.user_account,
+            infra.silo.inner.id(),
+            0,
+            true,
+        ).await.unwrap();
+
+        let user_balance_after_back_transfer = infra.engine.get_balance(infra.user_address).await.unwrap().raw().as_u64();
+        assert_eq!(user_balance_after_back_transfer, 200);
+
+        let user_balance_after_back_transfer_silo = infra.silo
+            .erc20_balance_of(&silo_eth_token, infra.user_address)
+            .await
+            .unwrap();
+
+        assert_eq!(user_balance_after_back_transfer_silo.as_u64(), 0);
     }
 
     #[ignore]
