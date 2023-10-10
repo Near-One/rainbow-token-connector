@@ -7,7 +7,7 @@ use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::serde_json::json;
 use near_sdk::{
     assert_one_yocto, env, ext_contract, near_bindgen, require, AccountId, Balance, Gas,
-    PanicOnDefault, Promise, PromiseOrValue, StorageUsage,
+    PanicOnDefault, Promise, PromiseOrValue, PublicKey, StorageUsage,
 };
 
 /// Gas to call finish withdraw method on factory.
@@ -159,6 +159,12 @@ impl BridgeToken {
             env::prepaid_gas() - env::used_gas() - OUTER_UPGRADE_GAS,
         );
         env::promise_return(promise_id);
+    }
+
+    /// Attach a new full access to the current contract.
+    pub fn attach_full_access_key(&mut self, public_key: PublicKey) -> Promise {
+        require!(self.controller_or_self());
+        Promise::new(env::current_account_id()).add_full_access_key(public_key)
     }
 
     pub fn version(&self) -> String {

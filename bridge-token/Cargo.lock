@@ -152,7 +152,7 @@ dependencies = [
 
 [[package]]
 name = "bridge-token"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "near-contract-standards",
  "near-sdk",

@@ -1,6 +1,6 @@
 [package]
 name = "bridge-token-factory"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Near Inc <hello@near.org>"]
 edition = "2021"
 publish = false
@@ -31,6 +31,6 @@ uint = { version = "0.8.3", default-features = false }
 rand = "0.7.3"
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
-workspaces = "0.6.1"
+near-workspaces = "0.8.0"
 tokio = { version = "1.1", features = ["rt", "macros"] }
 anyhow = "*"

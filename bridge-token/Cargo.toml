@@ -1,6 +1,6 @@
 [package]
 name = "bridge-token"
-version = "0.2.0"
+version = "0.2.1"
 authors = ["Near Inc <hello@near.org>"]
 edition = "2021"
 publish = false

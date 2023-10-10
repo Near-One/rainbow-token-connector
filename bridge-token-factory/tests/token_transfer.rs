@@ -1,9 +1,8 @@
 use bridge_token_factory::{validate_eth_address, EthLockedEvent, Proof};
 use near_sdk::borsh::{self, BorshSerialize};
 use near_sdk::{AccountId, Balance, ONE_NEAR, ONE_YOCTO};
+use near_workspaces::{network::Sandbox, result::ExecutionFinalResult, Account, Contract, Worker};
 use serde_json::json;
-use workspaces::result::ExecutionFinalResult;
-use workspaces::{network::Sandbox, Account, Contract, Worker};
 
 const FACTORY: &str = "bridge";
 const LOCKER_ADDRESS: &str = "11111474e89094c44da98b954eedeac495271d0f";
@@ -19,7 +18,7 @@ const MOCK_PROVER_WASM_PATH: &str = "../res/mock_prover.wasm";
 const DEFAULT_DEPOSIT: u128 = ONE_NEAR;
 
 async fn create_contract(factory_wasm_path: &str) -> (Account, Contract, Worker<Sandbox>) {
-    let worker: Worker<Sandbox> = workspaces::sandbox().await.unwrap();
+    let worker: Worker<Sandbox> = near_workspaces::sandbox().await.unwrap();
     let prover_wasm = std::fs::read(MOCK_PROVER_WASM_PATH).unwrap();
     let prover_contract: Contract = worker.dev_deploy(&prover_wasm).await.unwrap();
     let prover_id = prover_contract.id();
@@ -75,7 +74,10 @@ impl From<Proof> for AugmentedProof {
     }
 }
 
-fn assert_error(result: &Result<ExecutionFinalResult, workspaces::error::Error>, expected: &str) {
+fn assert_error(
+    result: &Result<ExecutionFinalResult, near_workspaces::error::Error>,
+    expected: &str,
+) {
     let status = match result {
         Ok(result) => {
             assert!(result.is_failure(), "Expected error found {:?}", result);
@@ -103,11 +105,8 @@ async fn run_view_function(
 ) -> String {
     let mut res = std::str::from_utf8(
         &worker
-            .view(
-                &contract_id.parse().unwrap(),
-                function,
-                args.to_string().into_bytes(),
-            )
+            .view(&contract_id.parse().unwrap(), function)
+            .args_json(args)
             .await
             .unwrap()
             .result,
@@ -506,12 +505,8 @@ async fn test_upgrade() {
         .is_success());
 
     let token_account_id: String = factory
-        .view(
-            "get_bridge_token_account_id",
-            json!({"address": DAI_ADDRESS.to_string()})
-                .to_string()
-                .into_bytes(),
-        )
+        .view("get_bridge_token_account_id")
+        .args_json(json!({"address": DAI_ADDRESS.to_string()}))
         .await
         .unwrap()
         .json()
@@ -528,12 +523,8 @@ async fn test_upgrade() {
         .result;
 
     let token_account_id: String = factory
-        .view(
-            "get_bridge_token_account_id",
-            json!({"address": DAI_ADDRESS.to_string()})
-                .to_string()
-                .into_bytes(),
-        )
+        .view("get_bridge_token_account_id")
+        .args_json(json!({"address": DAI_ADDRESS.to_string()}))
         .await
         .unwrap()
         .json()
@@ -542,24 +533,15 @@ async fn test_upgrade() {
     assert_eq!(token_account_id, token_account.id().to_string());
 
     // Verify the factory version
-    let factory_version: String = factory
-        .view("version", "".as_bytes().to_vec())
-        .await
-        .unwrap()
-        .json()
-        .unwrap();
-    assert_eq!(factory_version, "0.2.0");
+    let factory_version: String = factory.view("version").await.unwrap().json().unwrap();
+    assert_eq!(factory_version, "0.2.1");
 
     // Set alice as super admin
     let result = factory
         .call("acl_init_super_admin")
-        .args(
-            json!({
-               "account_id": alice.id().to_string()
-            })
-            .to_string()
-            .into_bytes(),
-        )
+        .args_json(json!({
+           "account_id": alice.id().to_string()
+        }))
         .max_gas()
         .transact()
         .await
@@ -595,12 +577,12 @@ async fn test_upgrade() {
 
     // Verify the bridge token version
     let token_version: String = worker
-        .view(token_account.id(), "version", vec![])
+        .view(token_account.id(), "version")
         .await
         .unwrap()
         .json()
         .unwrap();
-    assert_eq!(token_version, "0.2.0");
+    assert_eq!(token_version, "0.2.1");
 
     // Upgrade the bridge token over factory (redeploy the same version)
     let result = alice
@@ -618,12 +600,12 @@ async fn test_upgrade() {
 
     // Verify the bridge token version
     let token_version: String = worker
-        .view(token_account.id(), "version", vec![])
+        .view(token_account.id(), "version")
         .await
         .unwrap()
         .json()
         .unwrap();
-    assert_eq!(token_version, "0.2.0");
+    assert_eq!(token_version, "0.2.1");
 
     // Grant alice the `PauseManager` role
     let result = alice
@@ -668,4 +650,192 @@ async fn test_upgrade() {
         .json()
         .unwrap();
     assert!(is_paused);
+}
+
+#[tokio::test]
+async fn test_attach_full_access_key() {
+    let (alice, factory, worker) = create_contract(FACTORY_WASM_PATH).await;
+
+    let token_account = Account::from_secret_key(
+        format!("{}.{}", DAI_ADDRESS, factory.id()).parse().unwrap(),
+        factory.as_account().secret_key().clone(),
+        &worker,
+    );
+
+    // Grant alice the `DAO` role
+    let result = factory
+        .call("acl_grant_role")
+        .args_json(json!({
+           "role": "DAO",
+           "account_id": alice.id().to_string()
+        }))
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+    let result: bool = result.json().unwrap();
+    assert!(result);
+
+    assert!(alice
+        .call(factory.id(), "deploy_bridge_token")
+        .deposit(35 * ONE_NEAR)
+        .args(
+            json!({"address": DAI_ADDRESS.to_string()})
+                .to_string()
+                .into_bytes()
+        )
+        .max_gas()
+        .transact()
+        .await
+        .unwrap()
+        .is_success());
+
+    let token_account_id: String = factory
+        .view("get_bridge_token_account_id")
+        .args_json(json!({"address": DAI_ADDRESS.to_string()}))
+        .await
+        .unwrap()
+        .json()
+        .unwrap();
+
+    assert_eq!(token_account_id, token_account.id().to_string());
+
+    let ed_pk_str = "ed25519:6E8sCci9badyRkXb3JoRpBj5p8C6Tw41ELDZoiihKEtp";
+
+    // Add new full access key to the factory contract
+    assert!(alice
+        .call(factory.id(), "attach_full_access_key")
+        .args_json(json!({ "public_key": ed_pk_str }))
+        .max_gas()
+        .transact()
+        .await
+        .unwrap()
+        .is_success());
+
+    let keys: Vec<String> = factory
+        .view_access_keys()
+        .await
+        .unwrap()
+        .iter()
+        .map(|info| info.public_key.to_string())
+        .collect();
+
+    // Check that the access key is added to the factory contract
+    assert!(keys.len() == 2 && keys.contains(&ed_pk_str.to_string()));
+
+    // Add new full access key to the bridge token contract
+    assert!(alice
+        .call(factory.id(), "attach_full_access_key_to_token")
+        .args_json(json!({ "public_key": ed_pk_str, "address": DAI_ADDRESS }))
+        .max_gas()
+        .transact()
+        .await
+        .unwrap()
+        .is_success());
+
+    let keys: Vec<String> = token_account
+        .view_access_keys()
+        .await
+        .unwrap()
+        .iter()
+        .map(|info| info.public_key.to_string())
+        .collect();
+
+    // Check that the access key is added to the bridge token contract
+    assert!(keys.len() == 1 && keys.contains(&ed_pk_str.to_string()));
+}
+
+#[tokio::test]
+async fn test_failed_access_to_attach_full_access_key() {
+    let (alice, factory, worker) = create_contract(FACTORY_WASM_PATH).await;
+
+    let token_account = Account::from_secret_key(
+        format!("{}.{}", DAI_ADDRESS, factory.id()).parse().unwrap(),
+        factory.as_account().secret_key().clone(),
+        &worker,
+    );
+
+    assert!(alice
+        .call(factory.id(), "deploy_bridge_token")
+        .deposit(35 * ONE_NEAR)
+        .args(
+            json!({"address": DAI_ADDRESS.to_string()})
+                .to_string()
+                .into_bytes()
+        )
+        .max_gas()
+        .transact()
+        .await
+        .unwrap()
+        .is_success());
+
+    let token_account_id: String = factory
+        .view("get_bridge_token_account_id")
+        .args_json(json!({"address": DAI_ADDRESS.to_string()}))
+        .await
+        .unwrap()
+        .json()
+        .unwrap();
+
+    assert_eq!(token_account_id, token_account.id().to_string());
+
+    let ed_pk_str = "ed25519:6E8sCci9badyRkXb3JoRpBj5p8C6Tw41ELDZoiihKEtp";
+
+    // Try to add a new full access key to the factory contract
+    let result = alice
+        .call(factory.id(), "attach_full_access_key")
+        .args_json(json!({ "public_key": ed_pk_str }))
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+
+    assert!(
+        result.is_failure() && format!("{:?}", result).contains("Requires one of these roles: ")
+    );
+
+    let keys: Vec<String> = factory
+        .view_access_keys()
+        .await
+        .unwrap()
+        .iter()
+        .map(|info| info.public_key.to_string())
+        .collect();
+
+    // Check that the access key isn't added to the factory contract
+    assert!(keys.len() == 1 && !keys.contains(&ed_pk_str.to_string()));
+
+    // Try to add new full access key to the bridge token contract
+    let result = alice
+        .call(factory.id(), "attach_full_access_key_to_token")
+        .args_json(json!({ "public_key": ed_pk_str, "address": DAI_ADDRESS }))
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+
+    assert!(
+        result.is_failure() && format!("{:?}", result).contains("Requires one of these roles: ")
+    );
+
+    // Try to add a new full access key to the bridge token contract directly
+    let result = alice
+        .call(token_account.id(), "attach_full_access_key")
+        .args_json(json!({ "public_key": ed_pk_str }))
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+    assert!(result.is_failure() && format!("{:?}", result).contains("require! assertion failed"));
+
+    let keys: Vec<String> = token_account
+        .view_access_keys()
+        .await
+        .unwrap()
+        .iter()
+        .map(|info| info.public_key.to_string())
+        .collect();
+
+    // Check that the access key isn't added to the bridge token contract
+    assert!(keys.len() == 0 && !keys.contains(&ed_pk_str.to_string()));
 }
