@@ -744,3 +744,98 @@ async fn test_attach_full_access_key() {
     // Check that the access key is added to the bridge token contract
     assert!(keys.len() == 1 && keys.contains(&ed_pk_str.to_string()));
 }
+
+#[tokio::test]
+async fn test_failed_access_to_attach_full_access_key() {
+    let (alice, factory, worker) = create_contract(FACTORY_WASM_PATH).await;
+
+    let token_account = Account::from_secret_key(
+        format!("{}.{}", DAI_ADDRESS, factory.id()).parse().unwrap(),
+        factory.as_account().secret_key().clone(),
+        &worker,
+    );
+
+    assert!(alice
+        .call(factory.id(), "deploy_bridge_token")
+        .deposit(35 * ONE_NEAR)
+        .args(
+            json!({"address": DAI_ADDRESS.to_string()})
+                .to_string()
+                .into_bytes()
+        )
+        .max_gas()
+        .transact()
+        .await
+        .unwrap()
+        .is_success());
+
+    let token_account_id: String = factory
+        .view("get_bridge_token_account_id")
+        .args_json(json!({"address": DAI_ADDRESS.to_string()}))
+        .await
+        .unwrap()
+        .json()
+        .unwrap();
+
+    assert_eq!(token_account_id, token_account.id().to_string());
+
+    let ed_pk_str = "ed25519:6E8sCci9badyRkXb3JoRpBj5p8C6Tw41ELDZoiihKEtp";
+
+    // Try to add a new full access key to the factory contract
+    let result = alice
+        .call(factory.id(), "attach_full_access_key")
+        .args_json(json!({ "public_key": ed_pk_str }))
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+
+    assert!(
+        result.is_failure() && format!("{:?}", result).contains("Requires one of these roles: ")
+    );
+
+    let keys: Vec<String> = factory
+        .view_access_keys()
+        .await
+        .unwrap()
+        .iter()
+        .map(|info| info.public_key.to_string())
+        .collect();
+
+    // Check that the access key isn't added to the factory contract
+    assert!(keys.len() == 1 && !keys.contains(&ed_pk_str.to_string()));
+
+    // Try to add new full access key to the bridge token contract
+    let result = alice
+        .call(factory.id(), "attach_full_access_key_to_token")
+        .args_json(json!({ "public_key": ed_pk_str, "address": DAI_ADDRESS }))
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+
+    assert!(
+        result.is_failure() && format!("{:?}", result).contains("Requires one of these roles: ")
+    );
+
+    // Try to add a new full access key to the bridge token contract directly
+    let result = alice
+        .call(token_account.id(), "attach_full_access_key")
+        .args_json(json!({ "public_key": ed_pk_str }))
+        .max_gas()
+        .transact()
+        .await
+        .unwrap();
+    assert!(result.is_failure() && format!("{:?}", result).contains("require! assertion failed"));
+
+    let keys: Vec<String> = token_account
+        .view_access_keys()
+        .await
+        .unwrap()
+        .iter()
+        .map(|info| info.public_key.to_string())
+        .collect();
+
+    // Check that the access key isn't added to the bridge token contract
+    assert!(keys.len() == 0 && !keys.contains(&ed_pk_str.to_string()));
+}
