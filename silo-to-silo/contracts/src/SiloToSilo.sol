@@ -64,8 +64,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         IEvmErc20 indexed token,
         string receiverId,
         uint128 amount,
-        uint128 transferedAmount,
-        string message
+        uint128 transferedAmount
     );
 
     function initialize(
@@ -244,8 +243,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
                 msg.sender,
                 token,
                 amount,
-                receiverId,
-                message
+                receiverId
             ),
             NO_DEPOSIT,
             BASE_NEAR_GAS
@@ -259,8 +257,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         address sender,
         IEvmErc20 token,
         uint128 amount,
-        string calldata receiverId,
-        string calldata message
+        string calldata receiverId
     ) external onlyRole(CALLBACK_ROLE) {
         uint128 transferredAmount = 0;
         if (AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful) {
@@ -272,7 +269,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
             balance[token][sender] += refundAmount;
         }
 
-        emit FtTransferCall(nonce, sender, token, receiverId, amount, transferredAmount, message);
+        emit FtTransferCall(nonce, sender, token, receiverId, amount, transferredAmount);
     }
 
     function withdrawTo(IEvmErc20 token, string calldata receiverId, string calldata message) external whenNotPaused {

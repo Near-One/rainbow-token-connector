@@ -1,9 +1,7 @@
 #[cfg(test)]
 mod tests {
     use aurora_sdk_integration_tests::aurora_engine::erc20::ERC20;
-    use aurora_sdk_integration_tests::aurora_engine_types::parameters::engine::{
-        SubmitResult, TransactionStatus,
-    };
+    use aurora_sdk_integration_tests::aurora_engine_types::parameters::engine::{FunctionCallArgsV2, SubmitResult, TransactionStatus};
     use aurora_sdk_integration_tests::aurora_engine_types::H160;
     use aurora_sdk_integration_tests::wnear::Wnear;
     use aurora_sdk_integration_tests::workspaces::network::Sandbox;
@@ -22,6 +20,8 @@ mod tests {
         workspaces::{self, AccountId},
     };
     use std::path::Path;
+    use aurora_sdk_integration_tests::aurora_engine_types::types::WeiU256;
+
     const ONE_NEAR: u128 = 1_000_000_000_000_000_000_000_000;
 
     const ATTACHED_NEAR: u128 = 5 * ONE_NEAR;
@@ -111,6 +111,13 @@ mod tests {
                     self.user_address,
                     2 * (ATTACHED_NEAR + NEAR_DEPOSIT),
                 )
+                .await
+                .unwrap();
+        }
+
+        pub async fn mint_eth_engine(&self, user_address: Option<Address>, amount: u64) {
+            self.engine
+                .mint_account(user_address.unwrap_or(self.user_address.clone()), 0, Wei::new_u64(amount))
                 .await
                 .unwrap();
         }
@@ -245,7 +252,7 @@ mod tests {
             .await;
         }
 
-        pub async fn check_user_balance_engine(&self, expected_value: u8) {
+        pub async fn check_user_balance_engine(&self, expected_value: u64) {
             check_get_user_balance(
                 &self.engine_silo_to_silo_contract,
                 &self.user_account,
@@ -269,7 +276,6 @@ mod tests {
                         ethabi::Token::Address(self.engine_mock_token.address.raw()),
                         ethabi::Token::Uint(U256::from(TRANSFER_TOKENS_AMOUNT)),
                         ethabi::Token::String("receiverId".into()),
-                        ethabi::Token::String("message".into())
                     ],
                 );
 
@@ -278,6 +284,7 @@ mod tests {
                 contract_args,
                 &user_account,
                 self.engine.inner.id(),
+                0,
                 true,
             )
             .await
@@ -379,7 +386,7 @@ mod tests {
         infra.check_user_balance_engine(100).await;
         withdraw(
             &infra.engine_silo_to_silo_contract,
-            &infra.engine_mock_token,
+            infra.engine_mock_token.address.raw(),
             infra.engine.inner.id(),
             infra.user_account.clone(),
         )
@@ -440,6 +447,370 @@ mod tests {
         assert_eq!(balance_engine_before, balance_engine_after);
     }
 
+    #[tokio::test]
+    async fn storage_deposit_outside_contract_test() {
+        let infra = TestsInfrastructure::init(None).await;
+
+        mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
+
+        infra.mint_wnear_engine(None).await;
+        infra.approve_spend_wnear_engine(None).await;
+
+        let implicit_account = infra.engine_silo_to_silo_contract.address.encode() + "." + infra.engine.inner.id();
+
+        storage_deposit(&infra.mock_token, infra.engine.inner.id(), None).await;
+        storage_deposit(&infra.mock_token, infra.silo.inner.id(), None).await;
+        storage_deposit(&infra.mock_token, &implicit_account, None).await;
+
+        infra.silo_to_silo_register_token_engine(None, true).await;
+
+        engine_mint_tokens(infra.user_address, &infra.engine_mock_token, &infra.engine).await;
+        infra.approve_spend_mock_tokens_engine().await;
+
+        let balance_engine_before = infra.get_mock_token_balance_engine().await;
+        infra.engine_to_silo_transfer(true).await;
+
+        let balance_engine_after = infra.get_mock_token_balance_engine().await;
+        assert_eq!(
+            (balance_engine_before - balance_engine_after).as_u64(),
+            TRANSFER_TOKENS_AMOUNT
+        );
+
+        let balance_silo = infra.get_mock_token_balance_silo().await;
+        assert_eq!(balance_silo.as_u64(), TRANSFER_TOKENS_AMOUNT);
+    }
+
+    #[tokio::test]
+    async fn long_msg_test() {
+        let infra = TestsInfrastructure::init(None).await;
+
+        mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
+        infra.mint_wnear_engine(None).await;
+        infra.approve_spend_wnear_engine(None).await;
+        storage_deposit(&infra.mock_token, infra.engine.inner.id(), None).await;
+        storage_deposit(&infra.mock_token, infra.silo.inner.id(), None).await;
+        infra.silo_to_silo_register_token_engine(None, true).await;
+
+        let mut msg_len = 1;
+        let mut step = 1;
+
+        for i in 0..17 {
+            let mut msg = String::with_capacity(msg_len);
+            for _ in 0..msg_len {
+                msg.push('?');
+            }
+
+            println!("{}", msg_len);
+
+            engine_mint_tokens(infra.user_address, &infra.engine_mock_token, &infra.engine).await;
+
+            let balance_engine_before = infra.get_mock_token_balance_engine().await;
+            assert_eq!(balance_engine_before.as_u64(), TRANSFER_TOKENS_AMOUNT);
+
+            infra.approve_spend_mock_tokens_engine().await;
+
+            let contract_args = infra.engine_silo_to_silo_contract.create_call_method_bytes_with_args(
+                "ftTransferCallToNear",
+                &[
+                    ethabi::Token::Address(infra.engine_mock_token.address.raw()),
+                    ethabi::Token::Uint(U256::from(TRANSFER_TOKENS_AMOUNT)),
+                    ethabi::Token::String(infra.silo.inner.id().to_string()),
+                    ethabi::Token::String(msg),
+                ],
+            );
+
+            let _ = call_aurora_contract(
+                infra.engine_silo_to_silo_contract.address,
+                contract_args,
+                &infra.user_account,
+                infra.engine.inner.id(),
+                0,
+                false,
+            ).await;
+
+            let balance_engine_after = infra.get_mock_token_balance_engine().await;
+            if balance_engine_after.as_u64() == 0 {
+                let balance_silo = infra.get_mock_token_balance_silo().await;
+                assert_eq!(balance_silo.as_u64(), 0);
+                infra.check_user_balance_engine((i + 1) * TRANSFER_TOKENS_AMOUNT).await;
+                step = step * 2;
+                msg_len += step;
+            } else {
+                assert_eq!(balance_engine_after.as_u64(), TRANSFER_TOKENS_AMOUNT);
+                let balance_silo = infra.get_mock_token_balance_silo().await;
+                assert_eq!(balance_silo.as_u64(), 0);
+                infra.check_user_balance_engine(i * TRANSFER_TOKENS_AMOUNT).await;
+                break;
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn transfer_eth_test() {
+        let infra = TestsInfrastructure::init(None).await;
+
+        mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
+        infra.mint_wnear_engine(None).await;
+        infra.mint_wnear_engine(Some(infra.engine_silo_to_silo_contract.address)).await;
+        infra.approve_spend_wnear_engine(None).await;
+
+        infra.mint_eth_engine(None, 200).await;
+        let silo_eth_token = infra.silo.bridge_nep141(infra.engine.inner.id()).await.unwrap();
+
+        storage_deposit(&infra.engine.inner, infra.engine.inner.id(), None).await;
+        storage_deposit(&infra.engine.inner, infra.silo.inner.id(), None).await;
+
+        let contract_args = infra.engine_silo_to_silo_contract.create_call_method_bytes_with_args(
+            "storageDeposit",
+            &[
+                ethabi::Token::Address("0x0000000000000000000000000000000000000000".parse().unwrap()),
+                ethabi::Token::Uint(NEP141_STORAGE_DEPOSIT.into()),
+            ],
+        );
+
+        call_aurora_contract(
+            infra.engine_silo_to_silo_contract.address,
+            contract_args,
+            &infra.user_account,
+            infra.engine.inner.id(),
+            0,
+            true,
+        )
+            .await
+            .unwrap();
+
+        let user_balance_before = infra.engine.get_balance(infra.user_address).await.unwrap().raw().as_u64();
+        assert_eq!(user_balance_before, 200);
+
+        let user_balance_before_silo = infra.silo
+            .erc20_balance_of(&silo_eth_token, infra.user_address)
+            .await
+            .unwrap();
+
+        assert_eq!(user_balance_before_silo.as_u64(), 0);
+
+        let contract_args = infra.engine_silo_to_silo_contract.create_call_method_bytes_with_args(
+            "ftTransferCallToNear",
+            &[
+                ethabi::Token::Address("0x0000000000000000000000000000000000000000".parse().unwrap()),
+                ethabi::Token::Uint(U256::from(200)),
+                ethabi::Token::String(infra.silo.inner.id().to_string()),
+                ethabi::Token::String(infra.user_address.encode()),
+            ],
+        );
+
+        call_aurora_contract(
+            infra.engine_silo_to_silo_contract.address,
+            contract_args,
+            &infra.user_account,
+            infra.engine.inner.id(),
+            200,
+            true,
+        ).await.unwrap();
+
+        let user_balance_after = infra.engine.get_balance(infra.user_address).await.unwrap().raw().as_u64();
+        assert_eq!(user_balance_after, 0);
+
+        let user_balance_after_silo = infra.silo
+            .erc20_balance_of(&silo_eth_token, infra.user_address)
+            .await
+            .unwrap();
+
+        assert_eq!(user_balance_after_silo.as_u64(), 200);
+
+        // Transfer from silo back to aurora
+        infra.mint_wnear_silo().await;
+        infra.approve_spend_wnear_silo().await;
+
+        silo_to_silo_register_token(
+            &infra.silo_silo_to_silo_contract,
+            silo_eth_token.address.raw(),
+            &infra.user_account,
+            &infra.silo,
+            true,
+        ).await;
+
+        approve_spend_tokens(
+            &silo_eth_token,
+            infra.silo_silo_to_silo_contract.address,
+            &infra.user_account,
+            &infra.silo,
+        ).await;
+
+        infra.silo_to_engine_transfer().await;
+
+        let contract_args = infra.silo_silo_to_silo_contract.create_call_method_bytes_with_args(
+            "ftTransferCallToNear",
+            &[
+                ethabi::Token::Address(silo_eth_token.address.raw()),
+                ethabi::Token::Uint(U256::from(200)),
+                ethabi::Token::String(infra.engine.inner.id().to_string()),
+                ethabi::Token::String("fake.near:0000000000000000000000000000000000000000000000000000000000000000".to_string() + &infra.user_address.encode()),
+            ],
+        );
+
+        call_aurora_contract(
+            infra.silo_silo_to_silo_contract.address,
+            contract_args,
+            &infra.user_account,
+            infra.silo.inner.id(),
+            0,
+            true,
+        ).await.unwrap();
+
+        let user_balance_after_back_transfer = infra.engine.get_balance(infra.user_address).await.unwrap().raw().as_u64();
+        assert_eq!(user_balance_after_back_transfer, 200);
+
+        let user_balance_after_back_transfer_silo = infra.silo
+            .erc20_balance_of(&silo_eth_token, infra.user_address)
+            .await
+            .unwrap();
+
+        assert_eq!(user_balance_after_back_transfer_silo.as_u64(), 0);
+    }
+
+    #[tokio::test]
+    async fn eth_withdraw_test() {
+        let infra = TestsInfrastructure::init(None).await;
+
+        mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
+        infra.mint_wnear_engine(None).await;
+        infra.mint_wnear_engine(Some(infra.engine_silo_to_silo_contract.address)).await;
+        infra.approve_spend_wnear_engine(None).await;
+
+        infra.mint_eth_engine(None, 200).await;
+        
+        let contract_args = infra.engine_silo_to_silo_contract.create_call_method_bytes_with_args(
+            "storageDeposit",
+            &[
+                ethabi::Token::Address("0x0000000000000000000000000000000000000000".parse().unwrap()),
+                ethabi::Token::Uint(NEP141_STORAGE_DEPOSIT.into()),
+            ],
+        );
+
+        call_aurora_contract(
+            infra.engine_silo_to_silo_contract.address,
+            contract_args,
+            &infra.user_account,
+            infra.engine.inner.id(),
+            0,
+            true,
+        )
+            .await
+            .unwrap();
+
+        let user_balance_before = infra.engine.get_balance(infra.user_address).await.unwrap().raw().as_u64();
+        assert_eq!(user_balance_before, 200);
+
+        let contract_args = infra.engine_silo_to_silo_contract.create_call_method_bytes_with_args(
+            "ftTransferCallToNear",
+            &[
+                ethabi::Token::Address("0x0000000000000000000000000000000000000000".parse().unwrap()),
+                ethabi::Token::Uint(U256::from(200)),
+                ethabi::Token::String(infra.silo.inner.id().to_string()),
+                ethabi::Token::String(infra.user_address.encode()),
+            ],
+        );
+
+        call_aurora_contract(
+            infra.engine_silo_to_silo_contract.address,
+            contract_args,
+            &infra.user_account,
+            infra.engine.inner.id(),
+            200,
+            true,
+        ).await.unwrap();
+
+        let user_balance_after = infra.engine.get_balance(infra.user_address).await.unwrap().raw().as_u64();
+        assert_eq!(user_balance_after, 0);
+
+        check_get_user_balance(
+            &infra.engine_silo_to_silo_contract,
+            &infra.user_account,
+            "0x0000000000000000000000000000000000000000".parse().unwrap(),
+            infra.user_address.raw(),
+            &infra.engine,
+            200,
+        ).await;
+
+        withdraw(
+            &infra.engine_silo_to_silo_contract,
+            "0x0000000000000000000000000000000000000000".parse().unwrap(),
+            infra.engine.inner.id(),
+            infra.user_account.clone(),
+        ).await;
+
+        let balance_engine_after_withdraw = infra.engine.get_balance(infra.user_address).await.unwrap().raw().as_u64();
+        assert_eq!(balance_engine_after_withdraw, 200);
+
+        check_get_user_balance(
+            &infra.engine_silo_to_silo_contract,
+            &infra.user_account,
+            "0x0000000000000000000000000000000000000000".parse().unwrap(),
+            infra.user_address.raw(),
+            &infra.engine,
+            0,
+        ).await;
+    }
+
+        #[tokio::test]
+    async fn test_ft_transfer_to_silo_with_incorrect_deposit() {
+        let infra = TestsInfrastructure::init(None).await;
+
+        mint_tokens_near(&infra.mock_token, infra.engine.inner.id()).await;
+
+        infra.mint_wnear_engine(None).await;
+        infra.approve_spend_wnear_engine(None).await;
+
+        infra.silo_to_silo_register_token_engine(None, true).await;
+        infra.check_token_is_regester_engine(true).await;
+        check_near_account_id(
+            &infra.engine_silo_to_silo_contract,
+            &infra.user_account,
+            &infra.engine,
+        )
+            .await;
+
+        storage_deposit(&infra.mock_token, infra.engine.inner.id(), None).await;
+        storage_deposit(&infra.mock_token, infra.silo.inner.id(), None).await;
+
+        engine_mint_tokens(infra.user_address, &infra.engine_mock_token, &infra.engine).await;
+        infra.approve_spend_mock_tokens_engine().await;
+        infra.mint_eth_engine(None, TRANSFER_TOKENS_AMOUNT).await;
+
+        let balance_engine_before = infra.get_mock_token_balance_engine().await;
+
+        let mut user_eth_balance = infra.engine.get_balance(infra.user_address).await.unwrap().raw().as_u64();
+        assert_eq!(user_eth_balance, TRANSFER_TOKENS_AMOUNT);
+
+        let contract_args = infra.engine_silo_to_silo_contract.create_call_method_bytes_with_args(
+            "ftTransferCallToNear",
+            &[
+                ethabi::Token::Address(infra.engine_mock_token.address.raw()),
+                ethabi::Token::Uint(U256::from(TRANSFER_TOKENS_AMOUNT)),
+                ethabi::Token::String(infra.silo.inner.id().to_string()),
+                ethabi::Token::String(infra.user_address.encode()),
+            ],
+        );
+
+        call_aurora_contract(
+            infra.engine_silo_to_silo_contract.address,
+            contract_args,
+            &infra.user_account,
+            infra.engine.inner.id(),
+            TRANSFER_TOKENS_AMOUNT as u128,
+            true,
+        ).await.unwrap();
+
+        user_eth_balance = infra.engine.get_balance(infra.user_address).await.unwrap().raw().as_u64();
+        assert_eq!(user_eth_balance, TRANSFER_TOKENS_AMOUNT);
+
+        let balance_engine_after = infra.get_mock_token_balance_engine().await;
+        assert_eq!(balance_engine_before, balance_engine_after);
+        let balance_silo = infra.get_mock_token_balance_silo().await;
+        assert_eq!(balance_silo.as_u64(), 0);
+    }
+
     #[ignore]
     #[tokio::test]
     async fn error_on_withdraw_to_near() {
@@ -474,7 +845,7 @@ mod tests {
         assert_eq!(balance_silo.as_u64(), 0);
 
         infra
-            .check_user_balance_engine(TRANSFER_TOKENS_AMOUNT as u8)
+            .check_user_balance_engine(TRANSFER_TOKENS_AMOUNT)
             .await;
 
         storage_deposit(
@@ -487,7 +858,7 @@ mod tests {
         .await;
         withdraw(
             &infra.engine_silo_to_silo_contract,
-            &infra.engine_mock_token,
+            infra.engine_mock_token.address.raw(),
             infra.engine.inner.id(),
             infra.user_account.clone(),
         )
@@ -552,6 +923,7 @@ mod tests {
             &[
                 ethabi::Token::Address(wnear.aurora_token.address.raw()),
                 ethabi::Token::String(engine.inner.id().to_string()),
+                ethabi::Token::String(engine.inner.id().to_string())
             ],
         );
         call_aurora_contract(
@@ -559,6 +931,7 @@ mod tests {
             contract_args,
             &user_account,
             engine.inner.id(),
+            0,
             true,
         )
         .await
@@ -639,6 +1012,7 @@ mod tests {
             contract_args,
             user_account,
             engine.inner.id(),
+            0,
             check_result,
         )
         .await
@@ -657,6 +1031,7 @@ mod tests {
             contract_args,
             user_account,
             engine.inner.id(),
+            0,
             check_result,
         )
         .await
@@ -681,6 +1056,7 @@ mod tests {
             contract_args,
             user_account,
             engine.inner.id(),
+            0,
             true,
         )
         .await;
@@ -708,6 +1084,7 @@ mod tests {
             contract_args,
             user_account,
             engine.inner.id(),
+            0,
             true,
         )
         .await;
@@ -725,7 +1102,7 @@ mod tests {
         engine_mock_token_address: H160,
         user_address: H160,
         engine: &AuroraEngine,
-        expected_value: u8,
+        expected_value: u64,
     ) {
         let contract_args = silo_to_silo_contract.create_call_method_bytes_with_args(
             "getUserBalance",
@@ -739,13 +1116,16 @@ mod tests {
             contract_args,
             user_account,
             engine.inner.id(),
+            0,
             true,
         )
         .await;
 
         let result = outcome.unwrap().borsh::<SubmitResult>().unwrap();
         if let TransactionStatus::Succeed(res) = result.status {
-            assert_eq!(res[res.len() - 1], expected_value);
+            let mut buf = [0u8; 8];
+            buf.copy_from_slice(&res.as_slice()[res.len() - 8..res.len()]);
+            assert_eq!(u64::from_be_bytes(buf), expected_value);
         }
     }
 
@@ -824,6 +1204,7 @@ mod tests {
             contract_args,
             &user_account,
             silo1_address,
+            0,
             check_output,
         )
         .await
@@ -832,13 +1213,13 @@ mod tests {
 
     async fn withdraw(
         silo_to_silo_contract: &DeployedContract,
-        token_account: &ERC20,
+        token_address: H160,
         engine_address: &AccountId,
         user_account: Account,
     ) {
         let contract_args = silo_to_silo_contract.create_call_method_bytes_with_args(
             "withdraw",
-            &[ethabi::Token::Address(token_account.address.raw())],
+            &[ethabi::Token::Address(token_address)],
         );
 
         call_aurora_contract(
@@ -846,6 +1227,7 @@ mod tests {
             contract_args,
             &user_account,
             engine_address,
+            0,
             true,
         )
         .await
@@ -857,10 +1239,12 @@ mod tests {
         contract_args: Vec<u8>,
         user_account: &Account,
         engine_account: &AccountId,
+        deposit: u128,
         check_output: bool,
     ) -> ExecutionFinalResult {
-        let call_args = CallArgs::V1(FunctionCallArgsV1 {
+        let call_args = CallArgs::V2(FunctionCallArgsV2 {
             contract: contract_address,
+            value: WeiU256::from(U256::from(deposit)),
             input: contract_args,
         });
 
