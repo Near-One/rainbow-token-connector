@@ -189,6 +189,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
             require(msg.value == amount, "Incorrect attached value");
             _withdrawNativeTokenToNear(bytes(getImplicitNearAccountIdForSelf()), msg.value);
         } else {
+            require(msg.value == 0, "Incorrect attached value");
             token.transferFrom(msg.sender, address(this), amount);
             token.withdrawToNear(bytes(getImplicitNearAccountIdForSelf()), amount);
         }
