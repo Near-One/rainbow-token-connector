@@ -12,7 +12,7 @@ use near_sdk::{
 };
 
 pub use bridge_common::prover::{validate_eth_address, Proof};
-use bridge_common::{parse_recipient, prover::*, result_types, Recipient};
+use bridge_common::{parse_recipient, prover::*, Recipient};
 pub use lock_event::EthLockedEvent;
 pub use log_metadata_event::TokenMetadataEvent;
 
@@ -71,6 +71,15 @@ const TOKEN_TIMESTAMP_MAP_PREFIX: &[u8] = b"aTT";
 
 pub type Mask = u128;
 
+#[derive(Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
+pub enum ResultType {
+    Withdraw {
+        amount: Balance,
+        token: EthAddress,
+        recipient: EthAddress,
+    },
+}
+
 #[derive(AccessControlRole, Deserialize, Serialize, Copy, Clone)]
 #[serde(crate = "near_sdk::serde")]
 pub enum Role {
@@ -83,6 +92,7 @@ pub enum Role {
     UnrestrictedUpdateMetadata,
     UpgradableCodeStager,
     UpgradableCodeDeployer,
+    ForceWithdrawer,
 }
 
 #[near_bindgen]
@@ -416,7 +426,7 @@ impl BridgeTokenFactory {
         &mut self,
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] recipient: String,
-    ) -> result_types::Withdraw {
+    ) -> ResultType {
         let token = env::predecessor_account_id();
         let parts: Vec<&str> = token.as_str().split('.').collect();
         assert_eq!(
@@ -430,7 +440,25 @@ impl BridgeTokenFactory {
         );
         let token_address = validate_eth_address(parts[0].to_string());
         let recipient_address = validate_eth_address(recipient);
-        result_types::Withdraw::new(amount, token_address, recipient_address)
+        ResultType::Withdraw {
+            amount,
+            token: token_address,
+            recipient: recipient_address,
+        }
+    }
+
+    #[access_control_any(roles(Role::DAO, Role::ForceWithdrawer))]
+    #[result_serializer(borsh)]
+    pub fn force_withdraw(&self, token: String, amount: U128, recipient: String) -> ResultType {
+        assert!(
+            self.tokens.contains(&token),
+            "Such BridgeToken does not exist."
+        );
+        ResultType::Withdraw {
+            amount: amount.into(),
+            token: validate_eth_address(token),
+            recipient: validate_eth_address(recipient),
+        }
     }
 
     #[payable]
@@ -801,7 +829,11 @@ mod tests {
         let address = validate_eth_address(token_locker());
         assert_eq!(
             contract.finish_withdraw(1_000, token_locker()),
-            result_types::Withdraw::new(1_000, address, address)
+            ResultType::Withdraw {
+                amount: 1_000,
+                token: address,
+                recipient: address
+            }
         );
     }
 
