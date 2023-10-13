@@ -447,7 +447,7 @@ impl BridgeTokenFactory {
         }
     }
 
-    #[pause(except(roles(Role::DAO, Role::ForceWithdrawer)))]
+    #[access_control_any(roles(Role::DAO, Role::ForceWithdrawer))]
     #[result_serializer(borsh)]
     pub fn force_withdraw(&self, token: String, amount: Balance, recipient: String) -> ResultType {
         assert!(
