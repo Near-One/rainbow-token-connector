@@ -78,11 +78,6 @@ pub enum ResultType {
         token: EthAddress,
         recipient: EthAddress,
     },
-    Lock {
-        token: String,
-        amount: Balance,
-        recipient: EthAddress,
-    },
 }
 
 #[derive(AccessControlRole, Deserialize, Serialize, Copy, Clone)]
@@ -97,6 +92,7 @@ pub enum Role {
     UnrestrictedUpdateMetadata,
     UpgradableCodeStager,
     UpgradableCodeDeployer,
+    ForceWithdrawer,
 }
 
 #[near_bindgen]
@@ -448,6 +444,20 @@ impl BridgeTokenFactory {
             amount,
             token: token_address,
             recipient: recipient_address,
+        }
+    }
+
+    #[pause(except(roles(Role::DAO, Role::ForceWithdrawer)))]
+    #[result_serializer(borsh)]
+    pub fn force_withdraw(&self, token: String, amount: Balance, recipient: String) -> ResultType {
+        assert!(
+            self.tokens.contains(&token),
+            "Such BridgeToken does not exist."
+        );
+        ResultType::Withdraw {
+            amount,
+            token: validate_eth_address(token),
+            recipient: validate_eth_address(recipient),
         }
     }
 
