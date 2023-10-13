@@ -449,13 +449,13 @@ impl BridgeTokenFactory {
 
     #[access_control_any(roles(Role::DAO, Role::ForceWithdrawer))]
     #[result_serializer(borsh)]
-    pub fn force_withdraw(&self, token: String, amount: Balance, recipient: String) -> ResultType {
+    pub fn force_withdraw(&self, token: String, amount: U128, recipient: String) -> ResultType {
         assert!(
             self.tokens.contains(&token),
             "Such BridgeToken does not exist."
         );
         ResultType::Withdraw {
-            amount,
+            amount: amount.into(),
             token: validate_eth_address(token),
             recipient: validate_eth_address(recipient),
         }
