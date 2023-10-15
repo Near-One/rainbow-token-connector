@@ -38,7 +38,7 @@ pub trait ExtBridgeTokenFactory {
     fn finish_withdraw(
         &self,
         #[serializer(borsh)] amount: Balance,
-        #[serializer(borsh)] recipient: AccountId,
+        #[serializer(borsh)] recipient: String,
     ) -> Promise;
 }
 
@@ -113,7 +113,7 @@ impl BridgeToken {
 
         ext_bridge_token_factory::ext(self.controller.clone())
             .with_static_gas(FINISH_WITHDRAW_GAS)
-            .finish_withdraw(amount.into(), recipient.parse().unwrap())
+            .finish_withdraw(amount.into(), recipient)
     }
 
     pub fn account_storage_usage(&self) -> StorageUsage {
