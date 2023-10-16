@@ -534,7 +534,7 @@ async fn test_upgrade() {
 
     // Verify the factory version
     let factory_version: String = factory.view("version").await.unwrap().json().unwrap();
-    assert_eq!(factory_version, "0.2.1");
+    assert_eq!(factory_version, "0.2.2");
 
     // Set alice as super admin
     let result = factory
@@ -582,7 +582,7 @@ async fn test_upgrade() {
         .unwrap()
         .json()
         .unwrap();
-    assert_eq!(token_version, "0.2.1");
+    assert_eq!(token_version, "0.2.2");
 
     // Upgrade the bridge token over factory (redeploy the same version)
     let result = alice
@@ -605,7 +605,7 @@ async fn test_upgrade() {
         .unwrap()
         .json()
         .unwrap();
-    assert_eq!(token_version, "0.2.1");
+    assert_eq!(token_version, "0.2.2");
 
     // Grant alice the `PauseManager` role
     let result = alice
