@@ -1,0 +1,21 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: bridge-near-token-locker
+  title: FT-Locker on Near
+  description: FT-Locker on Near
+  tags:
+    - contract
+    - near
+  links: []
+  annotations:
+    aurora.dev/security-tier: "1"
+spec:
+  owner: bridge-team
+  type: contract
+  lifecycle: production
+  system: bridge-connectors
+  deployedAt:
+    - contract:near/mainnet/ft-locker.bridge.near
+  interactsWith: []
+  subcomponentOf: rainbow-token-connector
