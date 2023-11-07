@@ -14,7 +14,8 @@ const FACTORY_WASM_PATH: &str = "../res/bridge_token_factory.wasm";
 const FACTORY_WASM_PATH_V_0_1_6: &str = "res/bridge_token_factory_v0.1.6.wasm";
 const BRIDGE_TOKEN_WASM_PATH: &str = "../res/bridge_token.wasm";
 const MOCK_PROVER_WASM_PATH: &str = "../res/mock_prover.wasm";
-
+const LAST_FACTORY_VERSION: &str = env!("CARGO_PKG_VERSION");
+const LAST_BRIDGE_TOKEN_VERSION: &str = "0.2.2";
 const DEFAULT_DEPOSIT: u128 = ONE_NEAR;
 
 async fn create_contract(factory_wasm_path: &str) -> (Account, Contract, Worker<Sandbox>) {
@@ -534,7 +535,7 @@ async fn test_upgrade() {
 
     // Verify the factory version
     let factory_version: String = factory.view("version").await.unwrap().json().unwrap();
-    assert_eq!(factory_version, "0.2.2");
+    assert_eq!(factory_version, LAST_FACTORY_VERSION);
 
     // Set alice as super admin
     let result = factory
@@ -582,7 +583,7 @@ async fn test_upgrade() {
         .unwrap()
         .json()
         .unwrap();
-    assert_eq!(token_version, "0.2.2");
+    assert_eq!(token_version, LAST_BRIDGE_TOKEN_VERSION);
 
     // Upgrade the bridge token over factory (redeploy the same version)
     let result = alice
@@ -605,7 +606,7 @@ async fn test_upgrade() {
         .unwrap()
         .json()
         .unwrap();
-    assert_eq!(token_version, "0.2.2");
+    assert_eq!(token_version, LAST_BRIDGE_TOKEN_VERSION);
 
     // Grant alice the `PauseManager` role
     let result = alice
@@ -627,9 +628,9 @@ async fn test_upgrade() {
 
     // Pause bridge token withdraw
     let result = alice
-        .call(factory.id(), "set_paused_withdraw")
+        .call(factory.id(), "pause_withdraw")
         .args(
-            json!({"address": DAI_ADDRESS.to_string(), "paused": true})
+            json!({"address": DAI_ADDRESS.to_string()})
                 .to_string()
                 .into_bytes(),
         )
