@@ -508,18 +508,30 @@ impl BridgeTokenFactory {
         )
     }
 
-    /// Pause or unpause the withdraw method in the bridge token contract.
+    /// Pause the withdraw method in the bridge token contract.
     ///
     /// # Arguments
     ///
     /// * `address`: Ethereum address of the token ERC20 contract, in hexadecimal format without `0x`.
-    /// * `paused`: `true` to pause the withdraw method in the bridge token contract, `false` to unpause.
     ///
     #[access_control_any(roles(Role::DAO, Role::PauseManager))]
-    pub fn set_paused_withdraw(&mut self, address: String, paused: bool) -> Promise {
+    pub fn pause_withdraw(&mut self, address: String) -> Promise {
         ext_bridge_token::ext(self.get_bridge_token_account_id(address))
             .with_static_gas(SET_PAUSED_GAS)
-            .set_paused(paused)
+            .set_paused(true)
+    }
+
+    /// Unpause the withdraw method in the bridge token contract.
+    ///
+    /// # Arguments
+    ///
+    /// * `address`: Ethereum address of the token ERC20 contract, in hexadecimal format without `0x`.
+    ///
+    #[access_control_any(roles(Role::DAO, Role::PauseManager))]
+    pub fn unpause_withdraw(&mut self, address: String) -> Promise {
+        ext_bridge_token::ext(self.get_bridge_token_account_id(address))
+            .with_static_gas(SET_PAUSED_GAS)
+            .set_paused(false)
     }
 
     pub fn get_bridge_token_account_id(&self, address: String) -> AccountId {
