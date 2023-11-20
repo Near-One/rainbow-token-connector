@@ -13,7 +13,7 @@ metadata:
 spec:
   owner: bridge-team
   type: contract
-  lifecycle: production
+  lifecycle: experimental
   system: bridge-connectors
   deployedAt:
     - contract:near/mainnet/ft-locker.bridge.near
