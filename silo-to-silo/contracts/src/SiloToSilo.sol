@@ -136,6 +136,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     ) private {
         string memory nearTokenAccountId = registeredTokens[token].nearTokenAccountId;
         require(bytes(nearTokenAccountId).length > 0, "The token is not registered");
+        near.wNEAR.transferFrom(msg.sender, address(this), storageDepositAmount);
 
         PromiseCreateArgs memory callStorageDeposit = near.call(
             nearTokenAccountId,
