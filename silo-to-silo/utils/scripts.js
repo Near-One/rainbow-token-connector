@@ -159,13 +159,6 @@ async function safeFtTransferCallToNear(
   msg,
 ) {
   const siloToSilo = await getSiloToSiloContract(signer, config);
-
-  const wnear = await hre.ethers.getContractAt(
-    "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20",
-    config.wNearAddress,
-  );
-  await wnear.transfer(siloToSilo, 1);
-
   const token = await hre.ethers.getContractAt(
     "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20",
     auroraTokenAddress,
@@ -189,12 +182,6 @@ async function ftTransferCallToNear(
   msg,
 ) {
   const siloToSilo = await getSiloToSiloContract(signer, config);
-
-  const wnear = await hre.ethers.getContractAt(
-    "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20",
-    config.wNearAddress,
-  );
-  await wnear.transfer(siloToSilo, 1);
 
   const token = await hre.ethers.getContractAt(
     "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20",
@@ -262,13 +249,6 @@ async function getUserBalance(signer, config, auroraTokenAddress) {
 
 async function withdraw(signer, config, auroraTokenAddress) {
   const siloToSilo = await getSiloToSiloContract(signer, config);
-
-  const wnear = await hre.ethers.getContractAt(
-    "@openzeppelin/contracts/token/ERC20/IERC20.sol:IERC20",
-    config.wNearAddress,
-  );
-  await wnear.transfer(siloToSilo, 1);
-
   await siloToSilo.withdraw(auroraTokenAddress);
 }
 

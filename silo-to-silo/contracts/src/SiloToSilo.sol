@@ -27,7 +27,6 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
     bytes32 public constant UNPAUSE_ADMIN_ROLE = keccak256("UNPAUSE_ADMIN_ROLE");
 
     uint64 constant BASE_NEAR_GAS = 10_000_000_000_000;
-    uint64 constant WITHDRAW_NEAR_GAS = 50_000_000_000_000;
     uint64 constant FT_TRANSFER_CALL_NEAR_GAS = 150_000_000_000_000;
     uint128 constant ASCII_0 = 48;
     uint128 constant ASCII_9 = 57;
