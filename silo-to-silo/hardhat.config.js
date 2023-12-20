@@ -226,8 +226,8 @@ module.exports = {
       url: "https://develop.rpc.testnet.aurora.dev:8545",
       accounts: [`0x${AURORA_PRIVATE_KEY}`],
     },
-    enpower_silo_aurora: {
-      url: "https://enpower.aurora.dev",
+    mainnet_enpower: {
+      url: "http://powergold.aurora.dev",
       accounts: [`0x${AURORA_PRIVATE_KEY}`],
     },
   },
@@ -239,7 +239,7 @@ module.exports = {
     customChains: [
       {
         network: "mainnet_aurora",
-        chainId: 1313161554,
+        chainId: 1313161560,
         urls: {
           apiURL: "https://explorer.mainnet.aurora.dev/api",
           browserURL: "https://explorer.mainnet.aurora.dev",
@@ -251,6 +251,14 @@ module.exports = {
         urls: {
           apiURL: "https://explorer.testnet.aurora.dev/api",
           browserURL: "https://explorer.testnet.aurora.dev",
+        },
+      },
+      {
+        network: "mainnet_enpower",
+        chainId: 1313161555,
+        urls: {
+          apiURL: "https://explorer.powergold.aurora.dev/api",
+          browserURL: "https://explorer.powergold.aurora.dev",
         },
       },
     ],
