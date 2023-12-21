@@ -229,17 +229,19 @@ module.exports = {
     mainnet_enpower: {
       url: "http://powergold.aurora.dev",
       accounts: [`0x${AURORA_PRIVATE_KEY}`],
+      chainId: 1313161560,
     },
   },
   etherscan: {
     apiKey: {
       mainnet_aurora: `${ETHERSCAN_API_KEY}`,
       testnet_aurora: `${ETHERSCAN_API_KEY}`,
+      mainnet_enpower: `${ETHERSCAN_API_KEY}`,
     },
     customChains: [
       {
         network: "mainnet_aurora",
-        chainId: 1313161560,
+        chainId: 1313161554,
         urls: {
           apiURL: "https://explorer.mainnet.aurora.dev/api",
           browserURL: "https://explorer.mainnet.aurora.dev",
@@ -255,7 +257,7 @@ module.exports = {
       },
       {
         network: "mainnet_enpower",
-        chainId: 1313161555,
+        chainId: 1313161560,
         urls: {
           apiURL: "https://explorer.powergold.aurora.dev/api",
           browserURL: "https://explorer.powergold.aurora.dev",
