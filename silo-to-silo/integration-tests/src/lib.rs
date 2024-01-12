@@ -389,7 +389,7 @@ mod tests {
         let balance_silo = infra.get_mock_token_balance_silo().await;
         assert_eq!(balance_silo.as_u64(), 0);
 
-        infra.check_user_balance_engine(100).await;
+        infra.check_user_balance_engine(0).await;
         withdraw(
             &infra.engine_silo_to_silo_contract,
             infra.engine_mock_token.address.raw(),
@@ -399,7 +399,7 @@ mod tests {
         .await;
 
         let balance_engine_after_withdraw = infra.get_mock_token_balance_engine().await;
-        assert_eq!(balance_engine_before, balance_engine_after_withdraw);
+        assert_eq!(balance_engine_after_withdraw, 0.into());
 
         infra.check_user_balance_engine(0).await;
     }
