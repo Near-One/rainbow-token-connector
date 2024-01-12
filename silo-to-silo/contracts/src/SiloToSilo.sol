@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 pragma solidity ^0.8.17;
 
-import {IERC20 as IERC20_NEAR} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {AuroraSdk, NEAR, PromiseCreateArgs, PromiseResultStatus, PromiseWithCallback} from "@auroraisnear/aurora-sdk/aurora-sdk/AuroraSdk.sol";
 import "@auroraisnear/aurora-sdk/aurora-sdk/Utils.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
@@ -71,7 +71,7 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         string memory _siloAccountId,
         string memory _nativeTokenAccountId
     ) external initializer {
-        near = AuroraSdk.initNear(IERC20_NEAR(wnearAddress));
+        near = AuroraSdk.initNear(IERC20(wnearAddress));
         siloAccountId = _siloAccountId;
         registeredTokens[IEvmErc20(address(0))].nearTokenAccountId = _nativeTokenAccountId;
 

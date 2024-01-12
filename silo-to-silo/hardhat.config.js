@@ -25,7 +25,6 @@ task("deploy", "Deploy silo to silo proxy contract")
 
 task("upgrade", "Upgrade silo to silo proxy contract")
   .addParam("silo", "Config file name without extension")
-  .addParam("proxy", "Current proxy address of the SiloToSilo contract")
   .setAction(async (taskArgs, hre) => {
     const { upgrade } = require("./utils/scripts.js");
     const [signer] = await hre.ethers.getSigners();
