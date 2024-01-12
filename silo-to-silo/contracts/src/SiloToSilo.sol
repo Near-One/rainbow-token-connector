@@ -259,11 +259,8 @@ contract SiloToSilo is Initializable, UUPSUpgradeable, AccessControlUpgradeable,
         uint128 amount,
         string calldata receiverId
     ) external onlyRole(CALLBACK_ROLE) {
-        uint128 transferredAmount = 0;
-        if (AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful) {
-            transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
-        }
-
+        require(AuroraSdk.promiseResult(0).status == PromiseResultStatus.Successful, "ft_transfer_call failed");
+        uint128 transferredAmount = _stringToUint(AuroraSdk.promiseResult(0).output);
         uint128 refundAmount = amount - transferredAmount;
         if (refundAmount > 0) {
             balance[token][sender] += refundAmount;
