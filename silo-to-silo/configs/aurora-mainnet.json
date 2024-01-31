@@ -1,0 +1,9 @@
+{
+  "siloAccountId": "aurora",
+  "nativeTokenAccountId": "aurora",
+  "auroraSdkAddress": "0xc9279246BC677a528a9A28b48Ea67EA898E526a4",
+  "auroraUtilsAddress": "0xF59eFA6A6065674D639d8b5f1FDdADf7F8E5E8E2",
+  "auroraCodecAddress": "0xC042D3F70ADc2f74a1717147f9DDF413fee487C1",
+  "wNearAddress": "0xc42c30ac6cc15fac9bd938618bcaa1a1fae8501d",
+  "siloToSiloProxyAddress": "0x055707c67977e8217F98f19cFa8aca18B2282D0C"
+}

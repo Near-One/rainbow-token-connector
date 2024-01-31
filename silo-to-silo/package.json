@@ -1,0 +1,19 @@
+{
+  "name": "hardhat-project",
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-ethers": "^3.0.4",
+    "ethers": "^6.7.1",
+    "hardhat": "^2.17.1",
+    "prettier": "^3",
+    "prettier-plugin-solidity": "^1.1.3"
+  },
+  "dependencies": {
+    "@auroraisnear/aurora-sdk": "^0.0.1",
+    "@openzeppelin/contracts": "^4.9.3",
+    "@openzeppelin/contracts-upgradeable": "^4.9.3",
+    "@openzeppelin/hardhat-upgrades": "^2.2.0",
+    "dotenv": "^16",
+    "@nomicfoundation/hardhat-verify": "^1.0.0"
+  }
+}

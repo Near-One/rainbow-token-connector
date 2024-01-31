@@ -47,6 +47,15 @@ test-token-locker:
 	cd token-locker && \
 	cargo test --all
 
+test-token-silo-to-silo:
+	cd silo-to-silo && \
+	yarn && \
+	cd integration-tests && \
+	rustup target add wasm32-unknown-unknown && \
+	export RUSTFLAGS='-C link-arg=-s' && \
+	$(CARGO) build --target wasm32-unknown-unknown --release --manifest-path mock_token/Cargo.toml && \
+	cargo test --all --jobs 4 -- --test-threads 4
+
 # <--
 # For testing purposes only (can be removed at any moment)
 no_icon: res/bridge_token_no_icon.wasm res/bridge_token_factory_no_icon.wasm

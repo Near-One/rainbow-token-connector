@@ -88,3 +88,17 @@ jobs:
       - name: Test
         run: |
           make test-token-locker
+
+  test-silo-to-silo:
+    runs-on: self-hosted
+    name: Test silo-to-silo
+    steps:
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1        
+      - name: Clone the repository
+        uses: actions/checkout@v2
+        with:
+          submodules: recursive
+      - name: Test
+        run: |
+          make test-token-silo-to-silo
