@@ -5,7 +5,7 @@
     "license": "MIT",
     "dependencies": {
         "@openzeppelin/cli": "^2.8.1",
-        "@openzeppelin/contracts": "^4.7",
+        "@openzeppelin/contracts": "^4.9",
         "rainbow-bridge-sol": "https://gitpkg.now.sh/aurora-is-near/rainbow-bridge/contracts/eth?c80ff19c74a00ee2d08907668f95f4f99aee8356",
         "rainbow-bridge-lib": "https://github.com/near/rainbow-bridge-lib",
         "truffle-assertions": "^0.9.2"
