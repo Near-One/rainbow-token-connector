@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/IERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/token/ERC20/utils/SafeERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/utils/math/SafeMathUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {UUPSUpgradeable} from '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
 import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
 import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
@@ -12,14 +13,12 @@ import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 
 import "./IProofConsumer.sol";
 import "./BridgeToken.sol";
-import "./BridgeTokenProxy.sol";
 import "./ResultsDecoder.sol";
 import "./SelectivePausableUpgradable.sol";
 
-contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgradable {
+contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, SelectivePausableUpgradable {
     using Borsh for Borsh.Data;
-    using SafeMathUpgradeable for uint256;
-    using SafeERC20Upgradeable for IERC20Upgradeable;
+    using SafeERC20 for IERC20;
 
     enum WhitelistMode {
         NotInitialized,
@@ -37,6 +36,7 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
     bool private _isWhitelistModeEnabled;
 
     address public proofConsumerAddress;
+    address public tokenImplementationAddress;
 
     bytes32 public constant ADMIN_PAUSE_ROLE = keccak256("ADMIN_PAUSE_ROLE");
     bytes32 public constant PAUSE_DEPOSIT_ROLE = keccak256("PAUSE_DEPOSIT_ROLE");
@@ -72,18 +72,20 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
 
     // BridgeTokenFactory is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
-    function initialize(address _proofConsumerAddress) external initializer {
+    function initialize(address _proofConsumerAddress, address _tokenImplementationAddress) external initializer {
         require(_proofConsumerAddress != address(0), "Proof consumer shouldn't be zero address");
         proofConsumerAddress = _proofConsumerAddress;
+        tokenImplementationAddress = _tokenImplementationAddress;
 
+        __UUPSUpgradeable_init();
         __AccessControl_init();
         __Pausable_init_unchained();
-        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        _setupRole(ADMIN_PAUSE_ROLE, _msgSender());
-        _setupRole(PAUSE_DEPOSIT_ROLE, _msgSender());
-        _setupRole(PAUSE_WITHDRAW_ROLE, _msgSender());
-        _setupRole(PAUSE_SET_METADATA_ROLE, _msgSender());
-        _setupRole(WHITELIST_ADMIN_ROLE, _msgSender());
+        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
+        _grantRole(ADMIN_PAUSE_ROLE, _msgSender());
+        _grantRole(PAUSE_DEPOSIT_ROLE, _msgSender());
+        _grantRole(PAUSE_WITHDRAW_ROLE, _msgSender());
+        _grantRole(PAUSE_SET_METADATA_ROLE, _msgSender());
+        _grantRole(WHITELIST_ADMIN_ROLE, _msgSender());
         _isWhitelistModeEnabled = true;
     }
 
@@ -101,14 +103,13 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
         return _nearToEthToken[nearTokenId];
     }
 
-    function newBridgeToken(string calldata nearTokenId) external returns (BridgeTokenProxy) {
+    function newBridgeToken(string calldata nearTokenId) external returns (address) {
         require(!_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_TOKEN_EXIST");
 
-        BridgeToken bridgeToken = new BridgeToken();
-        BridgeTokenProxy bridgeTokenProxy = new BridgeTokenProxy(
-            address(bridgeToken),
-            abi.encodeWithSelector(BridgeToken(address(0)).initialize.selector, "", "", 0)
-        );
+        address bridgeTokenProxy = address(new ERC1967Proxy(
+            tokenImplementationAddress,
+            abi.encodeWithSelector(BridgeToken.initialize.selector, "", "", 0)));
+
         _isBridgeToken[address(bridgeTokenProxy)] = true;
         _ethToNearToken[address(bridgeTokenProxy)] = nearTokenId;
         _nearToEthToken[nearTokenId] = address(bridgeTokenProxy);
@@ -154,14 +155,6 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
         emit Withdraw(token, msg.sender, amount, recipient, tokenEthAddress);
     }
 
-    function pauseToken(string memory token) external onlyRole(ADMIN_PAUSE_ROLE) {
-        BridgeToken(_nearToEthToken[token]).pause();
-    }
-
-    function unpauseToken(string memory token) external onlyRole(ADMIN_PAUSE_ROLE) {
-        BridgeToken(_nearToEthToken[token]).unpause();
-    }
-
     function pause(uint flags) external onlyRole(ADMIN_PAUSE_ROLE) {
         _pause(flags);
     }
@@ -192,8 +185,8 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
 
     function upgradeToken(string calldata nearTokenId, address implementation) external onlyRole(DEFAULT_ADMIN_ROLE) {
        require(_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_NOT_BRIDGE_TOKEN");
-       BridgeTokenProxy proxy = BridgeTokenProxy(payable(_nearToEthToken[nearTokenId]));
-       proxy.upgradeTo(implementation);
+       BridgeToken proxy = BridgeToken(payable(_nearToEthToken[nearTokenId]));
+       proxy.upgradeToAndCall(implementation, bytes(""));
     }
 
     function setProofConsumer(address newProofConsumerAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -236,4 +229,8 @@ contract BridgeTokenFactory is AccessControlUpgradeable, SelectivePausableUpgrad
             revert("ERR_WHITELIST_TOKEN_BLOCKED");
         }
     }
+
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }

@@ -29,15 +29,15 @@ describe('BridgeToken', () => {
   let user
 
   beforeEach(async function () {
-    const [deployerAccount, userAccount] = await ethers.getSigners()
-    user = userAccount
-    // Make the deployer admin
-    adminAccount = deployerAccount
+    [adminAccount, user] = await ethers.getSigners()
+
     BridgeTokenInstance = await ethers.getContractFactory('BridgeToken')
     const ProverMock = await (await (await ethers.getContractFactory('NearProverMock')).deploy()).deployed()
     ProofConsumer = await (await (await ethers.getContractFactory('ProofConsumer')).deploy(Buffer.from('nearfuntoken', 'utf-8'), ProverMock.address, minBlockAcceptanceHeight)).deployed()
+    const brigeToken = await (await BridgeTokenInstance.deploy()).deployed()
     BridgeTokenFactory = await ethers.getContractFactory('BridgeTokenFactory')
-    BridgeTokenFactory = await upgrades.deployProxy(BridgeTokenFactory, [ProofConsumer.address], { initializer: 'initialize' })
+    BridgeTokenFactory = await upgrades.deployProxy(BridgeTokenFactory, [ProofConsumer.address, brigeToken.address], { initializer: 'initialize' })
+    await BridgeTokenFactory.deployed();
     await ProofConsumer.transferOwnership(BridgeTokenFactory.address);
   })
 
@@ -338,35 +338,6 @@ describe('BridgeToken', () => {
       .revertedWith('Pausable: paused');
   })
 
-  it('can not withdraw tokens when the specific token contract is paused', async function () {
-    const { tokenProxyAddress } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
-    await setMetadata(nearTokenId, tokenProxyAddress);
-
-    const amountToTransfer = 100;
-    const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
-    lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
-      prefix: RESULT_PREFIX_LOCK,
-      token: nearTokenId,
-      amount: amountToTransfer,
-      recipient: ethers.utils.arrayify(user.address),
-    }).toString('base64');
-    lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'F'.repeat(44);
-
-    await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckToken);
-    expect(
-      await BridgeTokenFactory.getTokenWhitelistMode(nearTokenId)
-    ).to.be.equal(WhitelistMode.CheckToken);
-
-    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
-    await BridgeTokenFactory.pauseToken(nearTokenId);
-    await expect(
-      BridgeTokenFactory.withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
-    )
-      .to
-      .be
-      .revertedWith('Pausable: paused');
-  })
-
   it('can deposit and withdraw after unpausing', async function () {
     const { tokenProxyAddress, token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await setMetadata(nearTokenId, tokenProxyAddress);
@@ -408,50 +379,6 @@ describe('BridgeToken', () => {
       .emit(BridgeTokenFactory, 'Paused')
       .withArgs(adminAccount.address, PauseMode.UnpausedAll);
 
-
-    await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
-    expect((await token.balanceOf(user.address)).toString()).to.be.equal('0')
-  })
-
-  it('can deposit and withdraw tokens after the specific token contract is unpaused', async function () {
-    const { tokenProxyAddress, token } = await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
-    await setMetadata(nearTokenId, tokenProxyAddress);
-
-    const amountToTransfer = 100;
-    const { proof: lockResultProof, proofBlockHeight } = getProofTemplate();
-    lockResultProof.outcome_proof.outcome.status.SuccessValue = serialize(SCHEMA, 'LockResult', {
-      prefix: RESULT_PREFIX_LOCK,
-      token: nearTokenId,
-      amount: amountToTransfer,
-      recipient: ethers.utils.arrayify(user.address),
-    }).toString('base64');
-    lockResultProof.outcome_proof.outcome.receipt_ids[0] = generateRandomBase58(64);
-
-    await BridgeTokenFactory.setTokenWhitelistMode(nearTokenId, WhitelistMode.CheckToken);
-    expect(
-      await BridgeTokenFactory.getTokenWhitelistMode(nearTokenId)
-    ).to.be.equal(WhitelistMode.CheckToken);
-
-    await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
-    await BridgeTokenFactory.pauseToken(nearTokenId);
-
-    await expect(
-      BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
-    )
-      .to
-      .be
-      .revertedWith('Pausable: paused');
-
-    lockResultProof.outcome_proof.outcome.receipt_ids[0] = generateRandomBase58(64);
-
-    await expect(
-      BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight)
-    )
-      .to
-      .be
-      .revertedWith('Pausable: paused');
-
-    await BridgeTokenFactory.unpauseToken(nearTokenId);
 
     await BridgeTokenFactory.connect(user).withdraw(nearTokenId, amountToTransfer, 'testrecipient.near')
     expect((await token.balanceOf(user.address)).toString()).to.be.equal('0')
@@ -509,7 +436,7 @@ describe('BridgeToken', () => {
     await expect(BridgeTokenFactory.connect(user).upgradeToken(nearTokenId, BridgeTokenV2.address))
       .to
       .be
-      .revertedWith(`AccessControl: account ${user.address.toLowerCase()} is missing role ${ADMIN_ROLE}`);
+      .revertedWith('AccessControlUnauthorizedAccount');
   })
 
   it('Test selective pause', async function () {
@@ -622,16 +549,12 @@ describe('BridgeToken', () => {
     const DEFAULT_ADMIN_ROLE = "0x0000000000000000000000000000000000000000000000000000000000000000";
     await expect(
       BridgeTokenFactory.connect(newAdminAccount).disableWhitelistMode()
-    ).to.be.revertedWith(
-      `is missing role ${DEFAULT_ADMIN_ROLE}`
-    );
+    ).to.be.revertedWith('AccessControlUnauthorizedAccount');
     expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
 
     await expect(
       BridgeTokenFactory.connect(newAdminAccount).enableWhitelistMode()
-    ).to.be.revertedWith(
-      `is missing role ${DEFAULT_ADMIN_ROLE}`
-    );
+    ).to.be.revertedWith('AccessControlUnauthorizedAccount');
     expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
 
     // Grant DEFAULT_ADMIN_ROLE to newAdminAccount
@@ -671,16 +594,12 @@ describe('BridgeToken', () => {
     // Check tx reverted on call from revoked adminAccount
     await expect(
       BridgeTokenFactory.connect(adminAccount).disableWhitelistMode()
-    ).to.be.revertedWith(
-      `is missing role ${DEFAULT_ADMIN_ROLE}`
-    );
+    ).to.be.revertedWith('AccessControlUnauthorizedAccount');
     expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
 
     await expect(
       BridgeTokenFactory.connect(adminAccount).enableWhitelistMode()
-    ).to.be.revertedWith(
-      `is missing role ${DEFAULT_ADMIN_ROLE}`
-    );
+    ).to.be.revertedWith('AccessControlUnauthorizedAccount');
     expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
 
     // Check newAdminAccount can perform admin calls

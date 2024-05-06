@@ -2,17 +2,19 @@ require('dotenv').config();
 const { ethers, upgrades } = require("hardhat");
 
 const PROOF_CONSUMER_ADDRESS = process.env.PROOF_CONSUMER_ADDRESS;
+const BRIDGE_TOKEN_IMPL_ADDRESS = process.env.BRIDGE_TOKEN_IMPL_ADDRESS;
 
 async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deploying contracts with the account:", deployer.address);
   console.log("Account balance:", (await deployer.getBalance()).toString());
   console.log("ProofConsumer address: ", PROOF_CONSUMER_ADDRESS);
+  console.log("Bridge token impl address: ", BRIDGE_TOKEN_IMPL_ADDRESS);
 
   const BridgeTokenFactoryContract = await ethers.getContractFactory("BridgeTokenFactory");
   const BridgeTokenFactory = await upgrades.deployProxy(
     BridgeTokenFactoryContract,
-    [PROOF_CONSUMER_ADDRESS],
+    [PROOF_CONSUMER_ADDRESS, BRIDGE_TOKEN_IMPL_ADDRESS],
     {
       initializer: 'initialize',
       timeout: 0

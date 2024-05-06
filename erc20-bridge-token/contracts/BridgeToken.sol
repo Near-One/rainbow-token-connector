@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 
-import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
 
 contract BridgeToken is
     Initializable,
+    UUPSUpgradeable,
     ERC20Upgradeable,
-    AccessControlUpgradeable,
-    PausableUpgradeable
+    OwnableUpgradeable
 {
     string private _name;
     string private _symbol;
@@ -18,30 +18,23 @@ contract BridgeToken is
 
     uint64 private _metadataLastUpdated;
 
-    bytes32 public constant PAUSE_ROLE = keccak256("PAUSE_ROLE");
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
 
     function initialize(
         string memory name_,
         string memory symbol_,
         uint8 decimals_
     ) external initializer {
-
         __ERC20_init(name_, symbol_);
-        __AccessControl_init();
+        __UUPSUpgradeable_init();
+        __Ownable_init(_msgSender());
 
-        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        _setupRole(PAUSE_ROLE, _msgSender());
         _name = name_;
         _symbol = symbol_;
         _decimals = decimals_;
-    }
-
-    function pause() external onlyRole(PAUSE_ROLE) {
-        _pause();
-    }
-
-    function unpause() external onlyRole(PAUSE_ROLE) {
-        _unpause();
     }
 
     function setMetadata(
@@ -49,7 +42,7 @@ contract BridgeToken is
         string memory symbol_,
         uint8 decimals_,
         uint64 blockHeight_
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external onlyOwner {
         _metadataLastUpdated = blockHeight_;
         _name = name_;
         _symbol = symbol_;
@@ -58,16 +51,14 @@ contract BridgeToken is
 
     function mint(address beneficiary, uint256 amount)
         external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-        whenNotPaused
+        onlyOwner
     {
         _mint(beneficiary, amount);
     }
 
     function burn(address act, uint256 amount)
         external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-        whenNotPaused
+        onlyOwner
     {
         _burn(act, amount);
     }
@@ -87,4 +78,8 @@ contract BridgeToken is
     function metadataLastUpdated() external view virtual returns (uint64) {
         return _metadataLastUpdated;
     }
+
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyOwner {}
 }

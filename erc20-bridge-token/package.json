@@ -5,14 +5,14 @@
     "license": "MIT",
     "dependencies": {
         "@openzeppelin/cli": "^2.8.1",
-        "@openzeppelin/contracts": "^4.7",
-        "@openzeppelin/contracts-upgradeable": "^4.5.2",
+        "@openzeppelin/contracts": "^5.0.2",
+        "@openzeppelin/contracts-upgradeable": "^5.0.2",
         "dotenv": "^16.0.1",
         "hardhat-contract-sizer": "^2.5.1",
+        "rainbow-bridge-eth2near-block-relay": "https://gitpkg.now.sh/aurora-is-near/rainbow-bridge/eth2near/eth2near-block-relay?327ff937bda3e3a99386fe488994f3c8e35f8aa0",
         "rainbow-bridge-lib": "https://gitpkg.now.sh/aurora-is-near/rainbow-bridge/utils?327ff937bda3e3a99386fe488994f3c8e35f8aa0",
         "rainbow-bridge-sol": "https://gitpkg.now.sh/aurora-is-near/rainbow-bridge/contracts/eth?327ff937bda3e3a99386fe488994f3c8e35f8aa0",
-        "rainbow-bridge-utils": "https://gitpkg.now.sh/aurora-is-near/rainbow-bridge/utils?327ff937bda3e3a99386fe488994f3c8e35f8aa0",
-        "rainbow-bridge-eth2near-block-relay": "https://gitpkg.now.sh/aurora-is-near/rainbow-bridge/eth2near/eth2near-block-relay?327ff937bda3e3a99386fe488994f3c8e35f8aa0"
+        "rainbow-bridge-utils": "https://gitpkg.now.sh/aurora-is-near/rainbow-bridge/utils?327ff937bda3e3a99386fe488994f3c8e35f8aa0"
     },
     "devDependencies": {
         "@nomiclabs/hardhat-ethers": "^2.1.0",

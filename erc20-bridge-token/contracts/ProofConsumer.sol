@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 
@@ -27,7 +27,7 @@ contract ProofConsumer is Ownable, IProofConsumer {
         bytes memory _nearTokenLocker,
         INearProver _prover,
         uint64 _minBlockAcceptanceHeight
-    )  {
+    ) Ownable(msg.sender) {
         require(
             _nearTokenLocker.length > 0,
             "Invalid Near Token Locker address"
