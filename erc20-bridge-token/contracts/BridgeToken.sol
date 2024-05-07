@@ -16,8 +16,6 @@ contract BridgeToken is
     string private _symbol;
     uint8 private _decimals;
 
-    uint64 private _metadataLastUpdated;
-
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
@@ -40,10 +38,8 @@ contract BridgeToken is
     function setMetadata(
         string memory name_,
         string memory symbol_,
-        uint8 decimals_,
-        uint64 blockHeight_
+        uint8 decimals_
     ) external onlyOwner {
-        _metadataLastUpdated = blockHeight_;
         _name = name_;
         _symbol = symbol_;
         _decimals = decimals_;
@@ -73,10 +69,6 @@ contract BridgeToken is
 
     function decimals() public view virtual override returns (uint8) {
         return _decimals;
-    }
-
-    function metadataLastUpdated() external view virtual returns (uint64) {
-        return _metadataLastUpdated;
     }
 
     function _authorizeUpgrade(

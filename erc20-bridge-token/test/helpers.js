@@ -1,3 +1,6 @@
+const { serialize } = require('rainbow-bridge-lib/borsh.js');
+const { borshifyOutcomeProof } = require('rainbow-bridge-lib/borshify-proof.js');
+
 const SCHEMA = {
   'SetMetadataResult': {
     kind: 'struct', fields: [
@@ -24,10 +27,31 @@ const RESULT_PREFIX_LOCK = Buffer.from("0a9eb877458579dbce83ea57d556be50d1c3160b
 const RESULT_PREFIX_METADATA = Buffer.from("b315d4d6e8f235f5fabb0b1a0f118507f6c8542fae8e1a9566abe60762047c16", "hex");
 
 const createEmptyToken = async (nearTokenId, BridgeTokenFactory, BridgeTokenInstance) => {
-  await BridgeTokenFactory.newBridgeToken(nearTokenId)
+  const { metadataProof, proofBlockHeight } = getMetadataProof(nearTokenId)
+  await BridgeTokenFactory.newBridgeToken(nearTokenId, borshifyOutcomeProof(metadataProof), proofBlockHeight)
   const tokenProxyAddress = await BridgeTokenFactory.nearToEthToken(nearTokenId)
   const token = BridgeTokenInstance.attach(tokenProxyAddress)
   return { tokenProxyAddress, token }
+}
+
+function getMetadataProof(nearTokenId) {
+  const { proof, proofBlockHeight } = getProofTemplate();
+  const metadata = createDefaultERC20Metadata(nearTokenId, proofBlockHeight);
+  proof.outcome_proof.outcome.receipt_ids[0] = generateRandomBase58(64);
+  proof.outcome_proof.outcome.status.SuccessValue = serialize(
+    SCHEMA,
+    "SetMetadataResult",
+    metadata
+  ).toString("base64");
+
+  return { metadataProof: proof, proofBlockHeight };
+}
+
+function getProofTemplate() {
+  return {
+    proof: require("./proof_template.json"),
+    proofBlockHeight: 1089,
+  };
 }
 
 const createDefaultERC20Metadata = (nearTokenId, blockHeight) => {
@@ -40,7 +64,6 @@ const createDefaultERC20Metadata = (nearTokenId, blockHeight) => {
     blockHeight
   }
 }
-
 
 const generateRandomBase58 = (rawSize) => {
   var rawInput = "0x";

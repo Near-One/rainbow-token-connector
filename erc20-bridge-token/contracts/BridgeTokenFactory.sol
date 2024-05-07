@@ -42,7 +42,6 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
     uint constant UNPAUSED_ALL = 0;
     uint constant PAUSED_WITHDRAW = 1 << 0;
     uint constant PAUSED_DEPOSIT = 1 << 1;
-    uint constant PAUSED_SET_METADATA = 1 << 2;
 
     // Event when funds are withdrawn from Ethereum back to NEAR.
     event Withdraw (
@@ -78,7 +77,6 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
         __Pausable_init_unchained();
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
         _grantRole(PAUSABLE_ADMIN_ROLE, _msgSender());
-        _isWhitelistModeEnabled = true;
     }
 
     function isBridgeToken(address token) external view returns (bool) {
@@ -95,12 +93,18 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
         return _nearToEthToken[nearTokenId];
     }
 
-    function newBridgeToken(string calldata nearTokenId) external returns (address) {
+    function newBridgeToken(string calldata nearTokenId, bytes memory proofData, uint64 proofBlockHeight) external returns (address) {
         require(!_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_TOKEN_EXIST");
+
+        ProofDecoder.ExecutionStatus memory status =
+            IProofConsumer(proofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
+        ResultsDecoder.MetadataResult memory result = ResultsDecoder.decodeMetadataResult(status.successValue);
 
         address bridgeTokenProxy = address(new ERC1967Proxy(
             tokenImplementationAddress,
-            abi.encodeWithSelector(BridgeToken.initialize.selector, "", "", 0)));
+            abi.encodeWithSelector(BridgeToken.initialize.selector, result.name, result.symbol, result.decimals)));
+
+        emit SetMetadata(bridgeTokenProxy, result.name, result.symbol, result.decimals);
 
         _isBridgeToken[address(bridgeTokenProxy)] = true;
         _ethToNearToken[address(bridgeTokenProxy)] = nearTokenId;
@@ -109,21 +113,14 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
         return bridgeTokenProxy;
     }
 
-    function setMetadata(bytes memory proofData, uint64 proofBlockHeight) external whenNotPaused(PAUSED_SET_METADATA) {
-        ProofDecoder.ExecutionStatus memory status =
-            IProofConsumer(proofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
-        ResultsDecoder.MetadataResult memory result = ResultsDecoder.decodeMetadataResult(status.successValue);
+    function setMetadata(string calldata token, string calldata name, string calldata symbol) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_isBridgeToken[_nearToEthToken[token]], "ERR_NOT_BRIDGE_TOKEN");
 
-        require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
-        require(
-            result.blockHeight >= BridgeToken(_nearToEthToken[result.token]).metadataLastUpdated(),
-            "ERR_OLD_METADATA"
-        );
+        BridgeToken bridgeToken = BridgeToken(_nearToEthToken[token]);
 
-        BridgeToken(_nearToEthToken[result.token])
-            .setMetadata(result.name, result.symbol, result.decimals, result.blockHeight);
+        bridgeToken.setMetadata(name, symbol, bridgeToken.decimals());
 
-        emit SetMetadata(_nearToEthToken[result.token], result.name, result.symbol, result.decimals);
+        emit SetMetadata(address(bridgeToken), name, symbol, bridgeToken.decimals());
     }
 
     function deposit(bytes memory proofData, uint64 proofBlockHeight) external whenNotPaused(PAUSED_DEPOSIT) {
@@ -158,15 +155,8 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
     function pauseWithdraw() external onlyRole(PAUSABLE_ADMIN_ROLE) {
         _pause(pausedFlags() | PAUSED_WITHDRAW);
     }
-
-    function pauseSetMetadata() external onlyRole(PAUSABLE_ADMIN_ROLE) {
-        _pause(pausedFlags() | PAUSED_SET_METADATA);
-    }
-
     function pauseAll() external onlyRole(PAUSABLE_ADMIN_ROLE) {
-        uint flags = PAUSED_DEPOSIT |
-            PAUSED_WITHDRAW |
-            PAUSED_SET_METADATA;
+        uint flags = PAUSED_DEPOSIT | PAUSED_WITHDRAW;
         _pause(flags);
     }
 
@@ -221,11 +211,10 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
 
         WhitelistMode tokenMode = _whitelistedTokens[token];
         require(tokenMode != WhitelistMode.NotInitialized, "ERR_NOT_INITIALIZED_WHITELIST_TOKEN");
+        require(tokenMode != WhitelistMode.Blocked, "ERR_WHITELIST_TOKEN_BLOCKED");
 
         if (tokenMode == WhitelistMode.CheckAccountAndToken) {
             require(_whitelistedAccounts[abi.encodePacked(token, account)], "ERR_ACCOUNT_NOT_IN_WHITELIST");
-        } else if (tokenMode == WhitelistMode.Blocked) {
-            revert("ERR_WHITELIST_TOKEN_BLOCKED");
         }
     }
 
