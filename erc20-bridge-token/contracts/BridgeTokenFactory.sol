@@ -38,11 +38,7 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
     address public proofConsumerAddress;
     address public tokenImplementationAddress;
 
-    bytes32 public constant ADMIN_PAUSE_ROLE = keccak256("ADMIN_PAUSE_ROLE");
-    bytes32 public constant PAUSE_DEPOSIT_ROLE = keccak256("PAUSE_DEPOSIT_ROLE");
-    bytes32 public constant PAUSE_WITHDRAW_ROLE = keccak256("PAUSE_WITHDRAW_ROLE");
-    bytes32 public constant PAUSE_SET_METADATA_ROLE = keccak256("PAUSE_SET_METADATA_ROLE");
-    bytes32 public constant WHITELIST_ADMIN_ROLE = keccak256("WHITELIST_ADMIN_ROLE");
+    bytes32 public constant PAUSABLE_ADMIN_ROLE = keccak256("PAUSABLE_ADMIN_ROLE");
     uint constant UNPAUSED_ALL = 0;
     uint constant PAUSED_WITHDRAW = 1 << 0;
     uint constant PAUSED_DEPOSIT = 1 << 1;
@@ -81,11 +77,7 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
         __AccessControl_init();
         __Pausable_init_unchained();
         _grantRole(DEFAULT_ADMIN_ROLE, _msgSender());
-        _grantRole(ADMIN_PAUSE_ROLE, _msgSender());
-        _grantRole(PAUSE_DEPOSIT_ROLE, _msgSender());
-        _grantRole(PAUSE_WITHDRAW_ROLE, _msgSender());
-        _grantRole(PAUSE_SET_METADATA_ROLE, _msgSender());
-        _grantRole(WHITELIST_ADMIN_ROLE, _msgSender());
+        _grantRole(PAUSABLE_ADMIN_ROLE, _msgSender());
         _isWhitelistModeEnabled = true;
     }
 
@@ -155,20 +147,27 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
         emit Withdraw(token, msg.sender, amount, recipient, tokenEthAddress);
     }
 
-    function pause(uint flags) external onlyRole(ADMIN_PAUSE_ROLE) {
+    function pause(uint flags) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _pause(flags);
     }
 
-    function pauseDeposit() external onlyRole(PAUSE_DEPOSIT_ROLE) {
+    function pauseDeposit() external onlyRole(PAUSABLE_ADMIN_ROLE) {
         _pause(pausedFlags() | PAUSED_DEPOSIT);
     }
 
-    function pauseWithdraw() external onlyRole(PAUSE_WITHDRAW_ROLE) {
+    function pauseWithdraw() external onlyRole(PAUSABLE_ADMIN_ROLE) {
         _pause(pausedFlags() | PAUSED_WITHDRAW);
     }
 
-    function pauseSetMetadata() external onlyRole(PAUSE_SET_METADATA_ROLE) {
+    function pauseSetMetadata() external onlyRole(PAUSABLE_ADMIN_ROLE) {
         _pause(pausedFlags() | PAUSED_SET_METADATA);
+    }
+
+    function pauseAll() external onlyRole(PAUSABLE_ADMIN_ROLE) {
+        uint flags = PAUSED_DEPOSIT |
+            PAUSED_WITHDRAW |
+            PAUSED_SET_METADATA;
+        _pause(flags);
     }
 
     function isWhitelistModeEnabled() view external returns(bool) {
@@ -202,16 +201,16 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
         _isWhitelistModeEnabled = false;
     }
 
-    function setTokenWhitelistMode(string calldata token, WhitelistMode mode) external onlyRole(WHITELIST_ADMIN_ROLE) {
+    function setTokenWhitelistMode(string calldata token, WhitelistMode mode) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _whitelistedTokens[token] = mode;
     }
 
-    function addAccountToWhitelist(string calldata token, address account) external onlyRole(WHITELIST_ADMIN_ROLE) {
+    function addAccountToWhitelist(string calldata token, address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(_whitelistedTokens[token] != WhitelistMode.NotInitialized, "ERR_NOT_INITIALIZED_WHITELIST_TOKEN");
        _whitelistedAccounts[abi.encodePacked(token, account)] = true;
     }
 
-    function removeAccountFromWhitelist(string calldata token, address account) external onlyRole(WHITELIST_ADMIN_ROLE) {
+    function removeAccountFromWhitelist(string calldata token, address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
         delete _whitelistedAccounts[abi.encodePacked(token, account)];
     }
 

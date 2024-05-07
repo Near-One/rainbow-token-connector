@@ -517,6 +517,21 @@ describe('BridgeToken', () => {
       .emit(BridgeTokenFactory, 'Paused')
       .withArgs(adminAccount.address, PauseMode.UnpausedAll);
     expect(await BridgeTokenFactory.pausedFlags()).to.be.equal(PauseMode.UnpausedAll);
+
+    // Pause all
+    await expect(
+      BridgeTokenFactory.pauseAll()
+    )
+      .to
+      .emit(BridgeTokenFactory, 'Paused')
+      .withArgs(adminAccount.address, PauseMode.PausedDeposit | PauseMode.PausedWithdraw | PauseMode.PausedSetMetadata);
+    expect(await BridgeTokenFactory.pausedFlags())
+      .to
+      .be
+      .equal(PauseMode.PausedDeposit | PauseMode.PausedWithdraw | PauseMode.PausedSetMetadata);
+    expect(await BridgeTokenFactory.paused(PauseMode.PausedDeposit)).to.be.equal(true);
+    expect(await BridgeTokenFactory.paused(PauseMode.PausedWithdraw)).to.be.equal(true);
+    expect(await BridgeTokenFactory.paused(PauseMode.PausedSetMetadata)).to.be.equal(true);
   })
 
   it("Test setProofConsumer ", async function() {
