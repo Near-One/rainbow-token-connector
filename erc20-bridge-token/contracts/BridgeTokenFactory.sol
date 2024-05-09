@@ -5,7 +5,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {UUPSUpgradeable} from '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
 import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
@@ -16,7 +16,11 @@ import "./BridgeToken.sol";
 import "./ResultsDecoder.sol";
 import "./SelectivePausableUpgradable.sol";
 
-contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, SelectivePausableUpgradable {
+contract BridgeTokenFactory is
+    UUPSUpgradeable,
+    AccessControlUpgradeable,
+    SelectivePausableUpgradable
+{
     using Borsh for Borsh.Data;
     using SafeERC20 for IERC20;
 
@@ -44,7 +48,7 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
     uint constant PAUSED_DEPOSIT = 1 << 1;
 
     // Event when funds are withdrawn from Ethereum back to NEAR.
-    event Withdraw (
+    event Withdraw(
         string token,
         address indexed sender,
         uint256 amount,
@@ -52,23 +56,20 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
         address indexed tokenEthAddress
     );
 
-    event Deposit (
-        string indexed token,
-        uint256 amount,
-        address recipient
-    );
+    event Deposit(string indexed token, uint256 amount, address recipient);
 
-    event SetMetadata (
-        address indexed token,
-        string name,
-        string symbol,
-        uint8 decimals
-    );
+    event SetMetadata(address indexed token, string name, string symbol, uint8 decimals);
 
     // BridgeTokenFactory is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
-    function initialize(address _proofConsumerAddress, address _tokenImplementationAddress) external initializer {
-        require(_proofConsumerAddress != address(0), "Proof consumer shouldn't be zero address");
+    function initialize(
+        address _proofConsumerAddress,
+        address _tokenImplementationAddress
+    ) external initializer {
+        require(
+            _proofConsumerAddress != address(0),
+            "Proof consumer should not be zero address"
+        );
         proofConsumerAddress = _proofConsumerAddress;
         tokenImplementationAddress = _tokenImplementationAddress;
 
@@ -93,16 +94,30 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
         return _nearToEthToken[nearTokenId];
     }
 
-    function newBridgeToken(string calldata nearTokenId, bytes memory proofData, uint64 proofBlockHeight) external returns (address) {
+    function newBridgeToken(
+        string calldata nearTokenId,
+        bytes memory proofData,
+        uint64 proofBlockHeight
+    ) external returns (address) {
         require(!_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_TOKEN_EXIST");
 
-        ProofDecoder.ExecutionStatus memory status =
-            IProofConsumer(proofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
-        ResultsDecoder.MetadataResult memory result = ResultsDecoder.decodeMetadataResult(status.successValue);
+        ProofDecoder.ExecutionStatus memory status = IProofConsumer(proofConsumerAddress)
+            .parseAndConsumeProof(proofData, proofBlockHeight);
+        ResultsDecoder.MetadataResult memory result = ResultsDecoder.decodeMetadataResult(
+            status.successValue
+        );
 
-        address bridgeTokenProxy = address(new ERC1967Proxy(
-            tokenImplementationAddress,
-            abi.encodeWithSelector(BridgeToken.initialize.selector, result.name, result.symbol, result.decimals)));
+        address bridgeTokenProxy = address(
+            new ERC1967Proxy(
+                tokenImplementationAddress,
+                abi.encodeWithSelector(
+                    BridgeToken.initialize.selector,
+                    result.name,
+                    result.symbol,
+                    result.decimals
+                )
+            )
+        );
 
         emit SetMetadata(bridgeTokenProxy, result.name, result.symbol, result.decimals);
 
@@ -113,7 +128,11 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
         return bridgeTokenProxy;
     }
 
-    function setMetadata(string calldata token, string calldata name, string calldata symbol) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setMetadata(
+        string calldata token,
+        string calldata name,
+        string calldata symbol
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         require(_isBridgeToken[_nearToEthToken[token]], "ERR_NOT_BRIDGE_TOKEN");
 
         BridgeToken bridgeToken = BridgeToken(_nearToEthToken[token]);
@@ -123,10 +142,15 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
         emit SetMetadata(address(bridgeToken), name, symbol, bridgeToken.decimals());
     }
 
-    function deposit(bytes memory proofData, uint64 proofBlockHeight) external whenNotPaused(PAUSED_DEPOSIT) {
-        ProofDecoder.ExecutionStatus memory status
-            = IProofConsumer(proofConsumerAddress).parseAndConsumeProof(proofData, proofBlockHeight);
-        ResultsDecoder.LockResult memory result = ResultsDecoder.decodeLockResult(status.successValue);
+    function deposit(
+        bytes memory proofData,
+        uint64 proofBlockHeight
+    ) external whenNotPaused(PAUSED_DEPOSIT) {
+        ProofDecoder.ExecutionStatus memory status = IProofConsumer(proofConsumerAddress)
+            .parseAndConsumeProof(proofData, proofBlockHeight);
+        ResultsDecoder.LockResult memory result = ResultsDecoder.decodeLockResult(
+            status.successValue
+        );
 
         require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
         BridgeToken(_nearToEthToken[result.token]).mint(result.recipient, result.amount);
@@ -134,7 +158,11 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
         emit Deposit(result.token, result.amount, result.recipient);
     }
 
-    function withdraw(string memory token, uint256 amount, string memory recipient) external whenNotPaused(PAUSED_WITHDRAW) {
+    function withdraw(
+        string memory token,
+        uint256 amount,
+        string memory recipient
+    ) external whenNotPaused(PAUSED_WITHDRAW) {
         _checkWhitelistedToken(token, msg.sender);
         require(_isBridgeToken[_nearToEthToken[token]], "ERR_NOT_BRIDGE_TOKEN");
 
@@ -160,26 +188,39 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
         _pause(flags);
     }
 
-    function isWhitelistModeEnabled() view external returns(bool) {
+    function isWhitelistModeEnabled() external view returns (bool) {
         return _isWhitelistModeEnabled;
     }
 
-    function getTokenWhitelistMode(string calldata token) view external returns(WhitelistMode) {
+    function getTokenWhitelistMode(
+        string calldata token
+    ) external view returns (WhitelistMode) {
         return _whitelistedTokens[token];
     }
 
-    function isAccountWhitelistedForToken(string calldata token, address account) view external returns(bool) {
+    function isAccountWhitelistedForToken(
+        string calldata token,
+        address account
+    ) external view returns (bool) {
         return _whitelistedAccounts[abi.encodePacked(token, account)];
     }
 
-    function upgradeToken(string calldata nearTokenId, address implementation) external onlyRole(DEFAULT_ADMIN_ROLE) {
-       require(_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_NOT_BRIDGE_TOKEN");
-       BridgeToken proxy = BridgeToken(payable(_nearToEthToken[nearTokenId]));
-       proxy.upgradeToAndCall(implementation, bytes(""));
+    function upgradeToken(
+        string calldata nearTokenId,
+        address implementation
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_NOT_BRIDGE_TOKEN");
+        BridgeToken proxy = BridgeToken(payable(_nearToEthToken[nearTokenId]));
+        proxy.upgradeToAndCall(implementation, bytes(""));
     }
 
-    function setProofConsumer(address newProofConsumerAddress) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(newProofConsumerAddress != address(0), "Proof consumer shouldn't be zero address");
+    function setProofConsumer(
+        address newProofConsumerAddress
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(
+            newProofConsumerAddress != address(0),
+            "Proof consumer should not be zero address"
+        );
         proofConsumerAddress = newProofConsumerAddress;
     }
 
@@ -191,16 +232,28 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
         _isWhitelistModeEnabled = false;
     }
 
-    function setTokenWhitelistMode(string calldata token, WhitelistMode mode) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setTokenWhitelistMode(
+        string calldata token,
+        WhitelistMode mode
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _whitelistedTokens[token] = mode;
     }
 
-    function addAccountToWhitelist(string calldata token, address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(_whitelistedTokens[token] != WhitelistMode.NotInitialized, "ERR_NOT_INITIALIZED_WHITELIST_TOKEN");
-       _whitelistedAccounts[abi.encodePacked(token, account)] = true;
+    function addAccountToWhitelist(
+        string calldata token,
+        address account
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        require(
+            _whitelistedTokens[token] != WhitelistMode.NotInitialized,
+            "ERR_NOT_INITIALIZED_WHITELIST_TOKEN"
+        );
+        _whitelistedAccounts[abi.encodePacked(token, account)] = true;
     }
 
-    function removeAccountFromWhitelist(string calldata token, address account) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function removeAccountFromWhitelist(
+        string calldata token,
+        address account
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         delete _whitelistedAccounts[abi.encodePacked(token, account)];
     }
 
@@ -210,11 +263,17 @@ contract BridgeTokenFactory is UUPSUpgradeable, AccessControlUpgradeable, Select
         }
 
         WhitelistMode tokenMode = _whitelistedTokens[token];
-        require(tokenMode != WhitelistMode.NotInitialized, "ERR_NOT_INITIALIZED_WHITELIST_TOKEN");
+        require(
+            tokenMode != WhitelistMode.NotInitialized,
+            "ERR_NOT_INITIALIZED_WHITELIST_TOKEN"
+        );
         require(tokenMode != WhitelistMode.Blocked, "ERR_WHITELIST_TOKEN_BLOCKED");
 
         if (tokenMode == WhitelistMode.CheckAccountAndToken) {
-            require(_whitelistedAccounts[abi.encodePacked(token, account)], "ERR_ACCOUNT_NOT_IN_WHITELIST");
+            require(
+                _whitelistedAccounts[abi.encodePacked(token, account)],
+                "ERR_ACCOUNT_NOT_IN_WHITELIST"
+            );
         }
     }
 

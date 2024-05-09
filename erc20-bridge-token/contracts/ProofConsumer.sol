@@ -23,15 +23,12 @@ contract ProofConsumer is Ownable, IProofConsumer {
     // OutcomeReciptId -> Used
     mapping(bytes32 => bool) public usedProofs;
 
-    constructor (
+    constructor(
         bytes memory _nearTokenLocker,
         INearProver _prover,
         uint64 _minBlockAcceptanceHeight
     ) Ownable(msg.sender) {
-        require(
-            _nearTokenLocker.length > 0,
-            "Invalid Near Token Locker address"
-        );
+        require(_nearTokenLocker.length > 0, "Invalid Near Token Locker address");
         require(address(_prover) != address(0), "Invalid Near prover address");
 
         nearTokenLocker = _nearTokenLocker;
@@ -44,7 +41,7 @@ contract ProofConsumer is Ownable, IProofConsumer {
     function parseAndConsumeProof(
         bytes memory proofData,
         uint64 proofBlockHeight
-    ) external onlyOwner override returns (ProofDecoder.ExecutionStatus memory result) {
+    ) external override onlyOwner returns (ProofDecoder.ExecutionStatus memory result) {
         require(
             prover.proveOutcome(proofData, proofBlockHeight),
             "Proof should be valid"
@@ -67,19 +64,12 @@ contract ProofConsumer is Ownable, IProofConsumer {
             .outcome_with_id
             .outcome
             .receipt_ids[0];
-        require(
-            !usedProofs[receiptId],
-            "The burn event proof cannot be reused"
-        );
+        require(!usedProofs[receiptId], "The burn event proof cannot be reused");
         usedProofs[receiptId] = true;
 
         require(
             keccak256(
-                fullOutcomeProof
-                    .outcome_proof
-                    .outcome_with_id
-                    .outcome
-                    .executor_id
+                fullOutcomeProof.outcome_proof.outcome_with_id.outcome.executor_id
             ) == keccak256(nearTokenLocker),
             "Can only unlock tokens/set metadata from the linked proof produced on Near blockchain"
         );

@@ -20,9 +20,14 @@ abstract contract SelectivePausableUpgradable is Initializable, ContextUpgradeab
     }
 
     // keccak256(abi.encode(uint256(keccak256("aurora.SelectivePausable")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant SelectivePausableStorageLocation = 0x3385e98de875c27690676838324244576ee92c4384629b3b7dd9c0a7c978e200;
+    bytes32 private constant SelectivePausableStorageLocation =
+        0x3385e98de875c27690676838324244576ee92c4384629b3b7dd9c0a7c978e200;
 
-    function _getSelectivePausableStorage() private pure returns (SelectivePausableStorage storage $) {
+    function _getSelectivePausableStorage()
+        private
+        pure
+        returns (SelectivePausableStorage storage $)
+    {
         assembly {
             $.slot := SelectivePausableStorageLocation
         }

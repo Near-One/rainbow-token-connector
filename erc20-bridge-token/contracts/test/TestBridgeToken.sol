@@ -5,7 +5,7 @@ import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
-import '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 contract TestBridgeToken is
     Initializable,
@@ -14,7 +14,6 @@ contract TestBridgeToken is
     AccessControlUpgradeable,
     PausableUpgradeable
 {
-
     string private _name;
     string private _symbol;
     uint8 private _decimals;
@@ -28,7 +27,6 @@ contract TestBridgeToken is
         string memory symbol_,
         uint8 decimals_
     ) external initializer {
-
         __ERC20_init(_name, _symbol);
         __AccessControl_init();
 
@@ -59,19 +57,17 @@ contract TestBridgeToken is
         _decimals = decimals_;
     }
 
-    function mint(address beneficiary, uint256 amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-        whenNotPaused
-    {
+    function mint(
+        address beneficiary,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused {
         _mint(beneficiary, amount);
     }
 
-    function burn(address act, uint256 amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-        whenNotPaused
-    {
+    function burn(
+        address act,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused {
         _burn(act, amount);
     }
 

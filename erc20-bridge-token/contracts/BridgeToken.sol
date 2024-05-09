@@ -4,7 +4,7 @@ pragma solidity ^0.8.24;
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {UUPSUpgradeable} from '@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol';
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 contract BridgeToken is
     Initializable,
@@ -45,17 +45,11 @@ contract BridgeToken is
         _decimals = decimals_;
     }
 
-    function mint(address beneficiary, uint256 amount)
-        external
-        onlyOwner
-    {
+    function mint(address beneficiary, uint256 amount) external onlyOwner {
         _mint(beneficiary, amount);
     }
 
-    function burn(address act, uint256 amount)
-        external
-        onlyOwner
-    {
+    function burn(address act, uint256 amount) external onlyOwner {
         _burn(act, amount);
     }
 
@@ -71,7 +65,5 @@ contract BridgeToken is
         return _decimals;
     }
 
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
