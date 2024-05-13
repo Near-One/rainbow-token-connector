@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/utils/ContextUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -15,6 +15,24 @@ import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
  * simply including this module, only once the modifiers are put in place.
  */
 abstract contract SelectivePausableUpgradable is Initializable, ContextUpgradeable {
+    struct SelectivePausableStorage {
+        uint _pausedFlags;
+    }
+
+    // keccak256(abi.encode(uint256(keccak256("aurora.SelectivePausable")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant SelectivePausableStorageLocation =
+        0x3385e98de875c27690676838324244576ee92c4384629b3b7dd9c0a7c978e200;
+
+    function _getSelectivePausableStorage()
+        private
+        pure
+        returns (SelectivePausableStorage storage $)
+    {
+        assembly {
+            $.slot := SelectivePausableStorageLocation
+        }
+    }
+
     /**
      * @dev Emitted when the pause is triggered by `account`.
      */
@@ -30,7 +48,8 @@ abstract contract SelectivePausableUpgradable is Initializable, ContextUpgradeab
     }
 
     function __Pausable_init_unchained() internal onlyInitializing {
-        _pausedFlags = 0;
+        SelectivePausableStorage storage $ = _getSelectivePausableStorage();
+        $._pausedFlags = 0;
     }
 
     /**
@@ -61,14 +80,16 @@ abstract contract SelectivePausableUpgradable is Initializable, ContextUpgradeab
      * @dev Returns true if the contract is paused, and false otherwise.
      */
     function paused(uint flag) public view virtual returns (bool) {
-        return (_pausedFlags & flag) != 0;
+        SelectivePausableStorage storage $ = _getSelectivePausableStorage();
+        return ($._pausedFlags & flag) != 0;
     }
 
     /**
      * @dev Returns paused flags.
      */
     function pausedFlags() public view virtual returns (uint) {
-        return _pausedFlags;
+        SelectivePausableStorage storage $ = _getSelectivePausableStorage();
+        return $._pausedFlags;
     }
 
     /**
@@ -89,14 +110,8 @@ abstract contract SelectivePausableUpgradable is Initializable, ContextUpgradeab
      * @dev Triggers stopped state.
      */
     function _pause(uint flags) internal virtual {
-        _pausedFlags = flags;
-        emit Paused(_msgSender(), _pausedFlags);
+        SelectivePausableStorage storage $ = _getSelectivePausableStorage();
+        $._pausedFlags = flags;
+        emit Paused(_msgSender(), $._pausedFlags);
     }
-
-    /**
-     * @dev This empty reserved space is put in place to allow future versions to add new
-     * variables without shifting down storage in the inheritance chain.
-     * See https://docs.openzeppelin.com/contracts/4.x/upgradeable#storage_gaps
-     */
-    uint256[49] private __gap;
 }

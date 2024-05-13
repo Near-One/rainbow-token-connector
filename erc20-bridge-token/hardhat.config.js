@@ -151,21 +151,27 @@ module.exports = {
   solidity: {
     compilers: [
       {
-        version: '0.8.11',
+        version: '0.8.24',
         settings: {
           optimizer: {
             enabled: true,
             runs: 200
+          },
+          metadata: {
+            // do not include the metadata hash, since this is machine dependent
+            // and we want all generated code to be deterministic
+            // https://docs.soliditylang.org/en/v0.8.24/metadata.html
+            bytecodeHash: "none"
           }
         }
       }
     ]
   },
   networks: {
-    goerli: {
+    sepolia: {
       url: INFURA_API_KEY
-        ? `https://goerli.infura.io/v3/${INFURA_API_KEY}`
-        : `https://eth-goerli.alchemyapi.io/v2/${ALCHEMY_API_KEY}`,
+        ? `https://sepolia.infura.io/v3/${INFURA_API_KEY}`
+        : `https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_API_KEY}`,
       accounts: [`${ETH_PRIVATE_KEY}`]
     },
     mainnet: {

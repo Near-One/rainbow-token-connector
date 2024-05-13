@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 
 import "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin/contracts-upgradeable/security/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/utils/PausableUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 contract TestBridgeToken is
     Initializable,
+    UUPSUpgradeable,
     ERC20Upgradeable,
     AccessControlUpgradeable,
     PausableUpgradeable
 {
-
     string private _name;
     string private _symbol;
     uint8 private _decimals;
@@ -26,12 +27,11 @@ contract TestBridgeToken is
         string memory symbol_,
         uint8 decimals_
     ) external initializer {
-
         __ERC20_init(_name, _symbol);
         __AccessControl_init();
 
-        _setupRole(DEFAULT_ADMIN_ROLE, _msgSender()); //should be sender or controller?
-        _setupRole(PAUSE_ROLE, _msgSender());
+        _grantRole(DEFAULT_ADMIN_ROLE, _msgSender()); //should be sender or controller?
+        _grantRole(PAUSE_ROLE, _msgSender());
         _name = name_;
         _symbol = symbol_;
         _decimals = decimals_;
@@ -57,19 +57,17 @@ contract TestBridgeToken is
         _decimals = decimals_;
     }
 
-    function mint(address beneficiary, uint256 amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-        whenNotPaused
-    {
+    function mint(
+        address beneficiary,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused {
         _mint(beneficiary, amount);
     }
 
-    function burn(address act, uint256 amount)
-        external
-        onlyRole(DEFAULT_ADMIN_ROLE)
-        whenNotPaused
-    {
+    function burn(
+        address act,
+        uint256 amount
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) whenNotPaused {
         _burn(act, amount);
     }
 
@@ -92,4 +90,8 @@ contract TestBridgeToken is
     function returnTestString() external pure returns (string memory) {
         return "test";
     }
+
+    function _authorizeUpgrade(
+        address newImplementation
+    ) internal override onlyRole(DEFAULT_ADMIN_ROLE) {}
 }

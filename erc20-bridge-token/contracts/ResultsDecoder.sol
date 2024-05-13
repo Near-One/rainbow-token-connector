@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.24;
 import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 
 library ResultsDecoder {
@@ -22,11 +22,9 @@ library ResultsDecoder {
         uint64 blockHeight;
     }
 
-    function decodeLockResult(bytes memory data)
-        internal
-        pure
-        returns (LockResult memory result)
-    {
+    function decodeLockResult(
+        bytes memory data
+    ) internal pure returns (LockResult memory result) {
         Borsh.Data memory borshData = Borsh.from(data);
         bytes32 prefix = borshData.decodeBytes32();
         require(prefix == RESULT_PREFIX_LOCK, "ERR_INVALID_LOCK_PREFIX");
@@ -37,17 +35,12 @@ library ResultsDecoder {
         borshData.done();
     }
 
-    function decodeMetadataResult(bytes memory data)
-        internal
-        pure
-        returns (MetadataResult memory result)
-    {
+    function decodeMetadataResult(
+        bytes memory data
+    ) internal pure returns (MetadataResult memory result) {
         Borsh.Data memory borshData = Borsh.from(data);
         bytes32 prefix = borshData.decodeBytes32();
-        require(
-            prefix == RESULT_PREFIX_METADATA,
-            "ERR_INVALID_METADATA_PREFIX"
-        );
+        require(prefix == RESULT_PREFIX_METADATA, "ERR_INVALID_METADATA_PREFIX");
         result.token = string(borshData.decodeBytes());
         result.name = string(borshData.decodeBytes());
         result.symbol = string(borshData.decodeBytes());
