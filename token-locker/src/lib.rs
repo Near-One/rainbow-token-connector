@@ -2,7 +2,6 @@ use near_plugins::{
     access_control, access_control_any, pause, AccessControlRole, AccessControllable, Pausable,
     Upgradable,
 };
-use std::convert::TryInto;
 
 use near_contract_standards::fungible_token::metadata::FungibleTokenMetadata;
 use near_contract_standards::storage_management::StorageBalance;
@@ -82,9 +81,6 @@ pub struct Contract {
     pub eth_factory_address: EthAddress,
     /// Hashes of the events that were already used.
     pub used_events: UnorderedSet<Vec<u8>>,
-    /// Mask determining all paused functions
-    #[deprecated]
-    paused: Mask,
     /// Mapping whitelisted tokens to their mode
     pub whitelist_tokens: UnorderedMap<AccountId, WhitelistMode>,
     /// Mapping whitelisted accounts to their whitelisted tokens by using combined key {token}:{account}
@@ -109,10 +105,10 @@ pub trait ExtContract {
         #[callback]
         #[serializer(borsh)]
         verification_success: bool,
-        #[serializer(borsh)] token: String,
-        #[serializer(borsh)] new_owner_id: String,
+        #[serializer(borsh)] token: AccountId,
+        #[serializer(borsh)] recipient: Recipient,
         #[serializer(borsh)] amount: Balance,
-        #[serializer(borsh)] proof: Proof,
+        #[serializer(borsh)] proof_key: Vec<u8>,
     ) -> Promise;
 
     #[result_serializer(borsh)]
@@ -126,8 +122,8 @@ pub trait ExtContract {
         &self,
         #[callback] storage_balance: Option<StorageBalance>,
         #[serializer(borsh)] proof: Proof,
-        #[serializer(borsh)] token: String,
-        #[serializer(borsh)] recipient: AccountId,
+        #[serializer(borsh)] token: AccountId,
+        #[serializer(borsh)] recipient: Recipient,
         #[serializer(borsh)] amount: Balance,
     );
 }
@@ -165,7 +161,6 @@ impl Contract {
             prover_account,
             used_events: UnorderedSet::new(StorageKey::UsedEvents),
             eth_factory_address: validate_eth_address(factory_address),
-            paused: Mask::default(),
             whitelist_tokens: UnorderedMap::new(StorageKey::WhitelistTokens),
             whitelist_accounts: UnorderedSet::new(StorageKey::WhitelistAccounts),
             is_whitelist_mode_enabled: true,
@@ -218,14 +213,15 @@ impl Contract {
             hex::encode(&self.eth_factory_address),
         );
 
-        let Recipient {
-            target: recipient_account_id,
-            message: _,
-        } = parse_recipient(event.recipient);
+        let recipient = parse_recipient(event.recipient);
+        let token: AccountId = event
+            .token
+            .parse()
+            .unwrap_or_else(|_| env::panic_str("Invalid token id"));
 
-        ext_token::ext(event.token.clone().try_into().unwrap())
+        ext_token::ext(token.clone())
             .with_static_gas(STORAGE_BALANCE_CALL_GAS)
-            .storage_balance_of(Some(recipient_account_id.clone()))
+            .storage_balance_of(Some(recipient.target.clone()))
             .then(
                 ext_self::ext(env::current_account_id())
                     .with_static_gas(
@@ -234,12 +230,7 @@ impl Contract {
                             + FT_TRANSFER_CALL_GAS,
                     )
                     .with_attached_deposit(env::attached_deposit())
-                    .storage_balance_callback(
-                        proof,
-                        event.token,
-                        recipient_account_id,
-                        event.amount,
-                    ),
+                    .storage_balance_callback(proof, token, recipient, event.amount),
             )
     }
 
@@ -248,17 +239,17 @@ impl Contract {
         &self,
         #[callback] storage_balance: Option<StorageBalance>,
         #[serializer(borsh)] proof: Proof,
-        #[serializer(borsh)] token: String,
-        #[serializer(borsh)] recipient: AccountId,
+        #[serializer(borsh)] token: AccountId,
+        #[serializer(borsh)] recipient: Recipient,
         #[serializer(borsh)] amount: Balance,
     ) -> Promise {
         assert!(
             storage_balance.is_some(),
             "The account {} is not registered",
-            recipient
+            recipient.target
         );
 
-        let proof_1 = proof.clone();
+        let proof_key = proof.get_key();
         ext_prover::ext(self.prover_account.clone())
             .with_static_gas(VERIFY_LOG_ENTRY_GAS)
             .with_attached_deposit(NO_DEPOSIT)
@@ -275,7 +266,7 @@ impl Contract {
                 ext_self::ext(env::current_account_id())
                     .with_attached_deposit(env::attached_deposit())
                     .with_static_gas(FINISH_WITHDRAW_GAS + FT_TRANSFER_CALL_GAS)
-                    .finish_withdraw(token, recipient.to_string(), amount, proof_1),
+                    .finish_withdraw(token, recipient, amount, proof_key),
             )
     }
 
@@ -297,32 +288,23 @@ impl Contract {
         #[callback]
         #[serializer(borsh)]
         verification_success: bool,
-        #[serializer(borsh)] token: String,
-        #[serializer(borsh)] new_owner_id: String,
+        #[serializer(borsh)] token: AccountId,
+        #[serializer(borsh)] recipient: Recipient,
         #[serializer(borsh)] amount: Balance,
-        #[serializer(borsh)] proof: Proof,
+        #[serializer(borsh)] proof_key: Vec<u8>,
     ) -> Promise {
         assert!(verification_success, "Failed to verify the proof");
-        let required_deposit = self.record_proof(&proof);
-
+        let required_deposit = self.record_proof(&proof_key);
         assert!(env::attached_deposit() >= required_deposit);
 
-        let Recipient { target, message } = parse_recipient(new_owner_id);
-
-        env::log_str(
-            format!(
-                "Finish deposit. Token:{} Target:{} Message:{:?}",
-                token, target, message
-            )
-            .as_str(),
-        );
+        let Recipient { target, message } = recipient;
 
         match message {
-            Some(message) => ext_token::ext(token.try_into().unwrap())
+            Some(message) => ext_token::ext(token)
                 .with_attached_deposit(near_sdk::ONE_YOCTO)
                 .with_static_gas(FT_TRANSFER_CALL_GAS)
                 .ft_transfer_call(target, amount.into(), None, message),
-            None => ext_token::ext(token.try_into().unwrap())
+            None => ext_token::ext(token)
                 .with_attached_deposit(near_sdk::ONE_YOCTO)
                 .with_static_gas(FT_TRANSFER_GAS)
                 .ft_transfer(target, amount.into(), None),
@@ -334,14 +316,15 @@ impl Contract {
         self.used_events.contains(&proof.get_key())
     }
 
+    #[access_control_any(roles(Role::DAO))]
+    pub fn update_factory_address(&mut self, factory_address: String) {
+        self.eth_factory_address = validate_eth_address(factory_address);
+    }
+
     /// Record proof to make sure it is not re-used later for anther withdrawal.
-    #[private]
-    fn record_proof(&mut self, proof: &Proof) -> Balance {
-        // TODO: Instead of sending the full proof (clone only relevant parts of the Proof)
-        //       log_index / receipt_index / header_data
+    fn record_proof(&mut self, proof_key: &Vec<u8>) -> Balance {
         let initial_storage = env::storage_usage();
 
-        let proof_key = proof.get_key();
         assert!(
             !self.used_events.contains(&proof_key),
             "Event cannot be reused for withdrawing."
@@ -353,11 +336,6 @@ impl Contract {
 
         env::log_str(&format!("RecordProof:{}", hex::encode(proof_key)));
         required_deposit
-    }
-
-    #[access_control_any(roles(Role::DAO))]
-    pub fn update_factory_address(&mut self, factory_address: String) {
-        self.eth_factory_address = validate_eth_address(factory_address);
     }
 }
 
@@ -377,6 +355,13 @@ mod tests {
 
     pub fn accounts(id: usize) -> AccountId {
         AccountId::new_unchecked(near_sdk::test_utils::accounts(id).to_string() + ".near")
+    }
+
+    pub fn recipients(id: usize) -> Recipient {
+        Recipient {
+            target: accounts(id),
+            message: None,
+        }
     }
 
     macro_rules! inner_set_env {
@@ -474,9 +459,9 @@ mod tests {
         contract.finish_withdraw(
             true,
             accounts(1).into(),
-            accounts(2).into(),
+            recipients(2),
             1_000_000,
-            proof,
+            proof.get_key(),
         );
     }
 
@@ -503,9 +488,9 @@ mod tests {
         contract.finish_withdraw(
             true,
             accounts(1).into(),
-            accounts(2).into(),
+            recipients(2),
             1_000_000,
-            proof,
+            proof.get_key(),
         );
     }
 

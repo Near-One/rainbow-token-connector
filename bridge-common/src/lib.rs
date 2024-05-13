@@ -1,8 +1,10 @@
+use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::AccountId;
 
 pub mod prover;
 pub mod result_types;
 
+#[derive(BorshSerialize, BorshDeserialize)]
 pub struct Recipient {
     pub target: AccountId,
     pub message: Option<String>,
