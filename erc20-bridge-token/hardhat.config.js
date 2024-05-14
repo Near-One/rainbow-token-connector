@@ -1,13 +1,6 @@
-/**
- * @type import('hardhat/config').HardhatUserConfig
- */
-require("@nomiclabs/hardhat-waffle");
-require('hardhat-contract-sizer');
-require('@openzeppelin/hardhat-upgrades')
-require('solidity-coverage')
-require("@nomiclabs/hardhat-etherscan");
-
-require('dotenv').config();
+require("dotenv").config();
+require("@openzeppelin/hardhat-upgrades");
+require("@nomicfoundation/hardhat-verify");
 
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 const INFURA_API_KEY = process.env.INFURA_API_KEY;

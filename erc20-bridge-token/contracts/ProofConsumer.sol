@@ -7,9 +7,7 @@ import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
 import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
 import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 
-import "./IProofConsumer.sol";
-
-contract ProofConsumer is Ownable, IProofConsumer {
+contract ProofConsumer {
     using Borsh for Borsh.Data;
     using ProofDecoder for Borsh.Data;
 
@@ -23,25 +21,12 @@ contract ProofConsumer is Ownable, IProofConsumer {
     // OutcomeReciptId -> Used
     mapping(bytes32 => bool) public usedProofs;
 
-    constructor(
-        bytes memory _nearTokenLocker,
-        INearProver _prover,
-        uint64 _minBlockAcceptanceHeight
-    ) Ownable(msg.sender) {
-        require(_nearTokenLocker.length > 0, "Invalid Near Token Locker address");
-        require(address(_prover) != address(0), "Invalid Near prover address");
-
-        nearTokenLocker = _nearTokenLocker;
-        prover = _prover;
-        minBlockAcceptanceHeight = _minBlockAcceptanceHeight;
-    }
-
     /// Parses the provided proof and consumes it if it's not already used.
     /// The consumed event cannot be reused for future calls.
-    function parseAndConsumeProof(
+    function _parseAndConsumeProof(
         bytes memory proofData,
         uint64 proofBlockHeight
-    ) external override onlyOwner returns (ProofDecoder.ExecutionStatus memory result) {
+    ) internal returns (ProofDecoder.ExecutionStatus memory result) {
         require(
             prover.proveOutcome(proofData, proofBlockHeight),
             "Proof should be valid"
@@ -84,4 +69,6 @@ contract ProofConsumer is Ownable, IProofConsumer {
             "Can't use unknown execution outcome for unlocking the tokens or set metadata"
         );
     }
+
+    uint256[50] private __gap;
 }

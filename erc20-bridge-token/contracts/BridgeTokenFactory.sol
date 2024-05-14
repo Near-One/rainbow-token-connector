@@ -11,7 +11,7 @@ import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
 import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
 import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 
-import "./IProofConsumer.sol";
+import "./ProofConsumer.sol";
 import "./BridgeToken.sol";
 import "./ResultsDecoder.sol";
 import "./SelectivePausableUpgradable.sol";
@@ -19,7 +19,8 @@ import "./SelectivePausableUpgradable.sol";
 contract BridgeTokenFactory is
     UUPSUpgradeable,
     AccessControlUpgradeable,
-    SelectivePausableUpgradable
+    SelectivePausableUpgradable,
+    ProofConsumer
 {
     using Borsh for Borsh.Data;
     using SafeERC20 for IERC20;
@@ -39,7 +40,6 @@ contract BridgeTokenFactory is
     mapping(bytes => bool) private _whitelistedAccounts;
     bool private _isWhitelistModeEnabled;
 
-    address public proofConsumerAddress;
     address public tokenImplementationAddress;
 
     bytes32 public constant PAUSABLE_ADMIN_ROLE = keccak256("PAUSABLE_ADMIN_ROLE");
@@ -63,14 +63,17 @@ contract BridgeTokenFactory is
     // BridgeTokenFactory is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
     function initialize(
-        address _proofConsumerAddress,
-        address _tokenImplementationAddress
+        address _tokenImplementationAddress,
+        bytes memory _nearTokenLocker,
+        INearProver _prover,
+        uint64 _minBlockAcceptanceHeight
     ) external initializer {
-        require(
-            _proofConsumerAddress != address(0),
-            "Proof consumer should not be zero address"
-        );
-        proofConsumerAddress = _proofConsumerAddress;
+        require(_nearTokenLocker.length > 0, "Invalid Near Token Locker address");
+        require(address(_prover) != address(0), "Invalid Near prover address");
+
+        nearTokenLocker = _nearTokenLocker;
+        prover = _prover;
+        minBlockAcceptanceHeight = _minBlockAcceptanceHeight;
         tokenImplementationAddress = _tokenImplementationAddress;
 
         __UUPSUpgradeable_init();
@@ -101,8 +104,10 @@ contract BridgeTokenFactory is
     ) external returns (address) {
         require(!_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_TOKEN_EXIST");
 
-        ProofDecoder.ExecutionStatus memory status = IProofConsumer(proofConsumerAddress)
-            .parseAndConsumeProof(proofData, proofBlockHeight);
+        ProofDecoder.ExecutionStatus memory status = _parseAndConsumeProof(
+            proofData,
+            proofBlockHeight
+        );
         ResultsDecoder.MetadataResult memory result = ResultsDecoder.decodeMetadataResult(
             status.successValue
         );
@@ -146,8 +151,10 @@ contract BridgeTokenFactory is
         bytes memory proofData,
         uint64 proofBlockHeight
     ) external whenNotPaused(PAUSED_DEPOSIT) {
-        ProofDecoder.ExecutionStatus memory status = IProofConsumer(proofConsumerAddress)
-            .parseAndConsumeProof(proofData, proofBlockHeight);
+        ProofDecoder.ExecutionStatus memory status = _parseAndConsumeProof(
+            proofData,
+            proofBlockHeight
+        );
         ResultsDecoder.LockResult memory result = ResultsDecoder.decodeLockResult(
             status.successValue
         );
@@ -212,16 +219,6 @@ contract BridgeTokenFactory is
         require(_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_NOT_BRIDGE_TOKEN");
         BridgeToken proxy = BridgeToken(payable(_nearToEthToken[nearTokenId]));
         proxy.upgradeToAndCall(implementation, bytes(""));
-    }
-
-    function setProofConsumer(
-        address newProofConsumerAddress
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(
-            newProofConsumerAddress != address(0),
-            "Proof consumer should not be zero address"
-        );
-        proofConsumerAddress = newProofConsumerAddress;
     }
 
     function enableWhitelistMode() external onlyRole(DEFAULT_ADMIN_ROLE) {
