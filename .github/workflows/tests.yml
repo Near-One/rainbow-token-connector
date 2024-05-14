@@ -7,7 +7,7 @@ on:
 name: Tests
 jobs:
   build:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -46,7 +46,7 @@ jobs:
           fi
 
   test-erc20-connector:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     name: Test erc20-connector
     steps:
       - name: Clone the repository
@@ -58,7 +58,7 @@ jobs:
           yarn test
 
   test-erc20-bridge-token:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     name: Test erc20-bridge-token
     steps:
       - name: Clone the repository
@@ -70,7 +70,7 @@ jobs:
           yarn test
 
   test-bridge-token-factory:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     name: Test bridge-token-factory
     steps:
       - name: Clone the repository
@@ -80,7 +80,7 @@ jobs:
           make test
 
   test-token-locker:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     name: Test token-locker
     steps:
       - name: Clone the repository
@@ -90,7 +90,7 @@ jobs:
           make test-token-locker
 
   test-silo-to-silo:
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     name: Test silo-to-silo
     steps:
       - name: Install Foundry
