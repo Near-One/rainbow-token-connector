@@ -1,15 +1,17 @@
-require('dotenv').config();
+require("dotenv").config();
 const { ethers } = require("hardhat");
 
 async function main() {
   const [deployer] = await ethers.getSigners();
   console.log("Deploying contracts with the account:", deployer.address);
-  console.log("Account balance:", (await deployer.getBalance()).toString());
+  const accountBalance = await deployer.provider.getBalance(deployer.address);
+  console.log("Account balance:", accountBalance.toString());
 
-  const BridgeTokenContractFactory = await ethers.getContractFactory("BridgeToken");
+  const BridgeTokenContractFactory =
+    await ethers.getContractFactory("BridgeToken");
   const BridgeTokenContract = await BridgeTokenContractFactory.deploy();
-  await BridgeTokenContract.deployed();
-  console.log(`BridgeTokenContract deployed at ${BridgeTokenContract.address}`);
+  await BridgeTokenContract.waitForDeployment();
+  console.log(`BridgeTokenContract deployed at ${await BridgeTokenContract.getAddress()}`);
 }
 
 main()
