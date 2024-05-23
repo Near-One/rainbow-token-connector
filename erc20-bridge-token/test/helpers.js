@@ -73,7 +73,7 @@ const generateRandomBase58 = (rawSize) => {
     rawInput += alphabet.charAt(Math.floor(Math.random() * alphabet.length));
   }
 
-  return ethers.utils.base58.encode(rawInput);
+  return ethers.encodeBase58(rawInput);
 }
 
 module.exports = { SCHEMA, createEmptyToken, createDefaultERC20Metadata, generateRandomBase58, ADMIN_ROLE, RESULT_PREFIX_LOCK, RESULT_PREFIX_METADATA };

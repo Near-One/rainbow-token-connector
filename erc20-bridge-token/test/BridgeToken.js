@@ -23,7 +23,6 @@ describe('BridgeToken', () => {
 
   let BridgeTokenInstance
   let BridgeTokenFactory
-  let ProofConsumer
   let adminAccount
   let user
 
@@ -31,13 +30,20 @@ describe('BridgeToken', () => {
     [adminAccount, user] = await ethers.getSigners()
 
     BridgeTokenInstance = await ethers.getContractFactory('BridgeToken')
-    const brigeToken = await (await BridgeTokenInstance.deploy()).deployed()
-    const ProverMock = await (await (await ethers.getContractFactory('NearProverMock')).deploy()).deployed()
-    ProofConsumer = await (await (await ethers.getContractFactory('ProofConsumer')).deploy(Buffer.from('nearfuntoken', 'utf-8'), ProverMock.address, minBlockAcceptanceHeight)).deployed()
+    const bridgeToken = await BridgeTokenInstance.deploy()
+    await bridgeToken.waitForDeployment()
+
+    const proverMock = await (await ethers.getContractFactory('NearProverMock')).deploy()
+    await proverMock.waitForDeployment()
+
     BridgeTokenFactory = await ethers.getContractFactory('BridgeTokenFactory')
-    BridgeTokenFactory = await upgrades.deployProxy(BridgeTokenFactory, [ProofConsumer.address, brigeToken.address], { initializer: 'initialize' })
-    await BridgeTokenFactory.deployed();
-    await ProofConsumer.transferOwnership(BridgeTokenFactory.address);
+    BridgeTokenFactory = await upgrades.deployProxy(BridgeTokenFactory, [
+      await bridgeToken.getAddress(),
+      Buffer.from('nearfuntoken', 'utf-8'), 
+      await proverMock.getAddress(),
+      minBlockAcceptanceHeight
+    ], { initializer: 'initialize' });
+    await BridgeTokenFactory.waitForDeployment();
   })
 
   function getProofTemplate() {
@@ -66,7 +72,7 @@ describe('BridgeToken', () => {
         prefix: RESULT_PREFIX_LOCK,
         token: nearTokenId,
         amount: amountToLock,
-        recipient: ethers.utils.arrayify(recipientAddress),
+        recipient: ethers.getBytes(recipientAddress),
       }
     ).toString("base64");
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = generateRandomBase58(64);
@@ -89,11 +95,7 @@ describe('BridgeToken', () => {
     await createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
     await expect(
       createEmptyToken(nearTokenId, BridgeTokenFactory, BridgeTokenInstance)
-
-    )
-      .to
-      .be
-      .revertedWith('ERR_TOKEN_EXIST')
+    ).to.be.revertedWith('ERR_TOKEN_EXIST')
   })
 
   it("can update token's metadata", async function() {
@@ -113,10 +115,7 @@ describe('BridgeToken', () => {
 
     await expect(
       BridgeTokenFactory.setMetadata('non-existing', 'Circle USDC', 'USDC')
-    )
-      .to
-      .be
-      .revertedWith('ERR_NOT_BRIDGE_TOKEN');
+    ).to.be.revertedWith('ERR_NOT_BRIDGE_TOKEN');
   })
 
   it('can\'t update metadata as a normal user', async function () {
@@ -124,10 +123,7 @@ describe('BridgeToken', () => {
 
     await expect(
       BridgeTokenFactory.connect(user).setMetadata(nearTokenId, 'Circle USDC', 'USDC')
-    )
-      .to
-      .be
-      .revertedWith('AccessControlUnauthorizedAccount');
+    ).to.be.revertedWithCustomError(BridgeTokenFactory, 'AccessControlUnauthorizedAccount');
   })
 
   it('deposit token', async function () {
@@ -145,7 +141,7 @@ describe('BridgeToken', () => {
           prefix: RESULT_PREFIX_LOCK,
           token: nearTokenId,
           amount: amountToTransfer,
-          recipient: ethers.utils.arrayify(user.address),
+          recipient: ethers.getBytes(user.address),
         }
     )
       .toString('base64');
@@ -179,7 +175,7 @@ describe('BridgeToken', () => {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
       amount: amountToTransfer,
-      recipient: ethers.utils.arrayify(adminAccount.address),
+      recipient: ethers.getBytes(adminAccount.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'C'.repeat(44);
     await expect (
@@ -206,7 +202,7 @@ describe('BridgeToken', () => {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
       amount: amountToTransfer,
-      recipient: ethers.utils.arrayify(user.address),
+      recipient: ethers.getBytes(user.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'D'.repeat(44);
 
@@ -246,7 +242,7 @@ describe('BridgeToken', () => {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
       amount: amountToTransfer,
-      recipient: ethers.utils.arrayify(user.address),
+      recipient: ethers.getBytes(user.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'F'.repeat(44);
 
@@ -279,7 +275,7 @@ describe('BridgeToken', () => {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
       amount: amountToTransfer,
-      recipient: ethers.utils.arrayify(user.address),
+      recipient: ethers.getBytes(user.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'G'.repeat(44);
 
@@ -324,7 +320,7 @@ describe('BridgeToken', () => {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
       amount: amountToTransfer,
-      recipient: ethers.utils.arrayify(user.address),
+      recipient: ethers.getBytes(user.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'B'.repeat(44);
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
@@ -332,9 +328,10 @@ describe('BridgeToken', () => {
     expect((await token.balanceOf(user.address)).toString()).to.be.equal(amountToTransfer.toString())
 
     const BridgeTokenV2Instance = await ethers.getContractFactory("TestBridgeToken");
-    const BridgeTokenV2 = await (await BridgeTokenV2Instance.deploy()).deployed();
+    const BridgeTokenV2 = await BridgeTokenV2Instance.deploy();
+    await BridgeTokenV2.waitForDeployment();
 
-    await BridgeTokenFactory.upgradeToken(nearTokenId, BridgeTokenV2.address)
+    await BridgeTokenFactory.upgradeToken(nearTokenId,  await BridgeTokenV2.getAddress())
     const BridgeTokenV2Proxied = BridgeTokenV2Instance.attach(tokenProxyAddress)
     expect(await BridgeTokenV2Proxied.returnTestString()).to.equal('test')
     expect(await BridgeTokenV2Proxied.name()).to.equal('NEAR ERC20')
@@ -351,7 +348,7 @@ describe('BridgeToken', () => {
       prefix: RESULT_PREFIX_LOCK,
       token: nearTokenId,
       amount: amountToTransfer,
-      recipient: ethers.utils.arrayify(user.address),
+      recipient: ethers.getBytes(user.address),
     }).toString('base64');
     lockResultProof.outcome_proof.outcome.receipt_ids[0] = 'C'.repeat(44);
     await BridgeTokenFactory.deposit(borshifyOutcomeProof(lockResultProof), proofBlockHeight);
@@ -359,12 +356,11 @@ describe('BridgeToken', () => {
     expect((await token.balanceOf(user.address)).toString()).to.be.equal(amountToTransfer.toString())
 
     const BridgeTokenV2Instance = await ethers.getContractFactory("TestBridgeToken");
-    const BridgeTokenV2 = await (await BridgeTokenV2Instance.deploy()).deployed();
+    const BridgeTokenV2 = await BridgeTokenV2Instance.deploy();
+    await BridgeTokenV2.waitForDeployment();
 
-    await expect(BridgeTokenFactory.connect(user).upgradeToken(nearTokenId, BridgeTokenV2.address))
-      .to
-      .be
-      .revertedWith('AccessControlUnauthorizedAccount');
+    await expect(BridgeTokenFactory.connect(user).upgradeToken(nearTokenId, await BridgeTokenV2.getAddress()))
+      .to.be.revertedWithCustomError(BridgeTokenFactory, 'AccessControlUnauthorizedAccount');
   })
 
   it('Test selective pause', async function () {
@@ -447,24 +443,6 @@ describe('BridgeToken', () => {
     expect(await BridgeTokenFactory.paused(PauseMode.PausedWithdraw)).to.be.equal(true);
   })
 
-  it("Test setProofConsumer ", async function() {
-    expect(
-      (await BridgeTokenFactory.proofConsumerAddress()).toLowerCase()
-    )
-      .to
-      .be
-      .equal(ProofConsumer.address.toLowerCase());
-
-    const newProofConsumerAddress = "0x0123456789abcdefdeadbeef0123456789abcdef";
-    await BridgeTokenFactory.setProofConsumer(newProofConsumerAddress);
-    expect(
-      (await BridgeTokenFactory.proofConsumerAddress()).toLowerCase()
-    )
-      .to
-      .be
-      .equal(newProofConsumerAddress);
-  });
-
   it("Test grant admin role", async function() {
     await BridgeTokenFactory.connect(adminAccount).disableWhitelistMode();
     expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.false;
@@ -477,12 +455,12 @@ describe('BridgeToken', () => {
     const DEFAULT_ADMIN_ROLE = "0x0000000000000000000000000000000000000000000000000000000000000000";
     await expect(
       BridgeTokenFactory.connect(newAdminAccount).disableWhitelistMode()
-    ).to.be.revertedWith('AccessControlUnauthorizedAccount');
+    ).to.be.revertedWithCustomError(BridgeTokenFactory, 'AccessControlUnauthorizedAccount');
     expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
 
     await expect(
       BridgeTokenFactory.connect(newAdminAccount).enableWhitelistMode()
-    ).to.be.revertedWith('AccessControlUnauthorizedAccount');
+    ).to.be.revertedWithCustomError(BridgeTokenFactory, 'AccessControlUnauthorizedAccount');
     expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
 
     // Grant DEFAULT_ADMIN_ROLE to newAdminAccount
@@ -522,12 +500,12 @@ describe('BridgeToken', () => {
     // Check tx reverted on call from revoked adminAccount
     await expect(
       BridgeTokenFactory.connect(adminAccount).disableWhitelistMode()
-    ).to.be.revertedWith('AccessControlUnauthorizedAccount');
+    ).to.be.revertedWithCustomError(BridgeTokenFactory, 'AccessControlUnauthorizedAccount');
     expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
 
     await expect(
       BridgeTokenFactory.connect(adminAccount).enableWhitelistMode()
-    ).to.be.revertedWith('AccessControlUnauthorizedAccount');
+    ).to.be.revertedWithCustomError(BridgeTokenFactory, 'AccessControlUnauthorizedAccount');
     expect(await BridgeTokenFactory.isWhitelistModeEnabled()).to.be.true;
 
     // Check newAdminAccount can perform admin calls
