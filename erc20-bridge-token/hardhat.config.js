@@ -1,6 +1,7 @@
 require("dotenv").config();
 require("@openzeppelin/hardhat-upgrades");
 require("@nomicfoundation/hardhat-verify");
+require("@nomicfoundation/hardhat-chai-matchers");
 
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 const INFURA_API_KEY = process.env.INFURA_API_KEY;
