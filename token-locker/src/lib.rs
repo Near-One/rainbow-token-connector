@@ -155,18 +155,18 @@ impl Contract {
     #[init]
     /// `prover_account`: NEAR account of the Near Prover contract;
     /// `factory_address`: Ethereum address of the token factory contract, in hex.
-    pub fn new(prover_account: AccountId, factory_address: String) -> Self {
-        #[allow(deprecated)]
+    pub fn new(prover_account: AccountId, factory_address: String, whitelist_mode: bool) -> Self {
         let mut contract = Self {
             prover_account,
             used_events: UnorderedSet::new(StorageKey::UsedEvents),
             eth_factory_address: validate_eth_address(factory_address),
             whitelist_tokens: UnorderedMap::new(StorageKey::WhitelistTokens),
             whitelist_accounts: UnorderedSet::new(StorageKey::WhitelistAccounts),
-            is_whitelist_mode_enabled: true,
+            is_whitelist_mode_enabled: whitelist_mode,
         };
 
         contract.acl_init_super_admin(near_sdk::env::predecessor_account_id());
+        contract.acl_grant_role("DAO".to_owned(), near_sdk::env::predecessor_account_id());
         contract
     }
 
@@ -440,12 +440,18 @@ mod tests {
         }
     }
 
+    fn create_contract() -> Contract {
+        let whitelist_mode = true;
+        Contract::new(prover(), token_locker(), whitelist_mode)
+    }
+
     #[test]
     fn test_lock_unlock_token() {
         set_env!(predecessor_account_id: accounts(0));
-        let mut contract = Contract::new(prover(), token_locker());
-        set_env!(predecessor_account_id: accounts(1));
+        let mut contract = create_contract();
         contract.set_token_whitelist_mode(accounts(1), WhitelistMode::CheckToken);
+
+        set_env!(predecessor_account_id: accounts(1));
         contract.ft_on_transfer(accounts(2), U128(1_000_000), ethereum_address_from_id(0));
         contract.finish_deposit(
             accounts(1).into(),
@@ -468,9 +474,10 @@ mod tests {
     #[test]
     fn test_lock_unlock_token_with_custom_recipient_message() {
         set_env!(predecessor_account_id: accounts(0));
-        let mut contract = Contract::new(prover(), token_locker());
-        set_env!(predecessor_account_id: accounts(1));
+        let mut contract = create_contract();
         contract.set_token_whitelist_mode(accounts(1), WhitelistMode::CheckToken);
+
+        set_env!(predecessor_account_id: accounts(1));
         contract.ft_on_transfer(accounts(2), U128(1_000_000), ethereum_address_from_id(0));
         contract.finish_deposit(
             accounts(1).into(),
@@ -500,7 +507,7 @@ mod tests {
             current_account_id: bridge_token_factory(),
             predecessor_account_id: bridge_token_factory(),
         );
-        let mut contract = Contract::new(prover(), token_locker());
+        let mut contract = create_contract();
         assert!(contract
             .acl_grant_role("PauseManager".to_owned(), pause_manager())
             .unwrap());
@@ -532,12 +539,13 @@ mod tests {
     #[should_panic(expected = "The token is blocked")]
     fn test_blocked_token() {
         set_env!(predecessor_account_id: accounts(0));
-        let mut contract = Contract::new(prover(), token_locker());
+        let mut contract = create_contract();
 
         let token_account = accounts(1);
         let sender_account = accounts(2);
-        set_env!(predecessor_account_id: token_account.clone());
-        contract.set_token_whitelist_mode(token_account, WhitelistMode::Blocked);
+        contract.set_token_whitelist_mode(token_account.clone(), WhitelistMode::Blocked);
+
+        set_env!(predecessor_account_id: token_account);
         contract.ft_on_transfer(sender_account, U128(1_000_000), ethereum_address_from_id(0));
     }
 
@@ -545,12 +553,14 @@ mod tests {
     #[should_panic(expected = "does not exist in the whitelist")]
     fn test_account_not_in_whitelist() {
         set_env!(predecessor_account_id: accounts(0));
-        let mut contract = Contract::new(prover(), token_locker());
+        let mut contract = create_contract();
 
         let token_account = accounts(1);
         let sender_account = accounts(2);
+        contract
+            .set_token_whitelist_mode(token_account.clone(), WhitelistMode::CheckAccountAndToken);
+
         set_env!(predecessor_account_id: token_account);
-        contract.set_token_whitelist_mode(accounts(1), WhitelistMode::CheckAccountAndToken);
         contract.ft_on_transfer(sender_account, U128(1_000_000), ethereum_address_from_id(0));
     }
 
@@ -558,7 +568,7 @@ mod tests {
     #[should_panic(expected = "The token is not whitelisted")]
     fn test_token_not_in_whitelist() {
         set_env!(predecessor_account_id: accounts(0));
-        let mut contract = Contract::new(prover(), token_locker());
+        let mut contract = create_contract();
 
         let token_account = accounts(1);
         let sender_account = accounts(2);
@@ -569,7 +579,7 @@ mod tests {
     #[test]
     fn test_account_in_whitelist() {
         set_env!(predecessor_account_id: accounts(0));
-        let mut contract = Contract::new(prover(), token_locker());
+        let mut contract = create_contract();
 
         let token_account = accounts(1);
         let sender_account = accounts(2);
@@ -585,7 +595,7 @@ mod tests {
     #[should_panic(expected = "does not exist in the whitelist")]
     fn test_remove_account_from_whitelist() {
         set_env!(predecessor_account_id: accounts(0));
-        let mut contract = Contract::new(prover(), token_locker());
+        let mut contract = create_contract();
 
         let token_account = accounts(1);
         let sender_account = accounts(2);
@@ -600,7 +610,10 @@ mod tests {
             ethereum_address_from_id(0),
         );
 
+        set_env!(predecessor_account_id: accounts(0));
         contract.remove_account_from_whitelist(token_account.clone(), sender_account.clone());
+
+        set_env!(predecessor_account_id: token_account.clone());
         contract.ft_on_transfer(
             sender_account.clone(),
             U128(1_000_000),
@@ -611,7 +624,7 @@ mod tests {
     #[test]
     fn test_tokens_in_whitelist() {
         set_env!(predecessor_account_id: accounts(0));
-        let mut contract = Contract::new(prover(), token_locker());
+        let mut contract = create_contract();
 
         let whitelist_tokens = ["token1.near", "token2.near", "token3.near"];
 
@@ -630,7 +643,7 @@ mod tests {
     #[test]
     fn test_accounts_in_whitelist() {
         set_env!(predecessor_account_id: accounts(0));
-        let mut contract = Contract::new(prover(), token_locker());
+        let mut contract = create_contract();
 
         let whitelist_tokens = ["token1.near", "token2.near", "token3.near"];
         let whitelist_accounts = ["account1.near", "account2.near", "account3.near"];
