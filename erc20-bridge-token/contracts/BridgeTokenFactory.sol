@@ -17,10 +17,10 @@ import "./ResultsDecoder.sol";
 import "./SelectivePausableUpgradable.sol";
 
 contract BridgeTokenFactory is
+    ProofConsumer,
     UUPSUpgradeable,
     AccessControlUpgradeable,
-    SelectivePausableUpgradable,
-    ProofConsumer
+    SelectivePausableUpgradable
 {
     using Borsh for Borsh.Data;
     using SafeERC20 for IERC20;
@@ -190,6 +190,7 @@ contract BridgeTokenFactory is
     function pauseWithdraw() external onlyRole(PAUSABLE_ADMIN_ROLE) {
         _pause(pausedFlags() | PAUSED_WITHDRAW);
     }
+
     function pauseAll() external onlyRole(PAUSABLE_ADMIN_ROLE) {
         uint flags = PAUSED_DEPOSIT | PAUSED_WITHDRAW;
         _pause(flags);
