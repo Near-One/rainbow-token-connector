@@ -184,7 +184,7 @@ contract BridgeTokenFactory is
 
     function withdraw(
         string memory token,
-        uint256 amount,
+        uint128 amount,
         string memory recipient
     ) external whenNotPaused(PAUSED_WITHDRAW) {
         _checkWhitelistedToken(token, msg.sender);
