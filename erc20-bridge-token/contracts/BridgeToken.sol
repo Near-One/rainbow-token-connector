@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ERC20Upgradeable} from "@openzeppelin/contracts-upgradeable/token/ERC20/ERC20Upgradeable.sol";
-import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import {Ownable2StepUpgradeable} from "@openzeppelin/contracts-upgradeable/access/Ownable2StepUpgradeable.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
@@ -10,7 +10,7 @@ contract BridgeToken is
     Initializable,
     UUPSUpgradeable,
     ERC20Upgradeable,
-    OwnableUpgradeable
+    Ownable2StepUpgradeable
 {
     string private _name;
     string private _symbol;

@@ -38,8 +38,6 @@ abstract contract SelectivePausableUpgradable is Initializable, ContextUpgradeab
      */
     event Paused(address account, uint flags);
 
-    uint private _pausedFlags;
-
     /**
      * @dev Initializes the contract in unpaused state.
      */
