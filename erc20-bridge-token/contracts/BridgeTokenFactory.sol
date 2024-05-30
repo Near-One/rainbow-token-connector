@@ -58,7 +58,13 @@ contract BridgeTokenFactory is
 
     event Deposit(string indexed token, uint256 amount, address recipient);
 
-    event SetMetadata(address indexed token, string name, string symbol, uint8 decimals);
+    event SetMetadata(
+        address indexed token,
+        string tokenId,
+        string name,
+        string symbol,
+        uint8 decimals
+    );
 
     // BridgeTokenFactory is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
@@ -123,7 +129,13 @@ contract BridgeTokenFactory is
             )
         );
 
-        emit SetMetadata(bridgeTokenProxy, result.name, result.symbol, result.decimals);
+        emit SetMetadata(
+            bridgeTokenProxy,
+            result.token,
+            result.name,
+            result.symbol,
+            result.decimals
+        );
 
         _isBridgeToken[address(bridgeTokenProxy)] = true;
         _ethToNearToken[address(bridgeTokenProxy)] = result.token;
@@ -143,7 +155,13 @@ contract BridgeTokenFactory is
 
         bridgeToken.setMetadata(name, symbol, bridgeToken.decimals());
 
-        emit SetMetadata(address(bridgeToken), name, symbol, bridgeToken.decimals());
+        emit SetMetadata(
+            address(bridgeToken),
+            token,
+            name,
+            symbol,
+            bridgeToken.decimals()
+        );
     }
 
     function deposit(
