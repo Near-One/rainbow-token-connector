@@ -17,12 +17,12 @@ fn get_token_account_key(token: AccountId, account: AccountId) -> String {
 
 #[near_bindgen]
 impl Contract {
-    #[private]
+    #[access_control_any(roles(Role::DAO))]
     pub fn set_token_whitelist_mode(&mut self, token: AccountId, mode: WhitelistMode) {
         self.whitelist_tokens.insert(&token, &mode);
     }
 
-    #[private]
+    #[access_control_any(roles(Role::DAO))]
     pub fn add_account_to_whitelist(&mut self, token: AccountId, account: AccountId) {
         assert!(
             self.whitelist_tokens.get(&token).is_some(),
@@ -32,7 +32,7 @@ impl Contract {
             .insert(&get_token_account_key(token, account));
     }
 
-    #[private]
+    #[access_control_any(roles(Role::DAO))]
     pub fn remove_account_from_whitelist(&mut self, token: AccountId, account: AccountId) -> bool {
         self.whitelist_accounts
             .remove(&get_token_account_key(token, account))
@@ -65,7 +65,7 @@ impl Contract {
         }
     }
 
-    #[private]
+    #[access_control_any(roles(Role::DAO))]
     pub fn set_whitelist_mode_enabled(&mut self, enabled: bool) {
         self.is_whitelist_mode_enabled = enabled;
     }
