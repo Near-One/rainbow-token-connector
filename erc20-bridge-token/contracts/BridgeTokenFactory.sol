@@ -239,12 +239,20 @@ contract BridgeTokenFactory is
         proxy.upgradeToAndCall(implementation, bytes(""));
     }
 
-    function enableWhitelistMode() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _isWhitelistModeEnabled = true;
+    function setWhitelistMode(bool isEnabled) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _isWhitelistModeEnabled = isEnabled;
     }
 
-    function disableWhitelistMode() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        _isWhitelistModeEnabled = false;
+    function updateConfig(
+        address _tokenImplementationAddress,
+        bytes memory _nearTokenLocker,
+        INearProver _prover,
+        uint64 _minBlockAcceptanceHeight
+    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        tokenImplementationAddress = _tokenImplementationAddress;
+        nearTokenLocker = _nearTokenLocker;
+        prover = _prover;
+        minBlockAcceptanceHeight = _minBlockAcceptanceHeight;
     }
 
     function setTokenWhitelistMode(
