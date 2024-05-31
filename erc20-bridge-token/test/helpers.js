@@ -28,7 +28,7 @@ const RESULT_PREFIX_METADATA = Buffer.from("b315d4d6e8f235f5fabb0b1a0f118507f6c8
 
 const createEmptyToken = async (nearTokenId, BridgeTokenFactory, BridgeTokenInstance) => {
   const { metadataProof, proofBlockHeight } = getMetadataProof(nearTokenId)
-  await BridgeTokenFactory.newBridgeToken(nearTokenId, borshifyOutcomeProof(metadataProof), proofBlockHeight)
+  await BridgeTokenFactory.newBridgeToken(borshifyOutcomeProof(metadataProof), proofBlockHeight)
   const tokenProxyAddress = await BridgeTokenFactory.nearToEthToken(nearTokenId)
   const token = BridgeTokenInstance.attach(tokenProxyAddress)
   return { tokenProxyAddress, token }

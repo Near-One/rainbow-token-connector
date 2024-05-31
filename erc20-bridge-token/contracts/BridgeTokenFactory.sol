@@ -2,14 +2,11 @@
 pragma solidity ^0.8.24;
 
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import {IERC20} from "@openzeppelin/contracts/interfaces/IERC20.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
 import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
-import "rainbow-bridge-sol/nearbridge/contracts/Borsh.sol";
 
 import "./ProofConsumer.sol";
 import "./BridgeToken.sol";
@@ -22,9 +19,6 @@ contract BridgeTokenFactory is
     AccessControlUpgradeable,
     SelectivePausableUpgradable
 {
-    using Borsh for Borsh.Data;
-    using SafeERC20 for IERC20;
-
     enum WhitelistMode {
         NotInitialized,
         Blocked,
