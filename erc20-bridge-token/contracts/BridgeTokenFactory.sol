@@ -22,6 +22,10 @@ contract BridgeTokenFactory is
         CheckAccountAndToken
     }
 
+    // We removed ProofConsumer from the list of parent contracts and added this gap
+    // to preserve storage layout when upgrading to the new contract version.
+    uint256[54] private __gap;
+
     mapping(address => string) private _ethToNearToken;
     mapping(string => address) private _nearToEthToken;
     mapping(address => bool) private _isBridgeToken;
@@ -32,6 +36,8 @@ contract BridgeTokenFactory is
 
     address public tokenImplementationAddress;
     address public nearBridgeDerivedAddress;
+
+    mapping(uint128 => bool) private _completedTransfers;
 
     bytes32 public constant PAUSABLE_ADMIN_ROLE = keccak256("PAUSABLE_ADMIN_ROLE");
     uint constant UNPAUSED_ALL = 0;
@@ -73,6 +79,7 @@ contract BridgeTokenFactory is
     );
 
     error InvalidSignature();
+    error NonceAlreadyUsed();
 
     // BridgeTokenFactory is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
@@ -167,6 +174,10 @@ contract BridgeTokenFactory is
     }
 
     function deposit(bytes calldata signatureData, BridgeDeposit calldata bridgeDeposit) external whenNotPaused(PAUSED_DEPOSIT) {
+        if (_completedTransfers[bridgeDeposit.nonce]) {
+            revert NonceAlreadyUsed();
+        }
+
         bytes memory borshEncoded = bytes.concat(
             Borsh.encodeUint128(bridgeDeposit.nonce),
             Borsh.encodeString(bridgeDeposit.token),
@@ -185,6 +196,8 @@ contract BridgeTokenFactory is
 
         require(_isBridgeToken[_nearToEthToken[bridgeDeposit.token]], "ERR_NOT_BRIDGE_TOKEN");
         BridgeToken(_nearToEthToken[bridgeDeposit.token]).mint(bridgeDeposit.recipient, bridgeDeposit.amount);
+
+        _completedTransfers[bridgeDeposit.nonce] = true;
 
         emit Deposit(bridgeDeposit.token, bridgeDeposit.amount, bridgeDeposit.recipient);
     }

@@ -143,6 +143,78 @@ describe('BridgeToken', () => {
       .revertedWith('Pausable: paused');
   })
 
+  it('can\'t deposit twice with the same signature', async function () {
+    await createToken(wrappedNearId);
+    
+    const { signature, payload } = depositSignature(wrappedNearId, user1.address);
+    await BridgeTokenFactory.deposit(signature, payload);
+
+    await expect(
+      BridgeTokenFactory.deposit(signature, payload)
+    )
+      .to.be.revertedWithCustomError(BridgeTokenFactory, 'NonceAlreadyUsed');
+  })
+
+  it('can\'t deposit with invalid amount', async function () {
+    await createToken(wrappedNearId);
+    
+    const { signature, payload } = depositSignature(wrappedNearId, user1.address);
+    payload.amount = 100000;
+
+    await expect(
+      BridgeTokenFactory.deposit(signature, payload)
+    )
+      .to.be.revertedWithCustomError(BridgeTokenFactory, 'InvalidSignature');
+  })
+
+  it('can\'t deposit with invalid nonce', async function () {
+    await createToken(wrappedNearId);
+    
+    const { signature, payload } = depositSignature(wrappedNearId, user1.address);
+    payload.nonce = 99;
+
+    await expect(
+      BridgeTokenFactory.deposit(signature, payload)
+    )
+      .to.be.revertedWithCustomError(BridgeTokenFactory, 'InvalidSignature');
+  })
+
+  it('can\'t deposit with invalid token', async function () {
+    await createToken(wrappedNearId);
+    
+    const { signature, payload } = depositSignature(wrappedNearId, user1.address);
+    payload.token = 'test-token.testnet';
+
+    await expect(
+      BridgeTokenFactory.deposit(signature, payload)
+    )
+      .to.be.revertedWithCustomError(BridgeTokenFactory, 'InvalidSignature');
+  })
+
+  it('can\'t deposit with invalid recipient', async function () {
+    await createToken(wrappedNearId);
+    
+    const { signature, payload } = depositSignature(wrappedNearId, user1.address);
+    payload.recipient = user2.address;
+
+    await expect(
+      BridgeTokenFactory.deposit(signature, payload)
+    )
+      .to.be.revertedWithCustomError(BridgeTokenFactory, 'InvalidSignature');
+  })
+
+  it('can\'t deposit with invalid relayer', async function () {
+    await createToken(wrappedNearId);
+    
+    const { signature, payload } = depositSignature(wrappedNearId, user1.address);
+    payload.relayer = user2.address;
+
+    await expect(
+      BridgeTokenFactory.deposit(signature, payload)
+    )
+      .to.be.revertedWithCustomError(BridgeTokenFactory, 'InvalidSignature');
+  })
+
   it('withdraw token', async function () {
     const { token } = await createToken(wrappedNearId);
 
