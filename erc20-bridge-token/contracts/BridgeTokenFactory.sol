@@ -4,17 +4,13 @@ pragma solidity ^0.8.24;
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 
-import "rainbow-bridge-sol/nearprover/contracts/INearProver.sol";
-import "rainbow-bridge-sol/nearprover/contracts/ProofDecoder.sol";
-
-import "./ProofConsumer.sol";
 import "./BridgeToken.sol";
-import "./ResultsDecoder.sol";
 import "./SelectivePausableUpgradable.sol";
+import "./Borsh.sol";
 
 contract BridgeTokenFactory is
-    ProofConsumer,
     UUPSUpgradeable,
     AccessControlUpgradeable,
     SelectivePausableUpgradable
@@ -26,6 +22,10 @@ contract BridgeTokenFactory is
         CheckAccountAndToken
     }
 
+    // We removed ProofConsumer from the list of parent contracts and added this gap
+    // to preserve storage layout when upgrading to the new contract version.
+    uint256[54] private __gap;
+
     mapping(address => string) private _ethToNearToken;
     mapping(string => address) private _nearToEthToken;
     mapping(address => bool) private _isBridgeToken;
@@ -35,11 +35,29 @@ contract BridgeTokenFactory is
     bool private _isWhitelistModeEnabled;
 
     address public tokenImplementationAddress;
+    address public nearBridgeDerivedAddress;
+
+    mapping(uint128 => bool) private _completedTransfers;
 
     bytes32 public constant PAUSABLE_ADMIN_ROLE = keccak256("PAUSABLE_ADMIN_ROLE");
     uint constant UNPAUSED_ALL = 0;
     uint constant PAUSED_WITHDRAW = 1 << 0;
     uint constant PAUSED_DEPOSIT = 1 << 1;
+
+    struct BridgeDeposit {
+        uint128 nonce;
+        string token;
+        uint128 amount;
+        address recipient;
+        address relayer;
+    }
+
+    struct MetadataPayload {
+        string token;
+        string name;
+        string symbol;
+        uint8 decimals;
+    }
 
     // Event when funds are withdrawn from Ethereum back to NEAR.
     event Withdraw(
@@ -60,21 +78,17 @@ contract BridgeTokenFactory is
         uint8 decimals
     );
 
+    error InvalidSignature();
+    error NonceAlreadyUsed();
+
     // BridgeTokenFactory is linked to the bridge token factory on NEAR side.
     // It also links to the prover that it uses to unlock the tokens.
     function initialize(
         address _tokenImplementationAddress,
-        bytes memory _nearTokenLocker,
-        INearProver _prover,
-        uint64 _minBlockAcceptanceHeight
+        address _nearBridgeDerivedAddress
     ) external initializer {
-        require(_nearTokenLocker.length > 0, "Invalid Near Token Locker address");
-        require(address(_prover) != address(0), "Invalid Near prover address");
-
-        nearTokenLocker = _nearTokenLocker;
-        prover = _prover;
-        minBlockAcceptanceHeight = _minBlockAcceptanceHeight;
         tokenImplementationAddress = _tokenImplementationAddress;
+        nearBridgeDerivedAddress = _nearBridgeDerivedAddress;
 
         __UUPSUpgradeable_init();
         __AccessControl_init();
@@ -97,43 +111,44 @@ contract BridgeTokenFactory is
         return _nearToEthToken[nearTokenId];
     }
 
-    function newBridgeToken(
-        bytes memory proofData,
-        uint64 proofBlockHeight
-    ) external returns (address) {
-        ProofDecoder.ExecutionStatus memory status = _parseAndConsumeProof(
-            proofData,
-            proofBlockHeight
+    function newBridgeToken(bytes calldata signatureData, MetadataPayload calldata metadata) external returns (address) {
+        bytes memory borshEncoded = bytes.concat(
+            Borsh.encodeString(metadata.token),
+            Borsh.encodeString(metadata.name),
+            Borsh.encodeString(metadata.symbol),
+            bytes1(metadata.decimals)
         );
-        ResultsDecoder.MetadataResult memory result = ResultsDecoder.decodeMetadataResult(
-            status.successValue
-        );
+        bytes32 hashed = keccak256(borshEncoded);
 
-        require(!_isBridgeToken[_nearToEthToken[result.token]], "ERR_TOKEN_EXIST");
+        if (ECDSA.recover(hashed, signatureData) != nearBridgeDerivedAddress) {
+            revert InvalidSignature();
+        }
+
+        require(!_isBridgeToken[_nearToEthToken[metadata.token]], "ERR_TOKEN_EXIST");
 
         address bridgeTokenProxy = address(
             new ERC1967Proxy(
                 tokenImplementationAddress,
                 abi.encodeWithSelector(
                     BridgeToken.initialize.selector,
-                    result.name,
-                    result.symbol,
-                    result.decimals
+                    metadata.name,
+                    metadata.symbol,
+                    metadata.decimals
                 )
             )
         );
 
         emit SetMetadata(
             bridgeTokenProxy,
-            result.token,
-            result.name,
-            result.symbol,
-            result.decimals
+            metadata.token,
+            metadata.name,
+            metadata.symbol,
+            metadata.decimals
         );
 
         _isBridgeToken[address(bridgeTokenProxy)] = true;
-        _ethToNearToken[address(bridgeTokenProxy)] = result.token;
-        _nearToEthToken[result.token] = address(bridgeTokenProxy);
+        _ethToNearToken[address(bridgeTokenProxy)] = metadata.token;
+        _nearToEthToken[metadata.token] = address(bridgeTokenProxy);
 
         return bridgeTokenProxy;
     }
@@ -158,22 +173,33 @@ contract BridgeTokenFactory is
         );
     }
 
-    function deposit(
-        bytes memory proofData,
-        uint64 proofBlockHeight
-    ) external whenNotPaused(PAUSED_DEPOSIT) {
-        ProofDecoder.ExecutionStatus memory status = _parseAndConsumeProof(
-            proofData,
-            proofBlockHeight
-        );
-        ResultsDecoder.LockResult memory result = ResultsDecoder.decodeLockResult(
-            status.successValue
-        );
+    function deposit(bytes calldata signatureData, BridgeDeposit calldata bridgeDeposit) external whenNotPaused(PAUSED_DEPOSIT) {
+        if (_completedTransfers[bridgeDeposit.nonce]) {
+            revert NonceAlreadyUsed();
+        }
 
-        require(_isBridgeToken[_nearToEthToken[result.token]], "ERR_NOT_BRIDGE_TOKEN");
-        BridgeToken(_nearToEthToken[result.token]).mint(result.recipient, result.amount);
+        bytes memory borshEncoded = bytes.concat(
+            Borsh.encodeUint128(bridgeDeposit.nonce),
+            Borsh.encodeString(bridgeDeposit.token),
+            Borsh.encodeUint128(bridgeDeposit.amount),
+            bytes1(0x00), // variant 1 in rust enum
+            Borsh.encodeAddress(bridgeDeposit.recipient),
+            bridgeDeposit.relayer == address(0)  // None or Some(Address) in rust
+                ? bytes("\x00") 
+                : bytes.concat(bytes("\x01"), Borsh.encodeAddress(bridgeDeposit.relayer))
+        );
+        bytes32 hashed = keccak256(borshEncoded);
 
-        emit Deposit(result.token, result.amount, result.recipient);
+        if (ECDSA.recover(hashed, signatureData) != nearBridgeDerivedAddress) {
+            revert InvalidSignature();
+        }
+
+        require(_isBridgeToken[_nearToEthToken[bridgeDeposit.token]], "ERR_NOT_BRIDGE_TOKEN");
+        BridgeToken(_nearToEthToken[bridgeDeposit.token]).mint(bridgeDeposit.recipient, bridgeDeposit.amount);
+
+        _completedTransfers[bridgeDeposit.nonce] = true;
+
+        emit Deposit(bridgeDeposit.token, bridgeDeposit.amount, bridgeDeposit.recipient);
     }
 
     function withdraw(
