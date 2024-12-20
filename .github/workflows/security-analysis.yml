@@ -13,6 +13,7 @@ jobs:
   contract_analysis:
     name: "Shared"
     uses: aurora-is-near/.github/.github/workflows/security_analysis.yml@master
-    secrets: inherit
+    secrets:
+      DD_API_KEY: ${{secrets.DD_API_KEY}}
     with:
       ignore_failures: "true"
