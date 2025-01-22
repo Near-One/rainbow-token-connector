@@ -155,7 +155,12 @@ pub trait ExtBridgeTokenFactory {
 
 #[ext_contract(ext_bridge_token)]
 pub trait ExtBridgeToken {
-    fn mint(&self, account_id: AccountId, amount: U128, msg: Option<String>) -> PromiseOrValue<U128>;
+    fn mint(
+        &self,
+        account_id: AccountId,
+        amount: U128,
+        msg: Option<String>,
+    ) -> PromiseOrValue<U128>;
 
     fn ft_transfer_call(
         &mut self,
