@@ -37,6 +37,7 @@ pub trait ExtBridgeTokenFactory {
     #[result_serializer(borsh)]
     fn finish_withdraw(
         &self,
+        #[serializer(borsh)] sender_id: AccountId,
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] recipient: String,
     ) -> Promise;
@@ -91,7 +92,10 @@ impl BridgeToken {
     }
 
     #[payable]
-    pub fn mint(&mut self, account_id: AccountId, amount: U128) {
+    pub fn mint(&mut self,
+                account_id: AccountId,
+                amount: U128,
+                msg: Option<String>) -> PromiseOrValue<U128> {
         assert_eq!(
             env::predecessor_account_id(),
             self.controller,
@@ -99,7 +103,26 @@ impl BridgeToken {
         );
 
         self.storage_deposit(Some(account_id.clone()), None);
-        self.token.internal_deposit(&account_id, amount.into());
+        if let Some(msg) = msg {
+            self.token
+                .internal_deposit(&env::predecessor_account_id(), amount.into());
+
+            self.ft_transfer_call(account_id, amount, None, msg)
+        } else {
+            self.token.internal_deposit(&account_id, amount.into());
+            PromiseOrValue::Value(amount)
+        }
+    }
+
+    pub fn burn(&mut self, amount: U128) {
+        assert_eq!(
+            env::predecessor_account_id(),
+            self.controller,
+            "Only controller can call burn"
+        );
+
+        self.token
+            .internal_withdraw(&env::predecessor_account_id(), amount.into());
     }
 
     #[payable]
@@ -113,7 +136,7 @@ impl BridgeToken {
 
         ext_bridge_token_factory::ext(self.controller.clone())
             .with_static_gas(FINISH_WITHDRAW_GAS)
-            .finish_withdraw(amount.into(), recipient)
+            .finish_withdraw(env::predecessor_account_id(), amount.into(), recipient)
     }
 
     pub fn account_storage_usage(&self) -> StorageUsage {
