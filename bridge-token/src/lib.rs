@@ -14,7 +14,7 @@ use near_sdk::{
 const FINISH_WITHDRAW_GAS: Gas = Gas(Gas::ONE_TERA.0 * 50);
 const OUTER_UPGRADE_GAS: Gas = Gas(Gas::ONE_TERA.0 * 15);
 const NO_DEPOSIT: Balance = 0;
-const CURRENT_STATE_VERSION: u32 = 1;
+const CURRENT_STATE_VERSION: u32 = 2;
 
 pub type Mask = u128;
 
@@ -30,6 +30,7 @@ pub struct BridgeToken {
     decimals: u8,
     paused: Mask,
     icon: Option<String>,
+    new_controller: Option<AccountId>
 }
 
 #[ext_contract(ext_bridge_token_factory)]
@@ -68,6 +69,7 @@ impl BridgeToken {
             decimals: 0,
             paused: Mask::default(),
             icon: None,
+            new_controller: None,
         }
     }
 
@@ -137,6 +139,17 @@ impl BridgeToken {
         ext_bridge_token_factory::ext(self.controller.clone())
             .with_static_gas(FINISH_WITHDRAW_GAS)
             .finish_withdraw(env::predecessor_account_id(), amount.into(), recipient)
+    }
+
+    pub fn set_new_controller(&mut self, new_controller: Option<AccountId>) {
+        require!(self.controller_or_self());
+        self.new_controller = new_controller;
+    }
+
+    pub fn update_controller(&mut self) {
+        require!(Some(env::predecessor_account_id()) == self.new_controller);
+        self.controller = env::predecessor_account_id();
+        self.new_controller = None;
     }
 
     pub fn account_storage_usage(&self) -> StorageUsage {
@@ -227,6 +240,20 @@ pub struct BridgeTokenV0 {
     paused: Mask,
 }
 
+#[near_bindgen]
+#[derive(BorshDeserialize, BorshSerialize)]
+pub struct BridgeTokenV1 {
+    controller: AccountId,
+    token: FungibleToken,
+    name: String,
+    symbol: String,
+    reference: String,
+    reference_hash: Base64VecU8,
+    decimals: u8,
+    paused: Mask,
+    icon: Option<String>,
+}
+
 impl From<BridgeTokenV0> for BridgeToken {
     fn from(obj: BridgeTokenV0) -> Self {
         #[allow(deprecated)]
@@ -240,6 +267,25 @@ impl From<BridgeTokenV0> for BridgeToken {
             decimals: obj.decimals,
             paused: obj.paused,
             icon: None,
+            new_controller: None,
+        }
+    }
+}
+
+impl From<BridgeTokenV1> for BridgeToken {
+    fn from(obj: BridgeTokenV1) -> Self {
+        #[allow(deprecated)]
+        Self {
+            controller: obj.controller,
+            token: obj.token,
+            name: obj.name,
+            symbol: obj.symbol,
+            reference: obj.reference,
+            reference_hash: obj.reference_hash,
+            decimals: obj.decimals,
+            paused: obj.paused,
+            icon: obj.icon,
+            new_controller: None,
         }
     }
 }
@@ -252,6 +298,11 @@ impl BridgeToken {
         if from_version == 0 {
             // Adding icon as suggested here: https://nomicon.io/Standards/FungibleToken/Metadata.html
             let old_state: BridgeTokenV0 = env::state_read().expect("Contract isn't initialized");
+            let new_state: BridgeToken = old_state.into();
+            assert!(new_state.controller_or_self());
+            new_state
+        } else if from_version == 1 {
+            let old_state: BridgeTokenV1 = env::state_read().expect("Contract isn't initialized");
             let new_state: BridgeToken = old_state.into();
             assert!(new_state.controller_or_self());
             new_state

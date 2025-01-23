@@ -54,6 +54,9 @@ const SET_METADATA_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 /// Amount of gas used by bridge token to pause withdraw.
 const SET_PAUSED_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 
+// Amount of gas used by bridge token to set new controller
+const SET_CONTROLLER_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
+
 /// Amount of gas used by `upgrade_bridge_token` in the factory, without taking into account
 /// the gas consumed by the promise.
 const OUTER_UPGRADE_TOKEN_GAS: Gas = Gas(Gas::ONE_TERA.0 * 15);
@@ -183,6 +186,8 @@ pub trait ExtBridgeToken {
     fn set_paused(&mut self, paused: bool);
 
     fn attach_full_access_key(&mut self, public_key: PublicKey) -> Promise;
+
+    fn set_new_controller(&mut self, new_controller: Option<AccountId>);
 }
 
 pub fn assert_self() {
@@ -501,6 +506,26 @@ impl BridgeTokenFactory {
             0,
             env::prepaid_gas() - OUTER_UPGRADE_TOKEN_GAS,
         )
+    }
+
+    /// Propose new controller for the provided tokens
+    ///
+    /// # Arguments
+    ///
+    /// * `tokens_account_id`: A list of tokens that need their controller updated.
+    /// * `new_controller`: New controller for tokens
+    ///
+    #[access_control_any(roles(Role::DAO))]
+    pub fn propose_new_controller_for_tokens(
+        &self,
+        tokens_account_id: Vec<AccountId>,
+        new_controller: AccountId,
+    ) {
+        for token_account_id in tokens_account_id {
+            ext_bridge_token::ext(token_account_id)
+                .with_static_gas(SET_CONTROLLER_GAS)
+                .set_new_controller(Some(new_controller.clone()));
+        }
     }
 
     /// Pause the withdraw method in the bridge token contract.
