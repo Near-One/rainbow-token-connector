@@ -59,7 +59,7 @@ const SET_CONTROLLER_GAS: Gas = Gas(Gas::ONE_TERA.0 * 5);
 
 /// Amount of gas used by `upgrade_bridge_token` in the factory, without taking into account
 /// the gas consumed by the promise.
-const OUTER_UPGRADE_TOKEN_GAS: Gas = Gas(Gas::ONE_TERA.0 * 15);
+const OUTER_UPGRADE_TOKEN_GAS: Gas = Gas(Gas::ONE_TERA.0 * 20);
 
 /// Controller storage key.
 const CONTROLLER_STORAGE_KEY: &[u8] = b"aCONTROLLER";
