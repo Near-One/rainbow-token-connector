@@ -420,10 +420,8 @@ impl BridgeTokenFactory {
     /// processing on Solidity side.
     /// Caller must be <token_address>.<current_account_id>, where <token_address> exists in the `tokens`.
     #[result_serializer(borsh)]
-    #[allow(unused_variables)]
     pub fn finish_withdraw(
         &mut self,
-        #[serializer(borsh)] sender_id: AccountId,
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] recipient: String,
     ) -> ResultType {
@@ -445,6 +443,16 @@ impl BridgeTokenFactory {
             token: token_address,
             recipient: recipient_address,
         }
+    }
+
+    #[allow(unused_variables)]
+    pub fn finish_withdraw_v2(
+        &mut self,
+        #[serializer(borsh)] sender_id: AccountId,
+        #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)] recipient: String,
+    ) -> ResultType {
+        self.finish_withdraw(amount, recipient)
     }
 
     #[access_control_any(roles(Role::DAO, Role::ForceWithdrawer))]

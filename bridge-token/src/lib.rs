@@ -30,7 +30,7 @@ pub struct BridgeToken {
     decimals: u8,
     paused: Mask,
     icon: Option<String>,
-    new_controller: Option<AccountId>
+    new_controller: Option<AccountId>,
 }
 
 #[ext_contract(ext_bridge_token_factory)]
@@ -94,10 +94,12 @@ impl BridgeToken {
     }
 
     #[payable]
-    pub fn mint(&mut self,
-                account_id: AccountId,
-                amount: U128,
-                msg: Option<String>) -> PromiseOrValue<U128> {
+    pub fn mint(
+        &mut self,
+        account_id: AccountId,
+        amount: U128,
+        msg: Option<String>,
+    ) -> PromiseOrValue<U128> {
         assert_eq!(
             env::predecessor_account_id(),
             self.controller,
@@ -138,7 +140,7 @@ impl BridgeToken {
 
         ext_bridge_token_factory::ext(self.controller.clone())
             .with_static_gas(FINISH_WITHDRAW_GAS)
-            .finish_withdraw(env::predecessor_account_id(), amount.into(), recipient)
+            .finish_withdraw_v2(env::predecessor_account_id(), amount.into(), recipient)
     }
 
     pub fn set_new_controller(&mut self, new_controller: Option<AccountId>) {
