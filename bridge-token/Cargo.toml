@@ -20,3 +20,4 @@ overflow-checks = true
 [dependencies]
 near-sdk = "4.0.0"
 near-contract-standards = "4.0.0"
+serde = { version = "*", features = ["derive"] }

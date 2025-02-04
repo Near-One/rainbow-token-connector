@@ -467,6 +467,7 @@ version = "0.2.2"
 dependencies = [
  "near-contract-standards",
  "near-sdk",
+ "serde",
 ]
 
 [[package]]
