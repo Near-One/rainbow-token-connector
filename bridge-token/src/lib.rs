@@ -4,6 +4,7 @@ use near_contract_standards::fungible_token::metadata::{
 use near_contract_standards::fungible_token::FungibleToken;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{Base64VecU8, U128};
+use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::serde_json::json;
 use near_sdk::{
     assert_one_yocto, env, ext_contract, near_bindgen, require, AccountId, Balance, Gas,
@@ -14,9 +15,16 @@ use near_sdk::{
 const FINISH_WITHDRAW_GAS: Gas = Gas(Gas::ONE_TERA.0 * 50);
 const OUTER_UPGRADE_GAS: Gas = Gas(Gas::ONE_TERA.0 * 15);
 const NO_DEPOSIT: Balance = 0;
-const CURRENT_STATE_VERSION: u32 = 1;
+const CURRENT_STATE_VERSION: u32 = 2;
 
 pub type Mask = u128;
+
+#[derive(Serialize, Deserialize, Default)]
+pub struct BasicMetadata {
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+}
 
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
@@ -40,12 +48,19 @@ pub trait ExtBridgeTokenFactory {
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] recipient: String,
     ) -> Promise;
+
+    fn finish_withdraw_v2(
+        &self,
+        #[serializer(borsh)] sender_id: AccountId,
+        #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)] recipient: String,
+    ) -> Promise;
 }
 
 #[near_bindgen]
 impl BridgeToken {
     #[init]
-    pub fn new() -> Self {
+    pub fn new(controller: Option<AccountId>, metadata: Option<BasicMetadata>) -> Self {
         let current_account_id = env::current_account_id();
         let (_eth_address, factory_account) = current_account_id
             .as_str()
@@ -57,14 +72,15 @@ impl BridgeToken {
             "Only the factory account can init this contract"
         );
 
+        let m = metadata.unwrap_or_default();
         Self {
-            controller: env::predecessor_account_id(),
+            controller: controller.unwrap_or(env::predecessor_account_id()),
             token: FungibleToken::new(b"t".to_vec()),
-            name: String::default(),
-            symbol: String::default(),
+            name: m.name,
+            symbol: m.symbol,
             reference: String::default(),
             reference_hash: Base64VecU8(vec![]),
-            decimals: 0,
+            decimals: m.decimals,
             paused: Mask::default(),
             icon: None,
         }
@@ -91,7 +107,12 @@ impl BridgeToken {
     }
 
     #[payable]
-    pub fn mint(&mut self, account_id: AccountId, amount: U128) {
+    pub fn mint(
+        &mut self,
+        account_id: AccountId,
+        amount: U128,
+        msg: Option<String>,
+    ) -> PromiseOrValue<U128> {
         assert_eq!(
             env::predecessor_account_id(),
             self.controller,
@@ -99,7 +120,26 @@ impl BridgeToken {
         );
 
         self.storage_deposit(Some(account_id.clone()), None);
-        self.token.internal_deposit(&account_id, amount.into());
+        if let Some(msg) = msg {
+            self.token
+                .internal_deposit(&env::predecessor_account_id(), amount.into());
+
+            self.ft_transfer_call(account_id, amount, None, msg)
+        } else {
+            self.token.internal_deposit(&account_id, amount.into());
+            PromiseOrValue::Value(amount)
+        }
+    }
+
+    pub fn burn(&mut self, amount: U128) {
+        assert_eq!(
+            env::predecessor_account_id(),
+            self.controller,
+            "Only controller can call burn"
+        );
+
+        self.token
+            .internal_withdraw(&env::predecessor_account_id(), amount.into());
     }
 
     #[payable]
@@ -113,7 +153,12 @@ impl BridgeToken {
 
         ext_bridge_token_factory::ext(self.controller.clone())
             .with_static_gas(FINISH_WITHDRAW_GAS)
-            .finish_withdraw(amount.into(), recipient)
+            .finish_withdraw_v2(env::predecessor_account_id(), amount.into(), recipient)
+    }
+
+    pub fn set_controller(&mut self, controller: AccountId) {
+        require!(self.controller_or_self());
+        self.controller = controller;
     }
 
     pub fn account_storage_usage(&self) -> StorageUsage {
