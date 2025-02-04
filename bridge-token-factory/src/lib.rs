@@ -556,14 +556,9 @@ impl BridgeTokenFactory {
     /// * `tokens_account_id`: A list of tokens that need their controller updated.
     /// * `new_controller`: New controller for tokens
     ///
-    #[access_control_any(roles(Role::DAO))]
-    pub fn set_controller_for_tokens(
-        &self,
-        tokens_account_id: Vec<AccountId>,
-        new_controller: AccountId,
-    ) {
-        require!(self.acl_has_role(Role::Controller.into(), new_controller.clone()));
-
+    #[access_control_any(roles(Role::Controller))]
+    pub fn set_controller_for_tokens(&self, tokens_account_id: Vec<AccountId>) {
+        let new_controller = env::predecessor_account_id();
         for token_account_id in tokens_account_id {
             ext_bridge_token::ext(token_account_id)
                 .with_static_gas(SET_CONTROLLER_GAS)
