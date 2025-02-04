@@ -4,6 +4,7 @@ use near_contract_standards::fungible_token::metadata::{
 use near_contract_standards::fungible_token::FungibleToken;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{Base64VecU8, U128};
+use near_sdk::serde::{Deserialize, Serialize};
 use near_sdk::serde_json::json;
 use near_sdk::{
     assert_one_yocto, env, ext_contract, near_bindgen, require, AccountId, Balance, Gas,
@@ -18,6 +19,13 @@ const CURRENT_STATE_VERSION: u32 = 2;
 
 pub type Mask = u128;
 
+#[derive(Serialize, Deserialize, Default)]
+pub struct BasicMetadata {
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+}
+
 #[near_bindgen]
 #[derive(BorshDeserialize, BorshSerialize, PanicOnDefault)]
 pub struct BridgeToken {
@@ -30,13 +38,18 @@ pub struct BridgeToken {
     decimals: u8,
     paused: Mask,
     icon: Option<String>,
-    new_controller: Option<AccountId>,
 }
 
 #[ext_contract(ext_bridge_token_factory)]
 pub trait ExtBridgeTokenFactory {
     #[result_serializer(borsh)]
     fn finish_withdraw(
+        &self,
+        #[serializer(borsh)] amount: Balance,
+        #[serializer(borsh)] recipient: String,
+    ) -> Promise;
+
+    fn finish_withdraw_v2(
         &self,
         #[serializer(borsh)] sender_id: AccountId,
         #[serializer(borsh)] amount: Balance,
@@ -47,7 +60,7 @@ pub trait ExtBridgeTokenFactory {
 #[near_bindgen]
 impl BridgeToken {
     #[init]
-    pub fn new() -> Self {
+    pub fn new(controller: Option<AccountId>, metadata: Option<BasicMetadata>) -> Self {
         let current_account_id = env::current_account_id();
         let (_eth_address, factory_account) = current_account_id
             .as_str()
@@ -59,17 +72,17 @@ impl BridgeToken {
             "Only the factory account can init this contract"
         );
 
+        let m = metadata.unwrap_or_default();
         Self {
-            controller: env::predecessor_account_id(),
+            controller: controller.unwrap_or(env::predecessor_account_id()),
             token: FungibleToken::new(b"t".to_vec()),
-            name: String::default(),
-            symbol: String::default(),
+            name: m.name,
+            symbol: m.symbol,
             reference: String::default(),
             reference_hash: Base64VecU8(vec![]),
-            decimals: 0,
+            decimals: m.decimals,
             paused: Mask::default(),
             icon: None,
-            new_controller: None,
         }
     }
 
@@ -143,15 +156,9 @@ impl BridgeToken {
             .finish_withdraw_v2(env::predecessor_account_id(), amount.into(), recipient)
     }
 
-    pub fn set_new_controller(&mut self, new_controller: Option<AccountId>) {
+    pub fn set_controller(&mut self, controller: AccountId) {
         require!(self.controller_or_self());
-        self.new_controller = new_controller;
-    }
-
-    pub fn update_controller(&mut self) {
-        require!(Some(env::predecessor_account_id()) == self.new_controller);
-        self.controller = env::predecessor_account_id();
-        self.new_controller = None;
+        self.controller = controller;
     }
 
     pub fn account_storage_usage(&self) -> StorageUsage {
@@ -242,20 +249,6 @@ pub struct BridgeTokenV0 {
     paused: Mask,
 }
 
-#[near_bindgen]
-#[derive(BorshDeserialize, BorshSerialize)]
-pub struct BridgeTokenV1 {
-    controller: AccountId,
-    token: FungibleToken,
-    name: String,
-    symbol: String,
-    reference: String,
-    reference_hash: Base64VecU8,
-    decimals: u8,
-    paused: Mask,
-    icon: Option<String>,
-}
-
 impl From<BridgeTokenV0> for BridgeToken {
     fn from(obj: BridgeTokenV0) -> Self {
         #[allow(deprecated)]
@@ -269,25 +262,6 @@ impl From<BridgeTokenV0> for BridgeToken {
             decimals: obj.decimals,
             paused: obj.paused,
             icon: None,
-            new_controller: None,
-        }
-    }
-}
-
-impl From<BridgeTokenV1> for BridgeToken {
-    fn from(obj: BridgeTokenV1) -> Self {
-        #[allow(deprecated)]
-        Self {
-            controller: obj.controller,
-            token: obj.token,
-            name: obj.name,
-            symbol: obj.symbol,
-            reference: obj.reference,
-            reference_hash: obj.reference_hash,
-            decimals: obj.decimals,
-            paused: obj.paused,
-            icon: obj.icon,
-            new_controller: None,
         }
     }
 }
@@ -300,11 +274,6 @@ impl BridgeToken {
         if from_version == 0 {
             // Adding icon as suggested here: https://nomicon.io/Standards/FungibleToken/Metadata.html
             let old_state: BridgeTokenV0 = env::state_read().expect("Contract isn't initialized");
-            let new_state: BridgeToken = old_state.into();
-            assert!(new_state.controller_or_self());
-            new_state
-        } else if from_version == 1 {
-            let old_state: BridgeTokenV1 = env::state_read().expect("Contract isn't initialized");
             let new_state: BridgeToken = old_state.into();
             assert!(new_state.controller_or_self());
             new_state

@@ -6,8 +6,9 @@ use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::collections::{UnorderedMap, UnorderedSet};
 use near_sdk::json_types::{Base64VecU8, U128};
 use near_sdk::serde::{Deserialize, Serialize};
+use near_sdk::serde_json::json;
 use near_sdk::{
-    env, ext_contract, near_bindgen, AccountId, Balance, Gas, PanicOnDefault, Promise,
+    env, ext_contract, near_bindgen, require, AccountId, Balance, Gas, PanicOnDefault, Promise,
     PromiseOrValue, PublicKey, ONE_NEAR,
 };
 
@@ -74,6 +75,14 @@ const TOKEN_TIMESTAMP_MAP_PREFIX: &[u8] = b"aTT";
 
 pub type Mask = u128;
 
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct BasicMetadata {
+    pub name: String,
+    pub symbol: String,
+    pub decimals: u8,
+}
+
 #[derive(Debug, Eq, PartialEq, BorshSerialize, BorshDeserialize)]
 pub enum ResultType {
     Withdraw {
@@ -96,6 +105,7 @@ pub enum Role {
     UpgradableCodeStager,
     UpgradableCodeDeployer,
     ForceWithdrawer,
+    Controller,
 }
 
 #[near_bindgen]
@@ -187,7 +197,7 @@ pub trait ExtBridgeToken {
 
     fn attach_full_access_key(&mut self, public_key: PublicKey) -> Promise;
 
-    fn set_new_controller(&mut self, new_controller: Option<AccountId>);
+    fn set_controller(&mut self, controller: AccountId);
 }
 
 pub fn assert_self() {
@@ -446,6 +456,7 @@ impl BridgeTokenFactory {
     }
 
     #[allow(unused_variables)]
+    #[result_serializer(borsh)]
     pub fn finish_withdraw_v2(
         &mut self,
         #[serializer(borsh)] sender_id: AccountId,
@@ -500,6 +511,28 @@ impl BridgeTokenFactory {
             )
     }
 
+    #[payable]
+    #[access_control_any(roles(Role::Controller))]
+    pub fn deploy_token(&mut self, account_id: AccountId, metadata: &BasicMetadata) -> Promise {
+        require!(
+            env::attached_deposit() >= BRIDGE_TOKEN_INIT_BALANCE,
+            "ERR_NOT_ENOUGH_ATTACHED_BALANCE"
+        );
+
+        Promise::new(account_id)
+            .create_account()
+            .transfer(BRIDGE_TOKEN_INIT_BALANCE)
+            .deploy_contract(BRIDGE_TOKEN_BINARY.to_vec())
+            .function_call(
+                "new".to_string(),
+                json!({"controller": env::predecessor_account_id(), "metadata": metadata})
+                    .to_string()
+                    .into_bytes(),
+                NO_DEPOSIT,
+                BRIDGE_TOKEN_NEW,
+            )
+    }
+
     /// Upgrades and migrates the bridge token contract to the current version.
     ///
     /// # Arguments
@@ -516,7 +549,7 @@ impl BridgeTokenFactory {
         )
     }
 
-    /// Propose new controller for the provided tokens
+    /// Set new controller for the provided tokens
     ///
     /// # Arguments
     ///
@@ -524,15 +557,17 @@ impl BridgeTokenFactory {
     /// * `new_controller`: New controller for tokens
     ///
     #[access_control_any(roles(Role::DAO))]
-    pub fn propose_new_controller_for_tokens(
+    pub fn set_controller_for_tokens(
         &self,
         tokens_account_id: Vec<AccountId>,
         new_controller: AccountId,
     ) {
+        require!(self.acl_has_role(Role::Controller.into(), new_controller.clone()));
+
         for token_account_id in tokens_account_id {
             ext_bridge_token::ext(token_account_id)
                 .with_static_gas(SET_CONTROLLER_GAS)
-                .set_new_controller(Some(new_controller.clone()));
+                .set_controller(new_controller.clone());
         }
     }
 
