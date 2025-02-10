@@ -119,11 +119,9 @@ impl BridgeToken {
             "Only controller can call mint"
         );
 
-        self.storage_deposit(Some(account_id.clone()), None);
         if let Some(msg) = msg {
             self.token
                 .internal_deposit(&env::predecessor_account_id(), amount.into());
-
             self.ft_transfer_call(account_id, amount, None, msg)
         } else {
             self.token.internal_deposit(&account_id, amount.into());

@@ -34,6 +34,8 @@ const BRIDGE_TOKEN_NEW: Gas = Gas(Gas::ONE_TERA.0 * 10);
 /// Gas to call mint method on bridge token.
 const MINT_GAS: Gas = Gas(Gas::ONE_TERA.0 * 10);
 
+const STORAGE_DEPOSIT_GAS: Gas = Gas(Gas::ONE_TERA.0 * 3);
+
 /// Gas to call finish deposit method.
 /// This doesn't cover the gas required for calling mint method.
 const FINISH_DEPOSIT_GAS: Gas = Gas(Gas::ONE_TERA.0 * 30);
@@ -198,6 +200,8 @@ pub trait ExtBridgeToken {
     fn attach_full_access_key(&mut self, public_key: PublicKey) -> Promise;
 
     fn set_controller(&mut self, controller: AccountId);
+
+    fn storage_deposit(&mut self, account_id: Option<AccountId>, registration_only: Option<bool>);
 }
 
 pub fn assert_self() {
@@ -419,9 +423,17 @@ impl BridgeTokenFactory {
             target, message
         ));
 
+        let deposit = if message.is_none() { 0 } else { 1 };
+
+        let storage_deposit = env::attached_deposit() - required_deposit - deposit;
+        ext_bridge_token::ext(self.get_bridge_token_account_id(token.clone()))
+            .with_static_gas(STORAGE_DEPOSIT_GAS)
+            .with_attached_deposit(storage_deposit)
+            .storage_deposit(Some(target.clone()), None);
+
         ext_bridge_token::ext(self.get_bridge_token_account_id(token))
             .with_static_gas(MINT_GAS + FT_TRANSFER_CALL_GAS)
-            .with_attached_deposit(env::attached_deposit() - required_deposit)
+            .with_attached_deposit(deposit)
             .mint(target, amount.into(), message)
     }
 
