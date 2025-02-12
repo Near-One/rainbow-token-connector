@@ -421,7 +421,7 @@ impl BridgeTokenFactory {
 
         ext_bridge_token::ext(self.get_bridge_token_account_id(token))
             .with_static_gas(MINT_GAS + FT_TRANSFER_CALL_GAS)
-            .with_attached_deposit( env::attached_deposit() - required_deposit)
+            .with_attached_deposit(env::attached_deposit() - required_deposit)
             .mint(target, amount.into(), message)
     }
 
