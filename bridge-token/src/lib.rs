@@ -247,10 +247,14 @@ impl BridgeToken {
         memo: Option<String>,
         msg: String,
     ) -> PromiseOrValue<U128> {
-        require!(env::prepaid_gas() > GAS_FOR_FT_TRANSFER_CALL, "More gas is required");
+        require!(
+            env::prepaid_gas() > GAS_FOR_FT_TRANSFER_CALL,
+            "More gas is required"
+        );
         let sender_id = env::predecessor_account_id();
         let amount: Balance = amount.into();
-        self.token.internal_transfer(&sender_id, &receiver_id, amount, memo);
+        self.token
+            .internal_transfer(&sender_id, &receiver_id, amount, memo);
         let receiver_gas = env::prepaid_gas()
             .0
             .checked_sub(GAS_FOR_FT_TRANSFER_CALL.0)
