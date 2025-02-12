@@ -16,6 +16,8 @@ const FINISH_WITHDRAW_GAS: Gas = Gas(Gas::ONE_TERA.0 * 50);
 const OUTER_UPGRADE_GAS: Gas = Gas(Gas::ONE_TERA.0 * 15);
 const NO_DEPOSIT: Balance = 0;
 const CURRENT_STATE_VERSION: u32 = 2;
+const GAS_FOR_RESOLVE_TRANSFER: Gas = Gas(5_000_000_000_000);
+const GAS_FOR_FT_TRANSFER_CALL: Gas = Gas(25_000_000_000_000 + GAS_FOR_RESOLVE_TRANSFER.0);
 
 pub type Mask = u128;
 
@@ -55,6 +57,26 @@ pub trait ExtBridgeTokenFactory {
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] recipient: String,
     ) -> Promise;
+}
+
+#[ext_contract(ext_ft_receiver)]
+pub trait ExtFungibleTokenReceiver {
+    fn ft_on_transfer(
+        &mut self,
+        sender_id: AccountId,
+        amount: U128,
+        msg: String,
+    ) -> PromiseOrValue<U128>;
+}
+
+#[ext_contract(ext_ft_resolver)]
+pub trait ExtFungibleTokenResolver {
+    fn ft_resolve_transfer(
+        &mut self,
+        sender_id: AccountId,
+        receiver_id: AccountId,
+        amount: U128,
+    ) -> U128;
 }
 
 #[near_bindgen]
@@ -119,10 +141,11 @@ impl BridgeToken {
             "Only controller can call mint"
         );
 
+        self.storage_deposit(Some(account_id.clone()), None);
         if let Some(msg) = msg {
             self.token
                 .internal_deposit(&env::predecessor_account_id(), amount.into());
-            self.ft_transfer_call(account_id, amount, None, msg)
+            self.ft_transfer_call_inner(account_id, amount, None, msg)
         } else {
             self.token.internal_deposit(&account_id, amount.into());
             PromiseOrValue::Value(amount)
@@ -212,6 +235,36 @@ impl BridgeToken {
 
     pub fn version(&self) -> String {
         env!("CARGO_PKG_VERSION").to_owned()
+    }
+}
+
+#[near_bindgen]
+impl BridgeToken {
+    fn ft_transfer_call_inner(
+        &mut self,
+        receiver_id: AccountId,
+        amount: U128,
+        memo: Option<String>,
+        msg: String,
+    ) -> PromiseOrValue<U128> {
+        require!(env::prepaid_gas() > GAS_FOR_FT_TRANSFER_CALL, "More gas is required");
+        let sender_id = env::predecessor_account_id();
+        let amount: Balance = amount.into();
+        self.token.internal_transfer(&sender_id, &receiver_id, amount, memo);
+        let receiver_gas = env::prepaid_gas()
+            .0
+            .checked_sub(GAS_FOR_FT_TRANSFER_CALL.0)
+            .unwrap_or_else(|| env::panic_str("Prepaid gas overflow"));
+        // Initiating receiver's call and the callback
+        ext_ft_receiver::ext(receiver_id.clone())
+            .with_static_gas(receiver_gas.into())
+            .ft_on_transfer(sender_id.clone(), amount.into(), msg)
+            .then(
+                ext_ft_resolver::ext(env::current_account_id())
+                    .with_static_gas(GAS_FOR_RESOLVE_TRANSFER)
+                    .ft_resolve_transfer(sender_id, receiver_id, amount.into()),
+            )
+            .into()
     }
 }
 
