@@ -1,6 +1,8 @@
 use near_contract_standards::fungible_token::metadata::{
     FungibleTokenMetadata, FungibleTokenMetadataProvider, FT_METADATA_SPEC,
 };
+use near_contract_standards::fungible_token::receiver::ext_ft_receiver;
+use near_contract_standards::fungible_token::resolver::ext_ft_resolver;
 use near_contract_standards::fungible_token::FungibleToken;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::json_types::{Base64VecU8, U128};
@@ -57,26 +59,6 @@ pub trait ExtBridgeTokenFactory {
         #[serializer(borsh)] amount: Balance,
         #[serializer(borsh)] recipient: String,
     ) -> Promise;
-}
-
-#[ext_contract(ext_ft_receiver)]
-pub trait ExtFungibleTokenReceiver {
-    fn ft_on_transfer(
-        &mut self,
-        sender_id: AccountId,
-        amount: U128,
-        msg: String,
-    ) -> PromiseOrValue<U128>;
-}
-
-#[ext_contract(ext_ft_resolver)]
-pub trait ExtFungibleTokenResolver {
-    fn ft_resolve_transfer(
-        &mut self,
-        sender_id: AccountId,
-        receiver_id: AccountId,
-        amount: U128,
-    ) -> U128;
 }
 
 #[near_bindgen]
