@@ -168,12 +168,7 @@ pub trait ExtBridgeTokenFactory {
 
 #[ext_contract(ext_bridge_token)]
 pub trait ExtBridgeToken {
-    fn mint(
-        &self,
-        account_id: AccountId,
-        amount: U128,
-        msg: Option<String>,
-    ) -> PromiseOrValue<U128>;
+    fn mint(&self, account_id: AccountId, amount: U128) -> PromiseOrValue<U128>;
 
     fn ft_transfer_call(
         &mut self,
@@ -419,10 +414,22 @@ impl BridgeTokenFactory {
             target, message
         ));
 
-        ext_bridge_token::ext(self.get_bridge_token_account_id(token))
-            .with_static_gas(MINT_GAS + FT_TRANSFER_CALL_GAS)
-            .with_attached_deposit(env::attached_deposit() - required_deposit)
-            .mint(target, amount.into(), message)
+        match message {
+            Some(message) => ext_bridge_token::ext(self.get_bridge_token_account_id(token.clone()))
+                .with_static_gas(MINT_GAS)
+                .with_attached_deposit(env::attached_deposit() - required_deposit - 1)
+                .mint(env::current_account_id(), amount.into())
+                .then(
+                    ext_bridge_token::ext(self.get_bridge_token_account_id(token))
+                        .with_static_gas(FT_TRANSFER_CALL_GAS)
+                        .with_attached_deposit(1)
+                        .ft_transfer_call(target, amount.into(), None, message),
+                ),
+            None => ext_bridge_token::ext(self.get_bridge_token_account_id(token))
+                .with_static_gas(MINT_GAS)
+                .with_attached_deposit(env::attached_deposit() - required_deposit)
+                .mint(target, amount.into()),
+        }
     }
 
     /// Burn given amount of tokens and unlock it on the Ethereum side for the recipient address.
