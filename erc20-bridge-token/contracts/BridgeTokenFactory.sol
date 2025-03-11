@@ -190,14 +190,9 @@ contract BridgeTokenFactory is
         emit Withdraw(token, msg.sender, amount, recipient, tokenEthAddress);
     }
 
-    function mint(address token, address to, uint128 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(_isBridgeToken[token], "ERR_NOT_BRIDGE_TOKEN");
-        BridgeToken(token).mint(to, amount);
-    }
-
-    function burn(address token, uint128 amount) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        require(_isBridgeToken[token], "ERR_NOT_BRIDGE_TOKEN");
-        BridgeToken(token).burn(address(this), amount);
+    function tokenOwnerTransfer(string calldata nearTokenId, address newAdmin) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        ethTokenId = nearToEthToken(nearTokenId);
+        BridgeToken(ethTokenId).transferOwnership(newAdmin);
     }
 
     function pause(uint flags) external onlyRole(DEFAULT_ADMIN_ROLE) {
