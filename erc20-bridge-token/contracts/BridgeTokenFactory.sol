@@ -191,7 +191,8 @@ contract BridgeTokenFactory is
     }
 
     function tokenOwnerTransfer(string calldata nearTokenId, address newAdmin) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        ethTokenId = nearToEthToken(nearTokenId);
+        require(_isBridgeToken[_nearToEthToken[nearTokenId]], "ERR_NOT_BRIDGE_TOKEN");
+        address ethTokenId = _nearToEthToken[nearTokenId];
         BridgeToken(ethTokenId).transferOwnership(newAdmin);
     }
 
