@@ -321,6 +321,15 @@ impl Contract {
         self.eth_factory_address = validate_eth_address(factory_address);
     }
 
+    #[access_control_any(roles(Role::DAO))]
+    #[payable]
+    pub fn transfer_tokens(&mut self, token_id: AccountId, receiver_id: AccountId, amount: U128) -> Promise {
+        ext_token::ext(token_id)
+            .with_attached_deposit(near_sdk::ONE_YOCTO)
+            .with_static_gas(FT_TRANSFER_GAS)
+            .ft_transfer(receiver_id, amount.into(), None)
+    }
+
     /// Record proof to make sure it is not re-used later for anther withdrawal.
     fn record_proof(&mut self, proof_key: &Vec<u8>) -> Balance {
         let initial_storage = env::storage_usage();

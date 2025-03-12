@@ -137,6 +137,22 @@ task('etherscan-verify', 'Verify contract on etherscan')
     });
   });
 
+task("deploy-token-factory-impl", "Deploys the BridgeToken Factory implementation").setAction(
+  async (_, hre) => {
+    const { ethers } = hre
+    const BridgeContractFactory = await ethers.getContractFactory("BridgeTokenFactory")
+    const BridgeContract = await BridgeContractFactory.deploy()
+    await BridgeContract.waitForDeployment()
+    console.log(
+      JSON.stringify({
+        bridgeTokenFactoryImplAddress: await BridgeContract.getAddress(),
+      }),
+    )
+  },
+)
+
+
+
 module.exports = {
   paths: {
     sources: './contracts',
