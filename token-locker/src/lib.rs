@@ -325,7 +325,7 @@ impl Contract {
     #[payable]
     pub fn transfer_tokens(&mut self, token_id: AccountId, receiver_id: AccountId, amount: U128) -> Promise {
         ext_token::ext(token_id)
-            .with_attached_deposit(env::attached_deposit())
+            .with_attached_deposit(near_sdk::ONE_YOCTO)
             .with_static_gas(FT_TRANSFER_GAS)
             .ft_transfer(receiver_id, amount.into(), None)
     }
